@@ -1,0 +1,101 @@
+import ApplicationLogo from "@/Components/ApplicationLogo";
+import Dropdown from "@/Components/Dropdown";
+import { Link, usePage } from "@inertiajs/react";
+import {
+    IconBell,
+    IconChevronDown,
+    IconMenu2,
+} from "@tabler/icons-react";
+
+export default function Header({
+    title,
+    onOpenMobileSidebar,
+    showLogo = true,
+}) {
+    const titleNode =
+        title == null ? null : typeof title === "string" ? (
+            <h1 className="truncate text-lg font-semibold tracking-tight text-gray-900 sm:text-xl">
+                {title}
+            </h1>
+        ) : (
+            title
+        );
+    const user = usePage().props.auth.user;
+
+    return (
+        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-4 border-b border-gray-200/80 bg-white/95 px-4 shadow-sm backdrop-blur-sm sm:px-6 lg:px-8">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+                <button
+                    type="button"
+                    onClick={onOpenMobileSidebar}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 shadow-sm transition hover:bg-gray-50 hover:text-gray-900 lg:hidden"
+                    aria-label="Buka menu"
+                >
+                    <IconMenu2 className="h-5 w-5" stroke={1.5} />
+                </button>
+
+                <div className="flex min-w-0 items-center gap-3">
+                    {showLogo && (
+                        <Link
+                            href={route("dashboard")}
+                            className="hidden shrink-0 sm:block"
+                        >
+                            <ApplicationLogo className="h-8 w-auto fill-current text-gray-800" />
+                        </Link>
+                    )}
+                    {titleNode}
+                </div>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+                <button
+                    type="button"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"
+                    aria-label="Notifikasi"
+                >
+                    <IconBell className="h-5 w-5" stroke={1.5} />
+                </button>
+
+                <Dropdown>
+                    <Dropdown.Trigger>
+                        <button
+                            type="button"
+                            className="flex max-w-[12rem] items-center gap-2 rounded-lg border border-gray-200 bg-white py-1.5 pl-1.5 pr-2 text-left text-sm shadow-sm transition hover:border-gray-300 hover:bg-gray-50"
+                        >
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gray-900 text-xs font-semibold uppercase text-white">
+                                {user.name?.charAt(0) ?? "?"}
+                            </span>
+                            <span className="hidden min-w-0 flex-1 truncate font-medium text-gray-700 md:block">
+                                {user.name}
+                            </span>
+                            <IconChevronDown
+                                className="hidden h-4 w-4 shrink-0 text-gray-400 md:block"
+                                stroke={1.5}
+                            />
+                        </button>
+                    </Dropdown.Trigger>
+                    <Dropdown.Content align="right" width="48">
+                        <div className="border-b border-gray-100 px-4 py-3">
+                            <p className="truncate text-sm font-medium text-gray-900">
+                                {user.name}
+                            </p>
+                            <p className="truncate text-xs text-gray-500">
+                                {user.email}
+                            </p>
+                        </div>
+                        <Dropdown.Link href={route("profile.edit")}>
+                            Profile
+                        </Dropdown.Link>
+                        <Dropdown.Link
+                            href={route("logout")}
+                            method="post"
+                            as="button"
+                        >
+                            Log Out
+                        </Dropdown.Link>
+                    </Dropdown.Content>
+                </Dropdown>
+            </div>
+        </header>
+    );
+}

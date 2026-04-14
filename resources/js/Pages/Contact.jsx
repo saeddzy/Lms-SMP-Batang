@@ -44,11 +44,11 @@ export default function Contact({ auth }) {
                 {/* Navbar */}
                 <nav className="fixed inset-x-0 top-0 z-50 px-4 sm:px-6 py-3">
                     <div className="bg-white/40 backdrop-blur-xl rounded-full w-full max-w-7xl mx-auto mt-6 px-6 sm:px-8 py-3 flex items-center justify-between gap-8 sm:gap-12 shadow-[0_20px_40px_rgba(0,7,103,0.06)]">
-                        <Link href="/" className="text-xl sm:text-2xl font-serif tracking-tighter text-indigo-900 hover:text-indigo-700 transition-colors flex-shrink-0">SMP 3</Link>
+                        <Link href="/" className="text-xl sm:text-2xl font-serif tracking-tighter text-indigo-900 hover:text-indigo-700 transition-colors flex-shrink-0">LMS SMP N 3 Batang</Link>
                         
                         {/* Desktop Navigation */}
                         <div className="hidden md:flex items-center gap-8">
-                            <Link href="/" className="text-xs uppercase tracking-widest font-sans text-slate-500 font-normal hover:text-indigo-700 transition-all duration-300 scale-105 active:scale-95">Home</Link>
+                            <a className="text-xs uppercase tracking-widest font-sans text-slate-500 font-normal hover:text-indigo-700 transition-all duration-300 scale-105 active:scale-95" href="/">Home</a>
                             <Link href={route('features')} className="text-xs uppercase tracking-widest font-sans text-slate-500 font-normal hover:text-indigo-700 transition-all duration-300 scale-105 active:scale-95">Fitur</Link>
                             <Link href={route('contact')} className="text-xs uppercase tracking-widest font-sans text-indigo-900 font-semibold hover:text-indigo-700 transition-all duration-300 scale-105 active:scale-95">Kontak</Link>
                         </div>
@@ -73,11 +73,11 @@ export default function Contact({ auth }) {
                 {/* Mobile Navigation Menu */}
                 {mobileMenuOpen && (
                     <div className="fixed top-20 left-0 right-0 z-40 md:hidden animate-in fade-in slide-in-from-top-2 duration-300">
-                        <div className="glass-card mx-4 max-w-3xl mx-auto rounded-[2rem] border border-white/30 bg-white/15 backdrop-blur-3xl shadow-2xl shadow-slate-900/20 px-6 py-6 space-y-4">
-                            <Link href="/" className="block px-5 py-4 text-sm uppercase tracking-widest font-sans text-slate-700 hover:bg-white/20 rounded-3xl transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
+                        <div className="glass-card max-w-3xl mx-auto rounded-[2rem] border border-white/30 bg-white/15 backdrop-blur-3xl shadow-2xl shadow-slate-900/20 px-6 py-6 space-y-4">
+                            <Link href="/" className="block px-5 py-4 text-sm uppercase tracking-widest font-sans text-slate-600 hover:bg-white/20 rounded-3xl transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
                                 Home
                             </Link>
-                            <Link href={route('features')} className="block px-5 py-4 text-sm uppercase tracking-widest font-sans text-slate-700 hover:bg-white/20 rounded-3xl transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
+                            <Link href={route('features')} className="block px-5 py-4 text-sm uppercase tracking-widest font-sans text-slate-600 hover:bg-white/20 rounded-3xl transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
                                 Fitur
                             </Link>
                             <Link href={route('contact')} className="block px-5 py-4 text-sm uppercase tracking-widest font-sans text-indigo-900 font-semibold hover:bg-white/20 rounded-3xl transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>

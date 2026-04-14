@@ -290,7 +290,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
             <div className="bg-surface text-on-surface overflow-x-hidden">
                 <nav className="fixed inset-x-0 top-0 z-50 px-4 sm:px-6 py-3">
                     <div className="bg-white/40 backdrop-blur-xl rounded-full w-full max-w-7xl mx-auto mt-6 px-6 sm:px-8 py-3 flex items-center justify-between gap-8 sm:gap-12 shadow-[0_20px_40px_rgba(0,7,103,0.06)]">
-                        <Link href="/" className="text-xl sm:text-2xl font-serif tracking-tighter text-indigo-900 hover:text-indigo-700 transition-colors flex-shrink-0">LMS SMP 3 Batang</Link>
+                        <Link href="/" className="text-xl sm:text-2xl font-serif tracking-tighter text-indigo-900 hover:text-indigo-700 transition-colors flex-shrink-0">LMS SMP N 3 Batang</Link>
                         
                         {/* Desktop Navigation */}
                         <div className="hidden md:flex items-center gap-8">

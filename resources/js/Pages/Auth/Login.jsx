@@ -26,6 +26,7 @@ export default function Login({ status, canResetPassword }) {
                 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&amp;family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&amp;display=swap" rel="stylesheet" />
                 <style dangerouslySetInnerHTML={{
                     __html: `
+                        html, body { overflow-x: hidden; max-width: 100%; }
                         body { font-family: 'Manrope', sans-serif; }
                         .font-serif { font-family: 'Newsreader', serif; }
                         .material-symbols-outlined {
@@ -45,9 +46,9 @@ export default function Login({ status, canResetPassword }) {
                     `
                 }} />
             </Head>
-            <main className="flex min-h-screen w-full">
+            <main className="flex min-h-screen w-full max-w-full overflow-x-hidden">
                 {/* Left Side: Immersive Imagery */}
-                <section className="hidden lg:flex relative w-1/2 h-screen overflow-hidden">
+                <section className="hidden min-w-0 lg:flex relative w-1/2 h-screen overflow-hidden">
                     <img alt="Gambar" className="absolute inset-0 w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAQMkScZFnx8Td0-2u3Zb2vN-XGQ7qGAvgO7KNdklUGaWo3vORH5M4cf2hmwpR_-8h9JhfKql8kkIcVTyurBTRFSq78yBBhwG6uOl2JuSDvl2Z8hKTm-pIXMe_Y5Aow6oRRFi-bB9jIoQY9O5rZip9gmpP-bDyv8mF2FKO9v-YQ3ZR4rLhTJ_-G9djUhc671EBXv20RXp8GDFpzW_Hzeti3sJ8cZfsBglupgzFueyeKEDfDS_tDXYSEF0SEg_HIY6Fa3NdSTHDdIYvY" />
                     {/* Glassmorphic Text Overlay */}
                     <div className="absolute inset-0 flex items-center justify-center p-12">
@@ -66,16 +67,18 @@ export default function Login({ status, canResetPassword }) {
                     </div>
                 </section>
                 {/* Right Side: Login Area */}
-                <section className="w-full lg:w-1/2 flex flex-col items-center justify-center px-6 sm:px-12 md:px-16 lg:px-24 bg-surface-bright relative">
-                    {/* Abstract background shape for depth */}
-                    <div className="absolute top-0 right-0 w-96 h-96 bg-primary-fixed/20 rounded-full blur-[120px] -mr-48 -mt-48"></div>
+                <section className="relative flex min-h-screen w-full min-w-0 flex-col items-center justify-start overflow-x-hidden bg-surface-bright px-6 pt-8 pb-24 sm:px-12 sm:pt-10 sm:pb-28 md:px-16 lg:w-1/2 lg:justify-center lg:px-24 lg:py-10 lg:pb-20">
+                    {/* Dekorasi blur — di dalam clip supaya tidak memperlebar halaman (scrollbar) */}
+                    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+                        <div className="absolute -right-16 -top-20 h-72 w-72 rounded-full bg-primary-fixed/20 blur-[100px] sm:h-80 sm:w-80 sm:-right-12 sm:-top-24" />
+                    </div>
                     <div className="w-full max-w-md relative z-10">
                         {/* Branding for Mobile */}
-                        <div className="lg:hidden mb-12 text-center">
+                        <div className="lg:hidden mb-6 text-center">
                             <span className="text-primary font-serif italic text-3xl font-bold">SMP 7 Batang</span>
                         </div>
-                        <div className="mb-12">
-                            <h1 className="font-serif text-3xl md:text-5xl text-on-surface font-light tracking-tight mb-3">Welcome Back</h1>
+                        <div className="mb-8">
+                            <h1 className="font-serif text-3xl md:text-5xl text-on-surface font-light tracking-tight mb-2">Welcome Back</h1>
                             <p className="text-on-surface-variant font-body text-base md:text-lg tracking-wide">Continue your journey through the archives.</p>
                         </div>
                         {status && (
@@ -83,7 +86,7 @@ export default function Login({ status, canResetPassword }) {
                                 {status}
                             </div>
                         )}
-                        <form onSubmit={submit} className="space-y-8">
+                        <form onSubmit={submit} className="space-y-5">
                             {/* Input: Email */}
                             <div className="space-y-3">
                                 <label className="block font-body text-sm font-semibold tracking-widest uppercase text-on-surface-variant ml-1" htmlFor="email">Email</label>
@@ -122,39 +125,40 @@ export default function Login({ status, canResetPassword }) {
                                 </div>
                                 {errors.password && <div className="text-red-500 text-sm mt-2">{errors.password}</div>}
                             </div>
-                            {/* Remember me */}
-                            <div className="flex items-center px-1">
-                                <label className="flex items-center cursor-pointer group">
-                                    <input
-                                        type="checkbox"
-                                        checked={data.remember}
-                                        onChange={(e) => setData('remember', e.target.checked)}
-                                        className="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary-container bg-surface-container-low"
-                                    />
-                                    <span className="ml-3 text-sm font-medium text-on-surface-variant group-hover:text-primary transition-colors">Remember me</span>
-                                </label>
-                            </div>
-                            {/* Actions */}
-                            <div className="flex items-center justify-end gap-8 mt-4">
-                                {canResetPassword && (
-                                    <Link href={route('password.request')} className="text-sm font-semibold text-on-surface-variant hover:text-primary transition-colors underline">
-                                        Forgot your password?
-                                    </Link>
-                                )}
-                                <button
-                                    type="submit"
-                                    disabled={processing}
-                                    className="h-10 md:h-12 px-6 md:px-8 pearlescent-gradient text-white font-body font-bold text-sm tracking-widest rounded-3xl shadow-lg hover:opacity-90 transition-all uppercase disabled:opacity-50"
-                                >
-                                    {processing ? 'Logging in...' : 'LOG IN'}
-                                </button>
+                            {/* Remember me + actions — satu blok rapat (hindari space-y besar di antara) */}
+                            <div className="space-y-4 pt-1">
+                                <div className="flex items-center px-1">
+                                    <label className="flex items-center cursor-pointer group">
+                                        <input
+                                            type="checkbox"
+                                            checked={data.remember}
+                                            onChange={(e) => setData('remember', e.target.checked)}
+                                            className="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary-container bg-surface-container-low"
+                                        />
+                                        <span className="ml-3 text-sm font-medium text-on-surface-variant group-hover:text-primary transition-colors">Remember me</span>
+                                    </label>
+                                </div>
+                                <div className="flex flex-wrap items-center justify-end gap-4 sm:gap-6">
+                                    {canResetPassword && (
+                                        <Link href={route('password.request')} className="order-2 w-full text-center text-sm font-semibold text-on-surface-variant hover:text-primary transition-colors underline sm:order-1 sm:w-auto sm:text-left">
+                                            Forgot your password?
+                                        </Link>
+                                    )}
+                                    <button
+                                        type="submit"
+                                        disabled={processing}
+                                        className="order-1 h-10 md:h-12 px-6 md:px-8 pearlescent-gradient text-white font-body font-bold text-sm tracking-widest rounded-3xl shadow-lg hover:opacity-90 transition-all uppercase disabled:opacity-50 sm:order-2"
+                                    >
+                                        {processing ? 'Logging in...' : 'LOG IN'}
+                                    </button>
+                                </div>
                             </div>
                         </form>
                         
                     </div>
                     {/* Bottom decorative utility */}
-                    <div className="absolute bottom-8 left-0 w-full flex justify-center opacity-40">
-                        <nav className="flex gap-8 text-[10px] uppercase tracking-[0.2em] font-bold text-on-surface-variant">
+                    <div className="absolute bottom-4 left-0 w-full flex justify-center opacity-40 sm:bottom-6">
+                        <nav className="flex gap-6 text-[10px] uppercase tracking-[0.2em] font-bold text-on-surface-variant sm:gap-8">
                             <a className="hover:text-primary transition-colors" href="#">Privacy</a>
                             <a className="hover:text-primary transition-colors" href="#">Ethics</a>
                             <a className="hover:text-primary transition-colors" href="#">Systems</a>
@@ -163,7 +167,7 @@ export default function Login({ status, canResetPassword }) {
                 </section>
             </main>
             {/* Support for background shapes & grain */}
-            <div className="fixed inset-0 pointer-events-none opacity-[0.03] mix-blend-multiply bg-[url('https://www.transparenttextures.com/patterns/natural-paper.png')]"></div>
+            <div className="pointer-events-none fixed inset-0 max-h-full max-w-full overflow-hidden opacity-[0.03] mix-blend-multiply bg-[url('https://www.transparenttextures.com/patterns/natural-paper.png')]"></div>
         </>
     );
 }

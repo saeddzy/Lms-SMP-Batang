@@ -8,7 +8,7 @@ import Checkbox from "@/Components/Checkbox";
 import Swal from "sweetalert2";
 export default function Create() {
     // destruct permissions from usepage props
-    const { permissions } = usePage().props;
+    const { permissions = [] } = usePage().props;
 
     // define state with helper inertia
     const { data, setData, post, errors, processing } = useForm({

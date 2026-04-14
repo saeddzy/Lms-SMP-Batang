@@ -4,6 +4,16 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\ClassController;
+use App\Http\Controllers\SubjectController;
+use App\Http\Controllers\MaterialController;
+use App\Http\Controllers\TaskController;
+use App\Http\Controllers\QuizController;
+use App\Http\Controllers\ExamController;
+use App\Http\Controllers\GradeController;
+use App\Http\Controllers\StudentDashboardController;
+use App\Http\Controllers\TeacherDashboardController;
+use App\Http\Controllers\AdminDashboardController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -11,11 +21,22 @@ use Inertia\Inertia;
 Route::get('/', function () {
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
         'laravelVersion' => Application::VERSION,
         'phpVersion' => PHP_VERSION,
     ]);
 });
+
+Route::get('/contact', function () {
+    return Inertia::render('Contact', [
+        'canLogin' => Route::has('login'),
+    ]);
+})->name('contact');
+
+Route::get('/fitur', function () {
+    return Inertia::render('Features', [
+        'canLogin' => Route::has('login'),
+    ]);
+})->name('features');
 
 Route::get('/dashboard', function () {
     return Inertia::render('Dashboard');
@@ -31,6 +52,77 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // LMS Routes
+    // Classes
+    Route::resource('classes', ClassController::class);
+    Route::post('classes/{class}/enroll-students', [ClassController::class, 'enrollStudents'])->name('classes.enroll-students');
+    Route::delete('classes/{class}/remove-student/{student}', [ClassController::class, 'removeStudent'])->name('classes.remove-student');
+    Route::patch('classes/{class}/toggle-active', [ClassController::class, 'toggleActive'])->name('classes.toggle-active');
+
+    // Subjects
+    Route::resource('subjects', SubjectController::class);
+
+    // Materials — file harus sebelum resource agar /materials/{id}/file tidak tertangkap sebagai {material}
+    Route::get('materials/{material}/file', [MaterialController::class, 'serveFile'])->name('materials.file');
+    Route::resource('materials', MaterialController::class);
+    Route::patch('materials/{material}/toggle-status', [MaterialController::class, 'toggleStatus'])->name('materials.toggle-status');
+    Route::post('materials/{material}/duplicate', [MaterialController::class, 'duplicate'])->name('materials.duplicate');
+
+    // Tasks — rute submit sebelum resource agar {task} tidak tertangkap sebagai "submit"
+    Route::get('tasks/{task}/submit', [TaskController::class, 'submitPage'])->name('tasks.submit-page');
+    Route::post('tasks/{task}/submit', [TaskController::class, 'submit'])->name('tasks.submit');
+    Route::post('tasks/{task}/grade/{submission}', [TaskController::class, 'gradeSubmission'])->name('tasks.grade-submission');
+    Route::patch('tasks/{task}/toggle-status', [TaskController::class, 'toggleStatus'])->name('tasks.toggle-status');
+    Route::resource('tasks', TaskController::class);
+
+    // Quizzes
+    Route::post('quizzes/{quiz}/questions', [QuizController::class, 'storeQuestion'])->name('quizzes.questions.store');
+    Route::put('quizzes/{quiz}/questions/{question}', [QuizController::class, 'updateQuestion'])->name('quizzes.questions.update');
+    Route::delete('quizzes/{quiz}/questions/{question}', [QuizController::class, 'destroyQuestion'])->name('quizzes.questions.destroy');
+    Route::get('quizzes/{quiz}/attempts/{attempt}/manual-grade', [QuizController::class, 'manualGradeAttempt'])->name('quizzes.manual-grade');
+    Route::post('quizzes/{quiz}/attempts/{attempt}/manual-grade', [QuizController::class, 'saveManualGradeAttempt'])->name('quizzes.manual-grade.save');
+    Route::resource('quizzes', QuizController::class);
+    Route::get('quizzes/{quiz}/attempt/{attempt}', [QuizController::class, 'attempt'])->name('quizzes.attempt');
+    Route::post('quizzes/{quiz}/start-attempt', [QuizController::class, 'startAttempt'])->name('quizzes.start-attempt');
+    Route::post('quizzes/{quiz}/attempts/{attempt}/submit', [QuizController::class, 'submitAttempt'])->name('quizzes.submit-attempt');
+    Route::patch('quizzes/{quiz}/toggle-status', [QuizController::class, 'toggleStatus'])->name('quizzes.toggle-status');
+
+    // Exams
+    Route::post('exams/{exam}/questions', [ExamController::class, 'storeQuestion'])->name('exams.questions.store');
+    Route::put('exams/{exam}/questions/{question}', [ExamController::class, 'updateQuestion'])->name('exams.questions.update');
+    Route::delete('exams/{exam}/questions/{question}', [ExamController::class, 'destroyQuestion'])->name('exams.questions.destroy');
+    Route::get('exams/{exam}/attempts/{attempt}/manual-grade', [ExamController::class, 'manualGradeAttempt'])->name('exams.manual-grade');
+    Route::post('exams/{exam}/attempts/{attempt}/manual-grade', [ExamController::class, 'saveManualGradeAttempt'])->name('exams.manual-grade.save');
+    Route::resource('exams', ExamController::class);
+    Route::get('exams/{exam}/attempt/{attempt}', [ExamController::class, 'attempt'])->name('exams.attempt');
+    Route::post('exams/{exam}/start-attempt', [ExamController::class, 'startAttempt'])->name('exams.start-attempt');
+    Route::post('exams/{exam}/attempts/{attempt}/submit', [ExamController::class, 'submitAttempt'])->name('exams.submit-attempt');
+    Route::patch('exams/{exam}/cancel', [ExamController::class, 'cancel'])->name('exams.cancel');
+    Route::patch('exams/{exam}/reschedule', [ExamController::class, 'reschedule'])->name('exams.reschedule');
+
+    // Grades
+    Route::resource('grades', GradeController::class);
+    Route::get('grades/export/excel', [GradeController::class, 'exportExcel'])->name('grades.export.excel');
+    Route::get('grades/class/{class}/report', [GradeController::class, 'classReport'])->name('grades.class-report');
+    Route::get('grades/students/{student}/report', [GradeController::class, 'studentReport'])->name('grades.student-report');
+    Route::get('grades/students-by-class/{class}', [GradeController::class, 'getStudentsByClass'])->name('grades.students-by-class');
+    Route::post('grades/bulk-create', [GradeController::class, 'bulkCreate'])->name('grades.bulk-create');
+
+    // Dashboard Routes
+    Route::get('/student/dashboard', [StudentDashboardController::class, 'index'])->name('student.dashboard');
+    Route::get('/student/classes', [StudentDashboardController::class, 'myClasses'])->name('student.classes');
+    Route::get('/student/grades', [StudentDashboardController::class, 'grades'])->name('student.grades');
+    Route::get('/student/tasks', [StudentDashboardController::class, 'tasks'])->name('student.tasks');
+    Route::get('/student/quizzes', [StudentDashboardController::class, 'quizzes'])->name('student.quizzes');
+    Route::get('/student/exams', [StudentDashboardController::class, 'exams'])->name('student.exams');
+
+    Route::get('/teacher/dashboard', [TeacherDashboardController::class, 'index'])->name('teacher.dashboard');
+    Route::get('/teacher/class/{class}/detail', [TeacherDashboardController::class, 'classDetail'])->name('teacher.class-detail');
+    Route::get('/teacher/tasks/{task}/grade', [TeacherDashboardController::class, 'gradeTask'])->name('teacher.grade-task');
+
+    Route::get('/admin/dashboard', [AdminDashboardController::class, 'index'])->name('admin.dashboard');
+    Route::get('/admin/reports', [AdminDashboardController::class, 'reports'])->name('admin.reports');
 });
 
 require __DIR__ . '/auth.php';

@@ -23,3 +23,10 @@ export default function hasAnyPermission(permissions){
 
    
 }
+export function hasRole(role){
+    const { auth } = usePage().props
+    const roles = auth?.roles
+    if (!roles) return false
+    if (Array.isArray(roles)) return roles.includes(role)
+    return Object.values(roles).includes(role)
+}

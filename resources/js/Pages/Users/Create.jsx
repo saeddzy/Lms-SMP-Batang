@@ -9,7 +9,7 @@ import Swal from 'sweetalert2';
 export default function Create() {
 
     // destruct roles from usepage props
-    const { roles } = usePage().props;
+    const { roles = [] } = usePage().props;
 
     // define state with helper inertia
     const { data, setData, post, errors } = useForm({
@@ -26,10 +26,15 @@ export default function Create() {
         label: role.name
     }));
 
+    // Get selected roles for display
+    const selectedRoleOptions = data.selectedRoles.map(roleName => 
+        formattedRoles.find(role => role.value === roleName)
+    ).filter(Boolean);
+
 
 
     const handleSelectedRoles = (selected) => {
-        const selectedValues = selected.map(option => option.value);
+        const selectedValues = selected ? selected.map(option => option.value) : [];
         setData('selectedRoles', selectedValues);
     }
 
@@ -65,7 +70,14 @@ export default function Create() {
                         <div className='flex items-center gap-2 text-sm text-gray-700'>
                                     Roles
                                 </div>
-                        <Select2 onChange={handleSelectedRoles} options={formattedRoles} placeholder="Pilih Role..." />
+                        <Select2 
+                            isMulti={true}
+                            value={selectedRoleOptions}
+                            onChange={handleSelectedRoles} 
+                            options={formattedRoles} 
+                            placeholder="Pilih Role..." 
+                        />
+                        {errors.selectedRoles && <div className='text-xs text-red-500 mt-1'>{errors.selectedRoles}</div>}
                             {/* {selectedOptions && selectedOptions.length > 0 && (
                                 <div>
                                     <h4>Rasa yang Anda pilih:</h4>

@@ -13,18 +13,19 @@ export default function Edit() {
     const { user, roles } = usePage().props;
 
     // define state with helper inertia
-    const { data, setData, post, errors } = useForm({
+    const { data, setData, put, errors } = useForm({
         name : user.name,
         email: user.email,
         selectedRoles : user.roles.map(role => role.name),
-        filterRole : user.roles.map(role => ({
-            value: role.name,
-            label: role.name
-        })),
-        _method: 'put'
     });
 
     const formattedRoles = roles.map(role => ({
+        value: role.name,
+        label: role.name
+    }));
+
+    // Get default selected roles for Select2
+    const defaultSelectedRoles = user.roles.map(role => ({
         value: role.name,
         label: role.name
     }));
@@ -33,7 +34,7 @@ export default function Edit() {
 
     // define method handleSelectedroles
     const handleSelectedRoles = (selected) => {
-        const selectedValues = selected.map(option => option.value);
+        const selectedValues = selected ? selected.map(option => option.value) : [];
         setData('selectedRoles', selectedValues);
     }
 
@@ -41,7 +42,7 @@ export default function Edit() {
     const handleUpdateData = async (e) => {
         e.preventDefault();
 
-        post(route('users.update', user.id), {
+        put(route('users.update', user.id), {
             onSuccess: () => {
                 Swal.fire({
                     title: 'Success!',
@@ -69,7 +70,14 @@ export default function Edit() {
                             <div className='flex items-center gap-2 text-sm text-gray-700'>
                                         Roles
                             </div>
-                            <Select2 onChange={handleSelectedRoles}  defaultOptions={data.filterRole} options={formattedRoles}  placeholder="Pilih Role..." />
+                            <Select2 
+                                isMulti={true}
+                                value={defaultSelectedRoles}
+                                onChange={handleSelectedRoles}  
+                                options={formattedRoles}  
+                                placeholder="Pilih Role..." 
+                            />
+                            {errors.selectedRoles && <div className='text-xs text-red-500 mt-1'>{errors.selectedRoles}</div>}
                         </div>
                        
                         <div className='flex items-center gap-2'>

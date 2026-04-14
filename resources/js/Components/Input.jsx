@@ -1,19 +1,65 @@
-import React from 'react'
+import React from "react";
+import clsx from "clsx";
 
-export default function Input({label, type, className, errors, ...props}) {
+const fieldClass =
+    "w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-800 shadow-sm transition-colors placeholder:text-stone-400 focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-400";
+
+function Input({ type = "text", className = "", ...props }) {
     return (
-        <div className='flex flex-col gap-2'>
-            <label className='text-gray-600 text-sm'>
-                {label}
-            </label>
-            <input
-                type={type}
-                className={`w-full px-4 py-2 border text-sm rounded-md focus:outline-none focus:ring-0 bg-white text-gray-700 focus:border-gray-200 border-gray-200 ${className}`}
-                {...props}
-            />
-            {errors && (
-                <small className='text-xs text-red-500'>{errors}</small>
-            )}
-        </div>
-    )
+        <input
+            type={type}
+            className={clsx(fieldClass, className)}
+            {...props}
+        />
+    );
 }
+
+function Label({ htmlFor, value, className = "" }) {
+    return (
+        <label
+            htmlFor={htmlFor}
+            className={clsx("text-sm font-medium text-stone-600", className)}
+        >
+            {value}
+        </label>
+    );
+}
+
+function Error({ message, className = "" }) {
+    if (!message) return null;
+
+    return (
+        <p className={clsx("text-xs text-red-600", className)}>{message}</p>
+    );
+}
+
+function Text(props) {
+    return <Input type="text" {...props} />;
+}
+
+function DateInput(props) {
+    return <Input type="date" {...props} />;
+}
+
+function TimeInput(props) {
+    return <Input type="time" {...props} />;
+}
+
+/** Gabungan tanggal + jam (zona waktu lokal browser). */
+function DateTimeLocalInput(props) {
+    return <Input type="datetime-local" step={60} {...props} />;
+}
+
+function NumberInput(props) {
+    return <Input type="number" {...props} />;
+}
+
+Input.Label = Label;
+Input.Error = Error;
+Input.Text = Text;
+Input.Date = DateInput;
+Input.Time = TimeInput;
+Input.DateTimeLocal = DateTimeLocalInput;
+Input.Number = NumberInput;
+
+export default Input;

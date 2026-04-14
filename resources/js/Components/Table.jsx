@@ -1,49 +1,66 @@
-import React from 'react'
+import clsx from "clsx";
 
 const Card = ({ title, className, children }) => {
     return (
-        <>
-            <div className={`p-4 rounded-t-lg border ${className} bg-white`}>
-                <div className='flex items-center gap-2 font-semibold text-sm text-gray-700 uppercase'>
-                    {title}
+        <div
+            className={clsx(
+                "overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-sm",
+                className
+            )}
+        >
+            {title ? (
+                <div className="border-b border-stone-100 px-5 py-4">
+                    <h2 className="text-sm font-semibold tracking-tight text-stone-900 capitalize">
+                        {title}
+                    </h2>
                 </div>
-            </div>
-            <div className='bg-white rounded-b-lg border-t-0'>
-                {children}
-            </div>
-        </>
-
-    )
-}
+            ) : null}
+            {children}
+        </div>
+    );
+};
 
 const Table = ({ children }) => {
     return (
-        <div className="w-full overflow-hidden overflow-x-auto border-collapse rounded-b-lg border border-t-0">
-            <table className="w-full text-sm">
-                {children}
-            </table>
+        <div className="w-full overflow-x-auto">
+            <table className="w-full text-sm">{children}</table>
         </div>
     );
 };
 
 const Thead = ({ className, children }) => {
     return (
-        <thead className={`${className} border-b bg-gray-50`}>{children}</thead>
+        <thead
+            className={clsx(
+                "border-b border-stone-100 bg-stone-50/90",
+                className
+            )}
+        >
+            {children}
+        </thead>
     );
 };
 
 const Tbody = ({ className, children }) => {
     return (
-        <tbody className={`${className} divide-y bg-white`}>
+        <tbody
+            className={clsx(
+                "divide-y divide-stone-100 bg-white [&_tr]:transition-colors [&_tr:hover]:bg-stone-50/70",
+                className
+            )}
+        >
             {children}
         </tbody>
     );
 };
 
-const Td = ({ className, children}) => {
+const Td = ({ className, children }) => {
     return (
         <td
-            className={`${className} whitespace-nowrap p-4 align-middle text-gray-700`}
+            className={clsx(
+                "whitespace-nowrap px-5 py-3.5 align-middle text-stone-700",
+                className
+            )}
         >
             {children}
         </td>
@@ -54,35 +71,50 @@ const Th = ({ className, children }) => {
     return (
         <th
             scope="col"
-            className={`${className} h-12 px-4 text-left align-middle font-medium text-gray-700`}
+            className={clsx(
+                "h-11 px-5 text-left align-middle text-xs font-medium uppercase tracking-wider text-stone-500",
+                className
+            )}
         >
             {children}
         </th>
     );
 };
 
-const Empty = ({colSpan, message, children}) => {
+const Footer = ({ className, children }) => {
+    return (
+        <div
+            className={clsx(
+                "border-t border-stone-100 bg-stone-50/50 px-5 py-4",
+                className
+            )}
+        >
+            {children}
+        </div>
+    );
+};
+
+const Empty = ({ colSpan, message, children }) => {
     return (
         <tr>
             <td colSpan={colSpan}>
-                <div className="flex items-center justify-center h-96">
-                    <div className="text-center">
+                <div className="flex h-48 items-center justify-center">
+                    <div className="text-center text-stone-500">
                         {children}
-                        <div className="mt-5">
-                            {message}
-                        </div>
+                        <div className="mt-2 text-sm">{message}</div>
                     </div>
                 </div>
             </td>
         </tr>
-    )
-}
+    );
+};
 
 Table.Card = Card;
 Table.Thead = Thead;
 Table.Tbody = Tbody;
 Table.Td = Td;
 Table.Th = Th;
+Table.Footer = Footer;
 Table.Empty = Empty;
 
 export default Table;

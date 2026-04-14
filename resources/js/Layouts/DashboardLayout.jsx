@@ -58,7 +58,7 @@ export default function DashboardLayout({
     const displayTitle = title ?? header;
 
     return (
-        <div className="min-h-screen bg-[#f8f9fb]">
+        <div className="min-h-screen bg-slate-50">
             <Sidebar
                 collapsed={hydrated ? collapsed : false}
                 onToggleCollapse={toggleCollapsed}

@@ -1,360 +1,726 @@
 import { Head, Link } from '@inertiajs/react';
+import { useState } from 'react';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Autoplay, Pagination, EffectCoverflow } from 'swiper/modules';
+import 'swiper/css';
+import 'swiper/css/pagination';
+import 'swiper/css/effect-coverflow';
 
 export default function Welcome({ auth, laravelVersion, phpVersion }) {
-    const handleImageError = () => {
-        document
-            .getElementById('screenshot-container')
-            ?.classList.add('!hidden');
-        document.getElementById('docs-card')?.classList.add('!row-span-1');
-        document
-            .getElementById('docs-card-content')
-            ?.classList.add('!flex-row');
-        document.getElementById('background')?.classList.add('!hidden');
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [activeSlide, setActiveSlide] = useState(0);
+    const totalSlides = 3;
+
+    const authButton = auth?.user
+        ? { href: route('dashboard'), label: 'Dashboard' }
+        : { href: route('login'), label: 'Login' };
+    const schoolImages = {
+        building: '/images/gedung-depan-smp3-e1569509634282.jpg',
+        medal: '/images/Penyerahan-Medali-KS_web.jpg',
+        staff: '/images/Foto-Guru-Karyawan-2019-1-2-e1569476157519.jpeg',
+        trophy: '/images/Piala-Bergilir-web.png',
     };
+    const fileUrl = (path) => encodeURI(path).replace(/\+/g, '%2B');
+    const normalizeLabel = (text) =>
+        text
+            .replace(/[-_]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .replace(/\bWali kelas\b/gi, 'Wali Kelas')
+            .replace(/\bGuru\b/gi, 'Guru')
+            .trim();
+    const buildTeacherProfile = (path) => {
+        const rawName = decodeURIComponent(path)
+            .replace('/images/guru/', '')
+            .replace(/\.(png|jpe?g|webp)$/i, '')
+            .replace(/\bscaled\b/gi, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const [namePart, rolePart] = rawName.split(/\s+Guru\s+/i);
+        const name = normalizeLabel(namePart || rawName);
+        const role = rolePart
+            ? `Guru ${normalizeLabel(rolePart)}`
+            : 'Guru SMP Negeri 3 Batang';
+
+        return {
+            name,
+            role,
+            description: 'Mendampingi siswa berkembang secara akademik, karakter, dan keterampilan hidup di lingkungan sekolah yang suportif.',
+            photo: fileUrl(path),
+        };
+    };
+    const principal = {
+        name: 'Budiyatmaka',
+        role: 'Kepala Sekolah',
+        description: 'Memimpin transformasi pembelajaran yang berfokus pada karakter, prestasi, dan budaya sekolah yang positif.',
+        photo: fileUrl('/images/guru/Budiyatmaka-kepala sekolah.png'),
+    };
+    const teacherImagePaths = [
+        '/images/guru/Umi-Haniin-S.-Pd Guru IPA + Wali Kelas 7 A.jpg',
+        '/images/guru/Sinta-Kusumawati-S.-Pd Guru Seni Budaya + Ur. Humas.jpg',
+        '/images/guru/Margining-Utami-S.-Pd Guru B. Indonesia + Ka Perpus + BOS.jpg',
+        '/images/guru/Pratama-Imanda-S.Pd-M.M Guru Seni Budaya + Ur. Kurikulum.png',
+        '/images/guru/Mursito-Adi-S.-Pd Guru PJOK + Ur. Kesiswaan.png',
+        '/images/guru/Nufindah-Pribadi-S.-Pd-M.-Pd Guru IPS Wali Kelas VIII D.jpg',
+        '/images/guru/Dita-Isfandiari-S.-Psi-MM Guru BK Wali Kelas 9 C.jpg',
+        '/images/guru/Muhammad-Labib-M.-Pd-scaled Guru PAI + Sarpras + Wali Kelas 9A.jpg',
+        '/images/guru/Mahardika-Adhi-Filando-S.-Pd Guru B. indonesia + Wali Kelas 9 G.jpg',
+        '/images/guru/Yudha-Anggarina-K-S.-Pd Guru PJOK + WKS2.jpg',
+        '/images/guru/Mohamad-Yakop-SE-M.Kom_ Guru IPS + WKS.jpg',
+        '/images/guru/Mohammad-Gurawan-S.-Pd-M.-Pd Wali kelas 8B.jpg',
+        '/images/guru/Sabar-S.-Pd-MT Guru Bahasa Inggris.jpg',
+        '/images/guru/Khaerodin-S.-Pd Guru B. Inggris.jpg',
+        '/images/guru/Erma-Fatmawati-S.-Pd Guru IPA + Wali Kelas 9E.jpg',
+        '/images/guru/Pardi-S.-Pd Guru Matematika Wali kelas 7D.jpg',
+    ];
+    const teachers = teacherImagePaths.map(buildTeacherProfile);
 
     return (
         <>
-            <Head title="Welcome" />
-            <div className="bg-gray-50 text-black/50 dark:bg-black dark:text-white/50">
-                <img
-                    id="background"
-                    className="absolute -left-20 top-0 max-w-[877px]"
-                    src="https://laravel.com/assets/img/welcome/background.svg"
-                />
-                <div className="relative flex min-h-screen flex-col items-center justify-center selection:bg-[#FF2D20] selection:text-white">
-                    <div className="relative w-full max-w-2xl px-6 lg:max-w-7xl">
-                        <header className="grid grid-cols-2 items-center gap-2 py-10 lg:grid-cols-3">
-                            <div className="flex lg:col-start-2 lg:justify-center">
-                                <svg
-                                    className="h-12 w-auto text-white lg:h-16 lg:text-[#FF2D20]"
-                                    viewBox="0 0 62 65"
-                                    fill="none"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                >
-                                    <path
-                                        d="M61.8548 14.6253C61.8778 14.7102 61.8895 14.7978 61.8897 14.8858V28.5615C61.8898 28.737 61.8434 28.9095 61.7554 29.0614C61.6675 29.2132 61.5409 29.3392 61.3887 29.4265L49.9104 36.0351V49.1337C49.9104 49.4902 49.7209 49.8192 49.4118 49.9987L25.4519 63.7916C25.3971 63.8227 25.3372 63.8427 25.2774 63.8639C25.255 63.8714 25.2338 63.8851 25.2101 63.8913C25.0426 63.9354 24.8666 63.9354 24.6991 63.8913C24.6716 63.8838 24.6467 63.8689 24.6205 63.8589C24.5657 63.8389 24.5084 63.8215 24.456 63.7916L0.501061 49.9987C0.348882 49.9113 0.222437 49.7853 0.134469 49.6334C0.0465019 49.4816 0.000120578 49.3092 0 49.1337L0 8.10652C0 8.01678 0.0124642 7.92953 0.0348998 7.84477C0.0423783 7.8161 0.0598282 7.78993 0.0697995 7.76126C0.0884958 7.70891 0.105946 7.65531 0.133367 7.6067C0.152063 7.5743 0.179485 7.54812 0.20192 7.51821C0.230588 7.47832 0.256763 7.43719 0.290416 7.40229C0.319084 7.37362 0.356476 7.35243 0.388883 7.32751C0.425029 7.29759 0.457436 7.26518 0.498568 7.2415L12.4779 0.345059C12.6296 0.257786 12.8015 0.211853 12.9765 0.211853C13.1515 0.211853 13.3234 0.257786 13.475 0.345059L25.4531 7.2415H25.4556C25.4955 7.26643 25.5292 7.29759 25.5653 7.32626C25.5977 7.35119 25.6339 7.37362 25.6625 7.40104C25.6974 7.43719 25.7224 7.47832 25.7523 7.51821C25.7735 7.54812 25.8021 7.5743 25.8196 7.6067C25.8483 7.65656 25.8645 7.70891 25.8844 7.76126C25.8944 7.78993 25.9118 7.8161 25.9193 7.84602C25.9423 7.93096 25.954 8.01853 25.9542 8.10652V33.7317L35.9355 27.9844V14.8846C35.9355 14.7973 35.948 14.7088 35.9704 14.6253C35.9792 14.5954 35.9954 14.5692 36.0053 14.5405C36.0253 14.4882 36.0427 14.4346 36.0702 14.386C36.0888 14.3536 36.1163 14.3274 36.1375 14.2975C36.1674 14.2576 36.1923 14.2165 36.2272 14.1816C36.2559 14.1529 36.292 14.1317 36.3244 14.1068C36.3618 14.0769 36.3942 14.0445 36.4341 14.0208L48.4147 7.12434C48.5663 7.03694 48.7383 6.99094 48.9133 6.99094C49.0883 6.99094 49.2602 7.03694 49.4118 7.12434L61.3899 14.0208C61.4323 14.0457 61.4647 14.0769 61.5021 14.1055C61.5333 14.1305 61.5694 14.1529 61.5981 14.1803C61.633 14.2165 61.6579 14.2576 61.6878 14.2975C61.7103 14.3274 61.7377 14.3536 61.7551 14.386C61.7838 14.4346 61.8 14.4882 61.8199 14.5405C61.8312 14.5692 61.8474 14.5954 61.8548 14.6253ZM59.893 27.9844V16.6121L55.7013 19.0252L49.9104 22.3593V33.7317L59.8942 27.9844H59.893ZM47.9149 48.5566V37.1768L42.2187 40.4299L25.953 49.7133V61.2003L47.9149 48.5566ZM1.99677 9.83281V48.5566L23.9562 61.199V49.7145L12.4841 43.2219L12.4804 43.2194L12.4754 43.2169C12.4368 43.1945 12.4044 43.1621 12.3682 43.1347C12.3371 43.1097 12.3009 43.0898 12.2735 43.0624L12.271 43.0586C12.2386 43.0275 12.2162 42.9888 12.1887 42.9539C12.1638 42.9203 12.1339 42.8916 12.114 42.8567L12.1127 42.853C12.0903 42.8156 12.0766 42.7707 12.0604 42.7283C12.0442 42.6909 12.023 42.656 12.013 42.6161C12.0005 42.5688 11.998 42.5177 11.9931 42.4691C11.9881 42.4317 11.9781 42.3943 11.9781 42.3569V15.5801L6.18848 12.2446L1.99677 9.83281ZM12.9777 2.36177L2.99764 8.10652L12.9752 13.8513L22.9541 8.10527L12.9752 2.36177H12.9777ZM18.1678 38.2138L23.9574 34.8809V9.83281L19.7657 12.2459L13.9749 15.5801V40.6281L18.1678 38.2138ZM48.9133 9.14105L38.9344 14.8858L48.9133 20.6305L58.8909 14.8846L48.9133 9.14105ZM47.9149 22.3593L42.124 19.0252L37.9323 16.6121V27.9844L43.7219 31.3174L47.9149 33.7317V22.3593ZM24.9533 47.987L39.59 39.631L46.9065 35.4555L36.9352 29.7145L25.4544 36.3242L14.9907 42.3482L24.9533 47.987Z"
-                                        fill="currentColor"
-                                    />
-                                </svg>
+            <Head>
+                <meta charSet="utf-8" />
+                <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+                <title>SMP 3 | Batang</title>
+                <link rel="preconnect" href="https://fonts.googleapis.com" />
+                <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin />
+                <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&amp;family=Manrope:wght@200..800&amp;display=swap" rel="stylesheet" />
+                <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet" />
+                <style dangerouslySetInnerHTML={{
+                    __html: `
+                        body { font-family: 'Manrope', sans-serif; background-color: #faf9f6; overflow-y: scroll; }
+                        .font-serif { font-family: 'Newsreader', serif; }
+                        .glass-card {
+                            background: rgba(255, 255, 255, 0.4);
+                            backdrop-filter: blur(20px);
+                            -webkit-backdrop-filter: blur(20px);
+                        }
+                        .pearlescent-gradient {
+                            background: linear-gradient(135deg, #000666 0%, #1a237e 100%);
+                        }
+                        .material-symbols-outlined {
+                            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+                        }
+                        .hero-door {
+                            position: relative;
+                            overflow: hidden;
+                            box-shadow: 0 40px 120px rgba(15, 23, 42, 0.14);
+                            clip-path: polygon(15% 0, 85% 0, 100% 10%, 100% 100%, 0 100%, 0 10%);
+                        }
+                        .hero-door::before {
+                            content: '';
+                            position: absolute;
+                            inset: 0;
+                            background: linear-gradient(180deg, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0.28) 35%, rgba(0, 0, 0, 0.05) 70%, transparent 100%);
+                            pointer-events: none;
+                        }
+                        .hero-door img {
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            width: 100%;
+                            height: 100%;
+                            object-fit: cover;
+                            transform: scale(1.06);
+                            filter: brightness(0.75) saturate(1.1);
+                            clip-path: inherit;
+                        }
+                        .hamburger-icon {
+                            transition: transform 0.3s ease-in-out;
+                        }
+                        .hamburger-icon.open {
+                            transform: rotate(90deg);
+                        }
+                        .carousel-swiper .swiper-button-prev,
+                        .carousel-swiper .swiper-button-next {
+                            color: white;
+                            opacity: 0.95;
+                            width: 2.5rem;
+                            height: 2.5rem;
+                        }
+                        .carousel-swiper .swiper-button-prev::after,
+                        .carousel-swiper .swiper-button-next::after {
+                            font-size: 1.4rem;
+                        }
+                        .custom-pagination {
+                            position: relative;
+                            height: 0.45rem;
+                            background: rgba(255, 255, 255, 0.18);
+                            border-radius: 9999px;
+                            overflow: hidden;
+                            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);
+                        }
+                        .custom-pagination .swiper-pagination-progressbar-fill {
+                            background: linear-gradient(90deg, rgba(255,255,255,0.96), rgba(255,255,255,0.85));
+                            border-radius: 9999px;
+                            transition: width 0.45s ease;
+                            box-shadow: inset 0 0 12px rgba(255,255,255,0.35);
+                        }
+                        .custom-pagination::before {
+                            content: '';
+                            position: absolute;
+                            inset: 0;
+                            border-radius: 9999px;
+                            background: linear-gradient(90deg, rgba(255,255,255,0.12), transparent 55%);
+                            pointer-events: none;
+                        }
+                        .swiper-pagination-bullet,
+                        .swiper-pagination-bullet-active {
+                            display: none;
+                        }
+                        .teacher-swiper .swiper-slide {
+                            height: auto;
+                        }
+                        .teacher-card {
+                            position: relative;
+                            overflow: hidden;
+                            border-radius: 1.5rem;
+                            height: 19rem;
+                            box-shadow: 0 18px 44px rgba(2, 6, 23, 0.14);
+                        }
+                        .teacher-card--principal {
+                            height: 21rem;
+                        }
+                        .teacher-card::after {
+                            content: '';
+                            position: absolute;
+                            inset: 0;
+                            background: linear-gradient(180deg, rgba(2, 6, 23, 0.05) 35%, rgba(2, 6, 23, 0.5) 100%);
+                            transition: opacity 260ms ease;
+                        }
+                        .teacher-card img {
+                            width: 100%;
+                            height: 100%;
+                            object-fit: cover;
+                            object-position: center 30%;
+                            transition: transform 450ms ease;
+                        }
+                        .teacher-card:hover img {
+                            transform: scale(1.06);
+                        }
+                        .teacher-card .teacher-info {
+                            position: absolute;
+                            left: 1rem;
+                            right: 1rem;
+                            bottom: 1rem;
+                            z-index: 2;
+                            color: white;
+                            backdrop-filter: blur(8px);
+                            background: rgba(15, 23, 42, 0.38);
+                            border: 1px solid rgba(255,255,255,0.2);
+                            border-radius: 1rem;
+                            padding: 0.95rem;
+                            opacity: 0;
+                            transform: translateY(14px);
+                            pointer-events: none;
+                            transition: opacity 220ms ease, transform 260ms ease;
+                        }
+                        .teacher-card:hover::after {
+                            opacity: 1;
+                        }
+                        .teacher-card:hover .teacher-info {
+                            opacity: 1;
+                            transform: translateY(0);
+                        }
+                        .teacher-card .teacher-name-inline {
+                            position: absolute;
+                            z-index: 2;
+                            left: 1rem;
+                            right: 1rem;
+                            bottom: 1rem;
+                            color: white;
+                            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+                            transition: opacity 220ms ease, transform 260ms ease;
+                        }
+                        .teacher-card:hover .teacher-name-inline {
+                            opacity: 0;
+                            transform: translateY(8px);
+                        }
+                        @media (max-width: 1024px) {
+                            .teacher-card,
+                            .teacher-card--principal {
+                                height: 18rem;
+                            }
+                        }
+                        @media (max-width: 767px) {
+                            .teacher-card,
+                            .teacher-card--principal {
+                                height: 16.5rem;
+                            }
+                            .carousel-swiper {
+                                height: 15.5rem !important;
+                                max-width: 100%;
+                            }
+                            .carousel-swiper .swiper-slide {
+                                width: min(18rem, 82vw) !important;
+                                height: 15.5rem !important;
+                            }
+                            .carousel-swiper .swiper-slide .w-full.h-full {
+                                min-height: 100%;
+                            }
+                            .carousel-swiper {
+                                touch-action: pan-y pinch-zoom;
+                            }
+                            .carousel-swiper .swiper-slide {
+                                user-select: none;
+                                touch-action: pan-y pinch-zoom;
+                            }
+                            .carousel-swiper .swiper-slide .p-6,
+                            .carousel-swiper .swiper-slide .p-5 {
+                                padding: 0.85rem !important;
+                            }
+                            .carousel-swiper .swiper-slide span {
+                                font-size: 0.66rem;
+                                letter-spacing: 0.32em;
+                            }
+                            .carousel-swiper .swiper-slide h3 {
+                                font-size: 0.92rem;
+                            }
+                            .carousel-swiper .swiper-slide p {
+                                font-size: 0.7rem;
+                            }
+                            .custom-pagination {
+                                height: 0.28rem;
+                            }
+                            .custom-pagination + .text-white {
+                                font-size: 0.9rem;
+                            }
+                        }
+                    `
+                }} />
+            </Head>
+            <div className="bg-surface text-on-surface overflow-x-hidden">
+                <nav className="fixed inset-x-0 top-0 z-50 px-4 sm:px-6 py-3">
+                    <div className="bg-white/40 backdrop-blur-xl rounded-full w-full max-w-7xl mx-auto mt-6 px-6 sm:px-8 py-3 flex items-center justify-between gap-8 sm:gap-12 shadow-[0_20px_40px_rgba(0,7,103,0.06)]">
+                        <Link href="/" className="text-xl sm:text-2xl font-serif tracking-tighter text-indigo-900 hover:text-indigo-700 transition-colors flex-shrink-0">LMS SMP 3 Batang</Link>
+                        
+                        {/* Desktop Navigation */}
+                        <div className="hidden md:flex items-center gap-8">
+                            <a className="text-xs uppercase tracking-widest font-sans text-indigo-900 font-semibold hover:text-indigo-700 transition-all duration-300 scale-105 active:scale-95" href="/">Home</a>
+                            <Link href={route('features')} className="text-xs uppercase tracking-widest font-sans text-slate-500 font-normal hover:text-indigo-700 transition-all duration-300 scale-105 active:scale-95">Fitur</Link>
+                            <Link href={route('contact')} className="text-xs uppercase tracking-widest font-sans text-slate-500 font-normal hover:text-indigo-700 transition-all duration-300 scale-105 active:scale-95">Kontak</Link>
+                        </div>
+
+                        {/* Mobile Menu Button */}
+                        <button 
+                            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                            className="md:hidden text-indigo-900 hover:text-indigo-700 transition-colors flex-shrink-0"
+                        >
+                            <span className={`material-symbols-outlined text-2xl hamburger-icon ${mobileMenuOpen ? 'open' : ''}`}>
+                                {mobileMenuOpen ? 'close' : 'menu'}
+                            </span>
+                        </button>
+                        
+                        {/* Desktop Login Button */}
+                        <Link href={authButton.href} className="hidden sm:block bg-primary text-on-primary px-6 py-2 rounded-full text-xs uppercase tracking-widest font-sans hover:opacity-90 transition-all active:scale-95 flex-shrink-0">
+                            {authButton.label}
+                        </Link>
+                    </div>
+                </nav>
+
+                {/* Mobile Navigation Menu */}
+                {mobileMenuOpen && (
+                    <div className="fixed top-20 left-0 right-0 z-40 md:hidden animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="glass-card max-w-3xl mx-auto rounded-[2rem] border border-white/30 bg-white/15 backdrop-blur-3xl shadow-2xl shadow-slate-900/20 px-6 py-6 space-y-4">
+                            <Link href="/" className="block px-5 py-4 text-sm uppercase tracking-widest font-sans text-indigo-900 font-semibold hover:bg-white/20 rounded-3xl transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
+                                Home
+                            </Link>
+                            <Link href={route('features')} className="block px-5 py-4 text-sm uppercase tracking-widest font-sans text-slate-600 hover:bg-white/20 rounded-3xl transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
+                                Fitur
+                            </Link>
+                            <Link href={route('contact')} className="block px-5 py-4 text-sm uppercase tracking-widest font-sans text-slate-600 hover:bg-white/20 rounded-3xl transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
+                                Kontak
+                            </Link>
+                            <div className="pt-4 border-t border-white/20">
+                                <Link href={authButton.href} className="block w-full bg-primary/95 text-on-primary px-6 py-3 rounded-full text-xs uppercase tracking-widest font-sans hover:bg-primary transition-all duration-300 text-center" onClick={() => setMobileMenuOpen(false)}>
+                                    {authButton.label}
+                                </Link>
                             </div>
-                            <nav className="-mx-3 flex flex-1 justify-end">
-                                {auth.user ? (
-                                    <Link
-                                        href={route('dashboard')}
-                                        className="rounded-md px-3 py-2 text-black ring-1 ring-transparent transition hover:text-black/70 focus:outline-none focus-visible:ring-[#FF2D20] dark:text-white dark:hover:text-white/80 dark:focus-visible:ring-white"
-                                    >
-                                        Dashboard
-                                    </Link>
-                                ) : (
-                                    <>
-                                        <Link
-                                            href={route('login')}
-                                            className="rounded-md px-3 py-2 text-black ring-1 ring-transparent transition hover:text-black/70 focus:outline-none focus-visible:ring-[#FF2D20] dark:text-white dark:hover:text-white/80 dark:focus-visible:ring-white"
+                        </div>
+                    </div>
+                )}
+                <main>
+                    <section className="relative min-h-screen flex flex-col items-center justify-center pt-32 px-6 overflow-hidden">
+                        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-[120px] -z-10"></div>
+                        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-secondary-container/20 rounded-full blur-[120px] -z-10"></div>
+                        <div className="mt-20 w-full max-w-6xl relative h-[620px] md:h-[920px] hero-door overflow-hidden">
+                            <img alt="Gedung depan SMP 3 Batang" src={schoolImages.medal} />
+                            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-900/30 to-transparent"></div>
+                            <div className="absolute inset-0 flex items-center justify-center px-6 py-10">
+                                <div className="max-w-4xl text-center space-y-8 text-white">
+                                    <span className="text-xs uppercase tracking-[0.35em] text-white/70 font-label">Sekolah Menengah Pertama Negeri 3 Batang</span>
+                                    <h1 className="text-4xl md:text-6xl font-serif italic font-light leading-snug tracking-tight text-white max-w-3xl mx-auto">
+                                        Membangun Generasi <br />Unggul dalam <span className="text-cyan-200">Semangat Kebangsaan</span>
+                                    </h1>
+                                    <p className="text-sm md:text-base text-white/80 max-w-xl mx-auto font-body tracking-tight leading-relaxed">
+                                        Menyatukan prestasi akademik dan karakter mulia di lingkungan belajar yang inspiratif dan berwawasan lokal.
+                                    </p>
+                                    <div className="pt-10">
+                                        <Swiper
+                                            modules={[Autoplay, Pagination, EffectCoverflow]}
+                                            effect="coverflow"
+                                            dir="ltr"
+                                            grabCursor={true}
+                                            slideToClickedSlide={true}
+                                            initialSlide={0}
+                                            centeredSlides={true}
+                                            slidesPerView="auto"
+                                            loop={true}
+                                            spaceBetween={16}
+                                            coverflowEffect={{
+                                                rotate: 50,
+                                                stretch: 0,
+                                                depth: 100,
+                                                modifier: 1,
+                                                slideShadows: true,
+                                            }}
+                                            touchRatio={1}
+                                            simulateTouch={true}
+                                            allowTouchMove={true}
+                                            keyboard={{ enabled: true, onlyInViewport: true }}
+                                            breakpoints={{
+                                                0: { slidesPerView: 'auto', centeredSlides: true, spaceBetween: 12 },
+                                                640: { slidesPerView: 'auto', centeredSlides: true, spaceBetween: 14 },
+                                                768: { slidesPerView: 1.08, centeredSlides: false, spaceBetween: 16 },
+                                                1024: { slidesPerView: 1.3, centeredSlides: false, spaceBetween: 18 },
+                                            }}
+                                            autoplay={{ delay: 4200, disableOnInteraction: false }}
+                                            pagination={{ el: '.custom-pagination', type: 'progressbar', progressbarOpposite: false }}
+                                            onSlideChange={(swiper) => setActiveSlide(swiper.realIndex)}
+                                            className="carousel-swiper max-w-4xl mx-auto h-[22rem]"
                                         >
-                                            Log in
-                                        </Link>
-                                        <Link
-                                            href={route('register')}
-                                            className="rounded-md px-3 py-2 text-black ring-1 ring-transparent transition hover:text-black/70 focus:outline-none focus-visible:ring-[#FF2D20] dark:text-white dark:hover:text-white/80 dark:focus-visible:ring-white"
-                                        >
-                                            Register
-                                        </Link>
-                                    </>
-                                )}
-                            </nav>
-                        </header>
-
-                        <main className="mt-6">
-                            <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
-                                <a
-                                    href="https://laravel.com/docs"
-                                    id="docs-card"
-                                    className="flex flex-col items-start gap-6 overflow-hidden rounded-lg bg-white p-6 shadow-[0px_14px_34px_0px_rgba(0,0,0,0.08)] ring-1 ring-white/[0.05] transition duration-300 hover:text-black/70 hover:ring-black/20 focus:outline-none focus-visible:ring-[#FF2D20] md:row-span-3 lg:p-10 lg:pb-10 dark:bg-zinc-900 dark:ring-zinc-800 dark:hover:text-white/70 dark:hover:ring-zinc-700 dark:focus-visible:ring-[#FF2D20]"
-                                >
-                                    <div
-                                        id="screenshot-container"
-                                        className="relative flex w-full flex-1 items-stretch"
-                                    >
-                                        <img
-                                            src="https://laravel.com/assets/img/welcome/docs-light.svg"
-                                            alt="Laravel documentation screenshot"
-                                            className="aspect-video h-full w-full flex-1 rounded-[10px] object-cover object-top drop-shadow-[0px_4px_34px_rgba(0,0,0,0.06)] dark:hidden"
-                                            onError={handleImageError}
-                                        />
-                                        <img
-                                            src="https://laravel.com/assets/img/welcome/docs-dark.svg"
-                                            alt="Laravel documentation screenshot"
-                                            className="hidden aspect-video h-full w-full flex-1 rounded-[10px] object-cover object-top drop-shadow-[0px_4px_34px_rgba(0,0,0,0.25)] dark:block"
-                                        />
-                                        <div className="absolute -bottom-16 -left-16 h-40 w-[calc(100%+8rem)] bg-gradient-to-b from-transparent via-white to-white dark:via-zinc-900 dark:to-zinc-900"></div>
-                                    </div>
-
-                                    <div className="relative flex items-center gap-6 lg:items-end">
-                                        <div
-                                            id="docs-card-content"
-                                            className="flex items-start gap-6 lg:flex-col"
-                                        >
-                                            <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[#FF2D20]/10 sm:size-16">
-                                                <svg
-                                                    className="size-5 sm:size-6"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    fill="none"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <path
-                                                        fill="#FF2D20"
-                                                        d="M23 4a1 1 0 0 0-1.447-.894L12.224 7.77a.5.5 0 0 1-.448 0L2.447 3.106A1 1 0 0 0 1 4v13.382a1.99 1.99 0 0 0 1.105 1.79l9.448 4.728c.14.065.293.1.447.1.154-.005.306-.04.447-.105l9.453-4.724a1.99 1.99 0 0 0 1.1-1.789V4ZM3 6.023a.25.25 0 0 1 .362-.223l7.5 3.75a.251.251 0 0 1 .138.223v11.2a.25.25 0 0 1-.362.224l-7.5-3.75a.25.25 0 0 1-.138-.22V6.023Zm18 11.2a.25.25 0 0 1-.138.224l-7.5 3.75a.249.249 0 0 1-.329-.099.249.249 0 0 1-.033-.12V9.772a.251.251 0 0 1 .138-.224l7.5-3.75a.25.25 0 0 1 .362.224v11.2Z"
-                                                    />
-                                                    <path
-                                                        fill="#FF2D20"
-                                                        d="m3.55 1.893 8 4.048a1.008 1.008 0 0 0 .9 0l8-4.048a1 1 0 0 0-.9-1.785l-7.322 3.706a.506.506 0 0 1-.452 0L4.454.108a1 1 0 0 0-.9 1.785H3.55Z"
-                                                    />
-                                                </svg>
-                                            </div>
-
-                                            <div className="pt-3 sm:pt-5 lg:pt-0">
-                                                <h2 className="text-xl font-semibold text-black dark:text-white">
-                                                    Documentation
-                                                </h2>
-
-                                                <p className="mt-4 text-sm/relaxed">
-                                                    Laravel has wonderful
-                                                    documentation covering every
-                                                    aspect of the framework.
-                                                    Whether you are a newcomer
-                                                    or have prior experience
-                                                    with Laravel, we recommend
-                                                    reading our documentation
-                                                    from beginning to end.
-                                                </p>
-                                            </div>
+                                            <SwiperSlide className="w-[14rem] h-[14rem] sm:w-[15.5rem] sm:h-[15.5rem] md:w-72 md:h-[20rem]">
+                                                <div className="relative w-full h-full rounded-3xl overflow-hidden shadow-2xl">
+                                                    <img src={schoolImages.building} alt="Gedung depan sekolah" className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                                                    <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                                                        <div className="backdrop-blur-sm bg-black/30 rounded-2xl p-4">
+                                                            <span className="text-[10px] uppercase tracking-[0.35em] text-cyan-200 font-semibold">Program Unggulan</span>
+                                                            <h3 className="mt-3 text-lg font-semibold leading-tight">Pembelajaran Digital & Literasi STEM</h3>
+                                                            <p className="mt-2 text-xs md:text-sm text-white/80">Untuk masa depan yang lebih cerah dengan teknologi terkini.</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </SwiperSlide>
+                                            <SwiperSlide className="w-[14rem] h-[14rem] sm:w-[15.5rem] sm:h-[15.5rem] md:w-72 md:h-[20rem]">
+                                                <div className="relative w-full h-full rounded-3xl overflow-hidden shadow-2xl">
+                                                    <img src={schoolImages.medal} alt="Penyerahan medali siswa" className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                                                    <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                                                        <div className="backdrop-blur-sm bg-black/30 rounded-2xl p-4">
+                                                            <span className="text-[10px] uppercase tracking-[0.35em] text-cyan-200 font-semibold">Ekstrakurikuler</span>
+                                                            <h3 className="mt-3 text-lg font-semibold leading-tight">Penguatan Karakter & Kreativitas</h3>
+                                                            <p className="mt-2 text-xs md:text-sm text-white/80">Melalui kegiatan siswa yang aktif dan bermanfaat.</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </SwiperSlide>
+                                            <SwiperSlide className="w-[14rem] h-[14rem] sm:w-[15.5rem] sm:h-[15.5rem] md:w-72 md:h-[20rem]">
+                                                <div className="relative w-full h-full rounded-3xl overflow-hidden shadow-2xl">
+                                                    <img src={schoolImages.staff} alt="Foto guru dan karyawan" className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                                                    <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                                                        <div className="backdrop-blur-sm bg-black/30 rounded-2xl p-4">
+                                                            <span className="text-[10px] uppercase tracking-[0.35em] text-cyan-200 font-semibold">Ruang Belajar Nyaman</span>
+                                                            <h3 className="mt-3 text-lg font-semibold leading-tight">Suasana Belajar Sehat & Aman</h3>
+                                                            <p className="mt-2 text-xs md:text-sm text-white/80">Penuh inspirasi untuk semua siswa SMP 3 Batang.</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </SwiperSlide>
+                                        </Swiper>
+                                        <div className="mt-6 flex items-center gap-4">
+                                            <div className="custom-pagination w-full h-2 rounded-full bg-white/15 overflow-hidden"></div>
+                                            <div className="text-white text-2xl font-semibold tracking-tight">0{activeSlide + 1}</div>
                                         </div>
-
-                                        <svg
-                                            className="size-6 shrink-0 stroke-[#FF2D20]"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            strokeWidth="1.5"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75"
-                                            />
-                                        </svg>
-                                    </div>
-                                </a>
-
-                                <a
-                                    href="https://laracasts.com"
-                                    className="flex items-start gap-4 rounded-lg bg-white p-6 shadow-[0px_14px_34px_0px_rgba(0,0,0,0.08)] ring-1 ring-white/[0.05] transition duration-300 hover:text-black/70 hover:ring-black/20 focus:outline-none focus-visible:ring-[#FF2D20] lg:pb-10 dark:bg-zinc-900 dark:ring-zinc-800 dark:hover:text-white/70 dark:hover:ring-zinc-700 dark:focus-visible:ring-[#FF2D20]"
-                                >
-                                    <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[#FF2D20]/10 sm:size-16">
-                                        <svg
-                                            className="size-5 sm:size-6"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <g fill="#FF2D20">
-                                                <path d="M24 8.25a.5.5 0 0 0-.5-.5H.5a.5.5 0 0 0-.5.5v12a2.5 2.5 0 0 0 2.5 2.5h19a2.5 2.5 0 0 0 2.5-2.5v-12Zm-7.765 5.868a1.221 1.221 0 0 1 0 2.264l-6.626 2.776A1.153 1.153 0 0 1 8 18.123v-5.746a1.151 1.151 0 0 1 1.609-1.035l6.626 2.776ZM19.564 1.677a.25.25 0 0 0-.177-.427H15.6a.106.106 0 0 0-.072.03l-4.54 4.543a.25.25 0 0 0 .177.427h3.783c.027 0 .054-.01.073-.03l4.543-4.543ZM22.071 1.318a.047.047 0 0 0-.045.013l-4.492 4.492a.249.249 0 0 0 .038.385.25.25 0 0 0 .14.042h5.784a.5.5 0 0 0 .5-.5v-2a2.5 2.5 0 0 0-1.925-2.432ZM13.014 1.677a.25.25 0 0 0-.178-.427H9.101a.106.106 0 0 0-.073.03l-4.54 4.543a.25.25 0 0 0 .177.427H8.4a.106.106 0 0 0 .073-.03l4.54-4.543ZM6.513 1.677a.25.25 0 0 0-.177-.427H2.5A2.5 2.5 0 0 0 0 3.75v2a.5.5 0 0 0 .5.5h1.4a.106.106 0 0 0 .073-.03l4.54-4.543Z" />
-                                            </g>
-                                        </svg>
-                                    </div>
-
-                                    <div className="pt-3 sm:pt-5">
-                                        <h2 className="text-xl font-semibold text-black dark:text-white">
-                                            Laracasts
-                                        </h2>
-
-                                        <p className="mt-4 text-sm/relaxed">
-                                            Laracasts offers thousands of video
-                                            tutorials on Laravel, PHP, and
-                                            JavaScript development. Check them
-                                            out, see for yourself, and massively
-                                            level up your development skills in
-                                            the process.
-                                        </p>
-                                    </div>
-
-                                    <svg
-                                        className="size-6 shrink-0 self-center stroke-[#FF2D20]"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        strokeWidth="1.5"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75"
-                                        />
-                                    </svg>
-                                </a>
-
-                                <a
-                                    href="https://laravel-news.com"
-                                    className="flex items-start gap-4 rounded-lg bg-white p-6 shadow-[0px_14px_34px_0px_rgba(0,0,0,0.08)] ring-1 ring-white/[0.05] transition duration-300 hover:text-black/70 hover:ring-black/20 focus:outline-none focus-visible:ring-[#FF2D20] lg:pb-10 dark:bg-zinc-900 dark:ring-zinc-800 dark:hover:text-white/70 dark:hover:ring-zinc-700 dark:focus-visible:ring-[#FF2D20]"
-                                >
-                                    <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[#FF2D20]/10 sm:size-16">
-                                        <svg
-                                            className="size-5 sm:size-6"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <g fill="#FF2D20">
-                                                <path d="M8.75 4.5H5.5c-.69 0-1.25.56-1.25 1.25v4.75c0 .69.56 1.25 1.25 1.25h3.25c.69 0 1.25-.56 1.25-1.25V5.75c0-.69-.56-1.25-1.25-1.25Z" />
-                                                <path d="M24 10a3 3 0 0 0-3-3h-2V2.5a2 2 0 0 0-2-2H2a2 2 0 0 0-2 2V20a3.5 3.5 0 0 0 3.5 3.5h17A3.5 3.5 0 0 0 24 20V10ZM3.5 21.5A1.5 1.5 0 0 1 2 20V3a.5.5 0 0 1 .5-.5h14a.5.5 0 0 1 .5.5v17c0 .295.037.588.11.874a.5.5 0 0 1-.484.625L3.5 21.5ZM22 20a1.5 1.5 0 1 1-3 0V9.5a.5.5 0 0 1 .5-.5H21a1 1 0 0 1 1 1v10Z" />
-                                                <path d="M12.751 6.047h2a.75.75 0 0 1 .75.75v.5a.75.75 0 0 1-.75.75h-2A.75.75 0 0 1 12 7.3v-.5a.75.75 0 0 1 .751-.753ZM12.751 10.047h2a.75.75 0 0 1 .75.75v.5a.75.75 0 0 1-.75.75h-2A.75.75 0 0 1 12 11.3v-.5a.75.75 0 0 1 .751-.753ZM4.751 14.047h10a.75.75 0 0 1 .75.75v.5a.75.75 0 0 1-.75.75h-10A.75.75 0 0 1 4 15.3v-.5a.75.75 0 0 1 .751-.753ZM4.75 18.047h7.5a.75.75 0 0 1 .75.75v.5a.75.75 0 0 1-.75.75h-7.5A.75.75 0 0 1 4 19.3v-.5a.75.75 0 0 1 .75-.753Z" />
-                                            </g>
-                                        </svg>
-                                    </div>
-
-                                    <div className="pt-3 sm:pt-5">
-                                        <h2 className="text-xl font-semibold text-black dark:text-white">
-                                            Laravel News
-                                        </h2>
-
-                                        <p className="mt-4 text-sm/relaxed">
-                                            Laravel News is a community driven
-                                            portal and newsletter aggregating
-                                            all of the latest and most important
-                                            news in the Laravel ecosystem,
-                                            including new package releases and
-                                            tutorials.
-                                        </p>
-                                    </div>
-
-                                    <svg
-                                        className="size-6 shrink-0 self-center stroke-[#FF2D20]"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        strokeWidth="1.5"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75"
-                                        />
-                                    </svg>
-                                </a>
-
-                                <div className="flex items-start gap-4 rounded-lg bg-white p-6 shadow-[0px_14px_34px_0px_rgba(0,0,0,0.08)] ring-1 ring-white/[0.05] lg:pb-10 dark:bg-zinc-900 dark:ring-zinc-800">
-                                    <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[#FF2D20]/10 sm:size-16">
-                                        <svg
-                                            className="size-5 sm:size-6"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <g fill="#FF2D20">
-                                                <path d="M16.597 12.635a.247.247 0 0 0-.08-.237 2.234 2.234 0 0 1-.769-1.68c.001-.195.03-.39.084-.578a.25.25 0 0 0-.09-.267 8.8 8.8 0 0 0-4.826-1.66.25.25 0 0 0-.268.181 2.5 2.5 0 0 1-2.4 1.824.045.045 0 0 0-.045.037 12.255 12.255 0 0 0-.093 3.86.251.251 0 0 0 .208.214c2.22.366 4.367 1.08 6.362 2.118a.252.252 0 0 0 .32-.079 10.09 10.09 0 0 0 1.597-3.733ZM13.616 17.968a.25.25 0 0 0-.063-.407A19.697 19.697 0 0 0 8.91 15.98a.25.25 0 0 0-.287.325c.151.455.334.898.548 1.328.437.827.981 1.594 1.619 2.28a.249.249 0 0 0 .32.044 29.13 29.13 0 0 0 2.506-1.99ZM6.303 14.105a.25.25 0 0 0 .265-.274 13.048 13.048 0 0 1 .205-4.045.062.062 0 0 0-.022-.07 2.5 2.5 0 0 1-.777-.982.25.25 0 0 0-.271-.149 11 11 0 0 0-5.6 2.815.255.255 0 0 0-.075.163c-.008.135-.02.27-.02.406.002.8.084 1.598.246 2.381a.25.25 0 0 0 .303.193 19.924 19.924 0 0 1 5.746-.438ZM9.228 20.914a.25.25 0 0 0 .1-.393 11.53 11.53 0 0 1-1.5-2.22 12.238 12.238 0 0 1-.91-2.465.248.248 0 0 0-.22-.187 18.876 18.876 0 0 0-5.69.33.249.249 0 0 0-.179.336c.838 2.142 2.272 4 4.132 5.353a.254.254 0 0 0 .15.048c1.41-.01 2.807-.282 4.117-.802ZM18.93 12.957l-.005-.008a.25.25 0 0 0-.268-.082 2.21 2.21 0 0 1-.41.081.25.25 0 0 0-.217.2c-.582 2.66-2.127 5.35-5.75 7.843a.248.248 0 0 0-.09.299.25.25 0 0 0 .065.091 28.703 28.703 0 0 0 2.662 2.12.246.246 0 0 0 .209.037c2.579-.701 4.85-2.242 6.456-4.378a.25.25 0 0 0 .048-.189 13.51 13.51 0 0 0-2.7-6.014ZM5.702 7.058a.254.254 0 0 0 .2-.165A2.488 2.488 0 0 1 7.98 5.245a.093.093 0 0 0 .078-.062 19.734 19.734 0 0 1 3.055-4.74.25.25 0 0 0-.21-.41 12.009 12.009 0 0 0-10.4 8.558.25.25 0 0 0 .373.281 12.912 12.912 0 0 1 4.826-1.814ZM10.773 22.052a.25.25 0 0 0-.28-.046c-.758.356-1.55.635-2.365.833a.25.25 0 0 0-.022.48c1.252.43 2.568.65 3.893.65.1 0 .2 0 .3-.008a.25.25 0 0 0 .147-.444c-.526-.424-1.1-.917-1.673-1.465ZM18.744 8.436a.249.249 0 0 0 .15.228 2.246 2.246 0 0 1 1.352 2.054c0 .337-.08.67-.23.972a.25.25 0 0 0 .042.28l.007.009a15.016 15.016 0 0 1 2.52 4.6.25.25 0 0 0 .37.132.25.25 0 0 0 .096-.114c.623-1.464.944-3.039.945-4.63a12.005 12.005 0 0 0-5.78-10.258.25.25 0 0 0-.373.274c.547 2.109.85 4.274.901 6.453ZM9.61 5.38a.25.25 0 0 0 .08.31c.34.24.616.561.8.935a.25.25 0 0 0 .3.127.631.631 0 0 1 .206-.034c2.054.078 4.036.772 5.69 1.991a.251.251 0 0 0 .267.024c.046-.024.093-.047.141-.067a.25.25 0 0 0 .151-.23A29.98 29.98 0 0 0 15.957.764a.25.25 0 0 0-.16-.164 11.924 11.924 0 0 0-2.21-.518.252.252 0 0 0-.215.076A22.456 22.456 0 0 0 9.61 5.38Z" />
-                                            </g>
-                                        </svg>
-                                    </div>
-
-                                    <div className="pt-3 sm:pt-5">
-                                        <h2 className="text-xl font-semibold text-black dark:text-white">
-                                            Vibrant Ecosystem
-                                        </h2>
-
-                                        <p className="mt-4 text-sm/relaxed">
-                                            Laravel's robust library of
-                                            first-party tools and libraries,
-                                            such as{' '}
-                                            <a
-                                                href="https://forge.laravel.com"
-                                                className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white dark:focus-visible:ring-[#FF2D20]"
-                                            >
-                                                Forge
-                                            </a>
-                                            ,{' '}
-                                            <a
-                                                href="https://vapor.laravel.com"
-                                                className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                            >
-                                                Vapor
-                                            </a>
-                                            ,{' '}
-                                            <a
-                                                href="https://nova.laravel.com"
-                                                className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                            >
-                                                Nova
-                                            </a>
-                                            ,{' '}
-                                            <a
-                                                href="https://envoyer.io"
-                                                className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                            >
-                                                Envoyer
-                                            </a>
-                                            , and{' '}
-                                            <a
-                                                href="https://herd.laravel.com"
-                                                className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                            >
-                                                Herd
-                                            </a>{' '}
-                                            help you take your projects to the
-                                            next level. Pair them with powerful
-                                            open source libraries like{' '}
-                                            <a
-                                                href="https://laravel.com/docs/billing"
-                                                className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                            >
-                                                Cashier
-                                            </a>
-                                            ,{' '}
-                                            <a
-                                                href="https://laravel.com/docs/dusk"
-                                                className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                            >
-                                                Dusk
-                                            </a>
-                                            ,{' '}
-                                            <a
-                                                href="https://laravel.com/docs/broadcasting"
-                                                className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                            >
-                                                Echo
-                                            </a>
-                                            ,{' '}
-                                            <a
-                                                href="https://laravel.com/docs/horizon"
-                                                className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                            >
-                                                Horizon
-                                            </a>
-                                            ,{' '}
-                                            <a
-                                                href="https://laravel.com/docs/sanctum"
-                                                className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                            >
-                                                Sanctum
-                                            </a>
-                                            ,{' '}
-                                            <a
-                                                href="https://laravel.com/docs/telescope"
-                                                className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                            >
-                                                Telescope
-                                            </a>
-                                            , and more.
-                                        </p>
                                     </div>
                                 </div>
                             </div>
-                        </main>
+                        </div>
+                    </section>
+                    <section className="py-32 px-6 md:px-12 bg-surface-container-low">
+                        <div className="max-w-7xl mx-auto space-y-20">
+                            <div className="flex flex-col md:flex-row justify-between items-end gap-8">
+                                <div className="space-y-4">
+                                    <h2 className="text-4xl md:text-5xl font-serif italic text-primary">Pengalaman Pendidikan Terpadu</h2>
+                                    <p className="text-on-surface-variant max-w-md">Program akademik dan ekstrakurikuler yang dirancang untuk memperkuat karakter, kompetensi, dan kebanggaan siswa SMP 3 Batang.</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-8" id="archive">
+                                <div className="md:col-span-8 group relative overflow-hidden bg-surface-container-lowest p-12 flex flex-col justify-between h-[500px] shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300" style={{ clipPath: 'polygon(0 0, 95% 0, 100% 10%, 100% 90%, 95% 100%, 0 100%, 0 10%)' }}>
+                                    <div className="absolute top-0 right-0 p-12 opacity-10 group-hover:opacity-20 transition-opacity">
+                                        <span className="material-symbols-outlined text-[120px]">architecture</span>
+                                    </div>
+                                    <div className="relative z-10 space-y-4">
+                                        <span className="text-xs uppercase tracking-widest text-primary font-bold">Kurikulum Unggul</span>
+                                        <h3 className="text-3xl font-serif">Pendekatan Pembelajaran Terstruktur</h3>
+                                        <p className="text-on-surface-variant max-w-xs">Kurikulum kami dirancang untuk membentuk kemampuan akademik dan karakter siswa secara seimbang di SMP 3 Batang.</p>
+                                    </div>
+                                    <div className="relative z-10">
+                                        <img className="w-full h-48 object-cover rounded-lg hover:scale-105 transition-transform duration-300" alt="Piala bergilir SMP 3 Batang" src={schoolImages.trophy} />
+                                    </div>
+                                </div>
+                                <div className="md:col-span-4 glass-card p-10 flex flex-col justify-center gap-8 h-[500px] shadow-[0_20px_40px_rgba(0,7,103,0.04)] hover:shadow-[0_30px_60px_rgba(0,7,103,0.08)] hover:-translate-y-1 transition-all duration-300" style={{ clipPath: 'polygon(0 0, 85% 0, 100% 20%, 100% 100%, 0 100%, 0 20%)' }}>
+                                    <div className="w-16 h-16 rounded-full bg-secondary-container flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-on-secondary-container">auto_awesome</span>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <h3 className="text-2xl font-serif">Prestasi Tercatat</h3>
+                                        <p className="text-sm text-on-surface-variant leading-relaxed">Laporan capaian belajar lengkap untuk mendukung pemantauan perkembangan siswa di sekolah kami.</p>
+                                    </div>
+                                    <div className="pt-4 h-32 flex items-end gap-2">
+                                        <div className="flex-1 bg-primary/10 rounded-t-full h-[40%] transition-all hover:h-[60%]"></div>
+                                        <div className="flex-1 bg-primary/20 rounded-t-full h-[70%] transition-all hover:h-[85%]"></div>
+                                        <div className="flex-1 bg-primary/15 rounded-t-full h-[55%] transition-all hover:h-[70%]"></div>
+                                        <div className="flex-1 bg-primary/30 rounded-t-full h-[90%] transition-all hover:h-[100%]"></div>
+                                        <div className="flex-1 bg-primary/25 rounded-t-full h-[65%] transition-all hover:h-[80%]"></div>
+                                    </div>
+                                </div>
+                                <div className="md:col-span-4 bg-primary text-on-primary p-10 flex flex-col justify-between h-[450px] shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300" style={{ clipPath: 'polygon(0 0, 80% 0, 100% 25%, 100% 100%, 0 100%, 0 25%)' }}>
+                                    <h3 className="text-2xl font-serif italic">&ldquo;SMART SCHOOL&rdquo;</h3>
+                                    <p className="text-sm text-on-primary/85 leading-relaxed">
+                                        Spirit for Marvelous, Aspiring, Responsive, and Trusted School.
+                                    </p>
+                                    <div className="space-y-4">
+                                        <p className="text-sm opacity-60 uppercase tracking-widest">Motto SMP 3 Batang</p>
+                                        <div className="h-px bg-on-primary/20 w-full"></div>
+                                    </div>
+                                </div>
+                                <div className="md:col-span-8 relative overflow-hidden h-[450px] shadow-xl hover:shadow-2xl transition-shadow duration-300" style={{ clipPath: 'polygon(0 0, 90% 0, 100% 15%, 100% 85%, 90% 100%, 0 100%, 0 15%)' }}>
+                                    <img className="w-full h-full object-cover" alt="Kegiatan siswa dan guru" src={schoolImages.staff} />
+                                    <div className="absolute inset-0 bg-primary/20 backdrop-blur-sm flex items-center justify-center p-12">
+                                        <div className="max-w-md text-center space-y-6">
+                                            <h3 className="text-3xl font-serif text-white">Laboratorium Kreatif</h3>
+                                            <p className="text-white/80">Ruang belajar dan praktek yang mendukung eksplorasi sains, seni, dan teknologi bagi siswa SMP 3 Batang.</p>
+                                            <button className="bg-white text-primary px-8 py-3 rounded-full text-xs uppercase tracking-widest font-bold hover:opacity-90 hover:scale-105 transition-all active:scale-95">Pelajari Lebih Lanjut</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    <section className="py-32 bg-surface overflow-hidden">
+                        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center gap-20">
+                            <div className="flex-1 space-y-8">
+                                <span className="text-xs uppercase tracking-[0.4em] text-on-surface-variant">Sistem Informasi Sekolah</span>
+                                <h2 className="text-5xl font-serif italic leading-tight text-primary">Kemajuan yang <br />Dikelola dengan Jelas</h2>
+                                <p className="text-lg text-on-surface-variant leading-relaxed">Laporan dan insight akademik untuk orang tua dan guru, menampilkan perkembangan siswa secara ringkas dan mudah dipahami.</p>
+                                <ul className="space-y-6 pt-4">
+                                    <li className="flex items-center gap-4 text-on-surface">
+                                        <span className="material-symbols-outlined text-primary">lens</span>
+                                        <span className="tracking-tight font-medium">Monitoring Kegiatan Belajar</span>
+                                    </li>
+                                    <li className="flex items-center gap-4 text-on-surface">
+                                        <span className="material-symbols-outlined text-primary">lens</span>
+                                        <span className="tracking-tight font-medium">Jalur Prestasi Siswa</span>
+                                    </li>
+                                    <li className="flex items-center gap-4 text-on-surface">
+                                        <span className="material-symbols-outlined text-primary">lens</span>
+                                        <span className="tracking-tight font-medium">Arsip Portofolio Kegiatan</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div className="flex-1 relative">
+                                <div className="relative w-full aspect-square rounded-full border border-outline-variant/20 flex items-center justify-center p-12">
+                                    <div className="absolute inset-0 border-[40px] border-secondary-container/10 rounded-full"></div>
+                                    <div className="w-full h-full rounded-full bg-gradient-to-br from-primary/5 to-secondary/10 flex items-center justify-center relative">
+                                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+                                            <circle className="text-outline-variant/30" cx="110" cy="110" r="70" fill="transparent" stroke="currentColor" strokeWidth="1" />
+                                            <circle className="text-primary" cx="110" cy="110" r="70" fill="transparent" stroke="currentColor" strokeDasharray="439.82" strokeDashoffset="105" strokeLinecap="round" strokeWidth="6" />
+                                        </svg>
+                                        <div className="absolute text-center space-y-1">
+                                            <span className="text-4xl font-serif italic text-primary">92%</span>
+                                            <p className="text-[10px] uppercase tracking-widest text-on-surface-variant">Mastery</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="absolute top-10 right-0 glass-card px-6 py-3 rounded-xl shadow-lg">
+                                    <span className="text-xs font-serif italic">Bahasa &amp; Literasi</span>
+                                </div>
+                                <div className="absolute bottom-20 -left-10 glass-card px-6 py-3 rounded-xl shadow-lg">
+                                    <span className="text-xs font-serif italic">Matematika &amp; IPA</span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    <section className="py-40 bg-surface-container-low px-6">
+                        <div className="max-w-4xl mx-auto space-y-20 text-center">
+                            <div className="space-y-8">
+                                <span className="text-xs uppercase tracking-[0.5em] text-on-surface-variant">Visi</span>
+                                <blockquote className="text-2xl md:text-3xl lg:text-4xl font-serif italic font-light text-primary leading-snug">
+                                    &ldquo;Terwujudnya Layanan Prima untuk Mencetak Generasi Yang Unggul dalam Prestasi, Cinta Lingkungan dan Budaya, Berlandaskan Iman dan Taqwa&rdquo;
+                                </blockquote>
+                            </div>
+                            <div className="h-px bg-outline-variant/30 w-24 mx-auto"></div>
+                            <div className="space-y-8 text-left max-w-3xl mx-auto">
+                                <span className="block text-center text-xs uppercase tracking-[0.5em] text-on-surface-variant">Misi</span>
+                                <ol className="list-decimal list-outside space-y-5 pl-6 md:pl-8 text-base md:text-lg text-primary/90 leading-relaxed font-light">
+                                    <li>Mewujudkan peserta didik yang berakhlak mulia, berprestasi, dan berkualitas dengan kecerdasan spiritual, emosional, dan intelektual.</li>
+                                    <li>Meningkatkan kualitas kurikulum untuk menciptakan budaya mutu di sekolah dengan pelaksanaan penguatan pendidikan karakter.</li>
+                                    <li>Menerapkan strategi pembelajaran yang kreatif, inovatif dan menyenangkan berbasis pada lingkungan dan kearifan lokal yang menuju daya saing global.</li>
+                                    <li>Mengembangkan sistem penilaian yang terprogram dan terencana berbasis Teknologi Informasi (IT).</li>
+                                    <li>Mewujudkan kualitas tenaga pendidik dan kependidikan yang profesional, berintegritas dan berkepribadian mulia.</li>
+                                    <li>Meningkatkan sarana dan prasarana sekolah untuk menciptakan suasana yang kondusif sehingga dapat menumbuhkan minat baca, mencintai lingkungan, kreatif dalam berkreasi dan terampil dalam berkarya serta berbudaya.</li>
+                                    <li>Mengembangkan pengelolaan sekolah untuk meningkatkan kualitas sekolah dalam memberikan pelayanan prima pendidikan.</li>
+                                </ol>
+                            </div>
+                            <div className="h-px bg-outline-variant/30 w-24 mx-auto"></div>
+                            <div className="space-y-6">
+                                <span className="text-xs uppercase tracking-[0.5em] text-on-surface-variant">Motto</span>
+                                <p className="text-3xl md:text-4xl font-serif italic font-semibold text-primary">&ldquo;SMART SCHOOL&rdquo;</p>
+                                <p className="text-sm md:text-base text-on-surface-variant leading-relaxed max-w-2xl mx-auto">
+                                    Spirit for Marvelous, Aspiring, Responsive, and Trusted School (Sekolah yang memiliki Semangat yang Hebat, Bercita-cita Tinggi, Cepat Tanggap, dan Terpercaya)
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+                    <section className="py-28 px-6 bg-surface">
+                        <div className="max-w-7xl mx-auto space-y-12">
+                            <div className="text-center space-y-4">
+                                <span className="text-xs uppercase tracking-[0.4em] text-on-surface-variant">
+                                    Tim Pengajar SMP 3 Batang
+                                </span>
+                                <h2 className="text-4xl md:text-5xl font-serif italic text-primary">
+                                    Kepala Sekolah & Guru-Guru Inspiratif
+                                </h2>
+                                <p className="text-on-surface-variant max-w-2xl mx-auto">
+                                    Mengenal sosok pendidik yang membimbing, menginspirasi, dan membersamai perjalanan belajar siswa setiap hari.
+                                </p>
+                            </div>
 
-                        <footer className="py-16 text-center text-sm text-black dark:text-white/70">
-                            Laravel v{laravelVersion} (PHP v{phpVersion})
-                        </footer>
+                            <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+                                <div className="lg:col-span-4">
+                                    <article className="teacher-card teacher-card--principal max-w-md">
+                                        <img src={principal.photo} alt={principal.name} />
+                                        <div className="teacher-name-inline">
+                                            <h3 className="text-xl font-serif">{principal.name}</h3>
+                                            <p className="text-xs text-white/90">{principal.role}</p>
+                                        </div>
+                                        <div className="teacher-info">
+                                            <p className="text-[10px] uppercase tracking-[0.3em] text-cyan-200">
+                                                Kepemimpinan Sekolah
+                                            </p>
+                                            <h3 className="mt-2 text-2xl font-serif">{principal.name}</h3>
+                                            <p className="text-sm text-white/90">{principal.role}</p>
+                                            <p className="mt-2 text-xs leading-relaxed text-white/85">
+                                                {principal.description}
+                                            </p>
+                                        </div>
+                                    </article>
+                                </div>
+
+                                <div className="lg:col-span-8">
+                                    <Swiper
+                                        modules={[Autoplay]}
+                                        spaceBetween={14}
+                                        slidesPerView={1}
+                                        loop={teachers.length > 1}
+                                        autoplay={{ delay: 3200, disableOnInteraction: false }}
+                                        breakpoints={{
+                                            768: { slidesPerView: 1.4 },
+                                            1024: { slidesPerView: 2 },
+                                            1280: { slidesPerView: 2.2 },
+                                        }}
+                                        className="teacher-swiper"
+                                    >
+                                        {teachers.map((teacher) => (
+                                            <SwiperSlide key={teacher.name}>
+                                                <article className="teacher-card">
+                                                    <img src={teacher.photo} alt={teacher.name} />
+                                                    <div className="teacher-name-inline">
+                                                        <h3 className="text-lg font-serif">{teacher.name}</h3>
+                                                        <p className="text-xs text-white/90">{teacher.role}</p>
+                                                    </div>
+                                                    <div className="teacher-info">
+                                                        <p className="text-[10px] uppercase tracking-[0.3em] text-cyan-200">
+                                                            Profil Guru
+                                                        </p>
+                                                        <h3 className="mt-2 text-xl font-serif">{teacher.name}</h3>
+                                                        <p className="text-sm text-white/90">{teacher.role}</p>
+                                                        <p className="mt-2 text-xs leading-relaxed text-white/85">
+                                                            {teacher.description}
+                                                        </p>
+                                                    </div>
+                                                </article>
+                                            </SwiperSlide>
+                                        ))}
+                                    </Swiper>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    <section className="relative py-48 px-6 overflow-hidden">
+                        <img className="absolute inset-0 w-full h-full object-cover grayscale opacity-20" alt="Gedung SMP 3 Batang" src={schoolImages.building} />
+                        <div className="absolute inset-0 bg-primary/10"></div>
+                        <div className="relative z-10 max-w-4xl mx-auto text-center space-y-12">
+                            <h2 className="text-5xl md:text-7xl font-serif italic text-primary">Bergabung Bersama SMP 3 Batang</h2>
+                            <p className="text-xl text-on-surface-variant max-w-xl mx-auto">Pendaftaran siswa baru dibuka, mari wujudkan potensi akademik dan karakter di lingkungan sekolah kami.</p>
+                            <div className="flex justify-center">
+                                <Link href={route('register')} className="pearlescent-gradient text-on-primary px-16 py-6 rounded-xl text-sm uppercase tracking-[0.2em] font-bold shadow-2xl hover:scale-105 active:scale-95 transition-all">
+                                    Daftar Sekarang
+                                </Link>
+                            </div>
+                        </div>
+                    </section>
+                </main>
+                <footer className="bg-[#f4f3f1] w-full px-12 md:px-24 flex flex-col items-start gap-20 pt-32 pb-16">
+                    <div className="grid w-full grid-cols-1 gap-12 lg:grid-cols-2">
+                        <div className="space-y-10">
+                            <div className="space-y-6">
+                                <span className="text-4xl font-serif italic text-indigo-900">SMP 3 Batang</span>
+                                <p className="font-serif text-lg text-indigo-900 max-w-xs">Menjadi pusat pendidikan yang kuat dalam prestasi, karakter, dan kebanggaan daerah.</p>
+                            </div>
+                            <div className="space-y-1 text-sm text-slate-700">
+                                <p><span className="font-semibold text-indigo-900">Alamat:</span> Jl. Ki. Mangunsarkoro No. 6 Proyonanggan Selatan</p>
+                                <p>Batang - Jawa Tengah - Indonesia</p>
+                                <p><span className="font-semibold text-indigo-900">Kode Pos:</span> 51211</p>
+                                <p><span className="font-semibold text-indigo-900">Telepon:</span> 0285-391422</p>
+                                <p><span className="font-semibold text-indigo-900">Fax:</span> 0285-391422</p>
+                                <p><span className="font-semibold text-indigo-900">Posmail:</span> smptigabatang@gmail.cccom</p>
+                                <p>
+                                    <span className="font-semibold text-indigo-900">Website:</span>{" "}
+                                    <a
+                                        href="https://www.smpn3batang.sch.id"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-indigo-800 underline hover:text-indigo-600"
+                                    >
+                                        www.smpn3batang.sch.id
+                                    </a>
+                                </p>
+                                <p>
+                                    <span className="font-semibold text-indigo-900">Administrator:</span>{" "}
+                                    <a
+                                        href="mailto:madya15@gmail.com"
+                                        className="text-indigo-800 underline hover:text-indigo-600"
+                                    >
+                                        madya15@gmail.com
+                                    </a>
+                                </p>
+                            </div>
+                        </div>
+                        <div className="w-full">
+                            <p className="mb-4 font-sans tracking-tight text-slate-500 text-sm">
+                                Lokasi Sekolah
+                            </p>
+                            <div className="overflow-hidden rounded-2xl border border-indigo-100 shadow-sm">
+                                <iframe
+                                    title="Lokasi SMP N 3 Batang"
+                                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3960.7498867103236!2d109.72903811323248!3d-6.920475169654714!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x6b7184d9fc3822fd!2sSMP%20N%203%20BATANG!5e0!3m2!1sid!2sid!4v1569472653245!5m2!1sid!2sid"
+                                    className="h-[280px] w-full"
+                                    loading="lazy"
+                                    referrerPolicy="no-referrer-when-downgrade"
+                                />
+                            </div>
+                        </div>
                     </div>
-                </div>
+                    <div className="w-full pt-16 border-t border-outline-variant/20 flex flex-col md:flex-row justify-between items-center gap-6">
+                        <span className="text-slate-500 font-sans tracking-tight text-sm">© 2026 SMP Negeri 3 Batang. Pendidikan untuk Generasi Emas.</span>
+                        <div className="flex gap-8">
+                            <span className="material-symbols-outlined text-indigo-900/50">brush</span>
+                            <span className="material-symbols-outlined text-indigo-900/50">book</span>
+                            <span className="material-symbols-outlined text-indigo-900/50">school</span>
+                        </div>
+                    </div>
+                </footer>
             </div>
         </>
     );

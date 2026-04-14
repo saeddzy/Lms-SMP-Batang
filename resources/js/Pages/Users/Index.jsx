@@ -16,7 +16,11 @@ export default function Index() {
             <div className="space-y-6">
                 <div className="mb-4 flex items-center justify-between gap-4">
                     {hasAnyPermission(["users create"]) && (
-                        <Button type={"add"} url={route("users.create")} />
+                        <Button
+                            type="add"
+                            url={route("users.create")}
+                            label="Tambah user"
+                        />
                     )}
                     <div className="w-full md:w-4/6">
                         <Search
@@ -54,7 +58,7 @@ export default function Index() {
                                         <div className="flex items-center gap-2 flex-wrap">
                                             {user.roles.map((role, i) => (
                                                 <span
-                                                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-sky-100 text-sky-700"
+                                                    className="inline-flex items-center rounded-lg bg-stone-100 px-2.5 py-0.5 text-xs font-medium text-stone-700 ring-1 ring-stone-200/80"
                                                     key={i}
                                                 >
                                                     {role.name}

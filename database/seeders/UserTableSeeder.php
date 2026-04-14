@@ -15,23 +15,43 @@ class UserTableSeeder extends Seeder
      */
     public function run(): void
     {
-        //create user
-        $user = User::create([
-            'name'      => 'Syahrizaldev',
-            'email'     => 'izaldev@gmail.com',
-            'password'  => bcrypt('password'),
+        // Create admin user
+        $admin = User::firstOrCreate([
+            'email' => 'izaldev@gmail.com',
+        ], [
+            'name' => 'Syahrizaldev',
+            'password' => bcrypt('password'),
         ]);
 
-        //get all permissions
-        $permissions = Permission::all();
+        $adminRole = Role::where('name', 'admin')->first();
+        if ($adminRole) {
+            $admin->assignRole($adminRole);
+        }
 
-        //get role admin
-        $role = Role::find(1);
+        // Create teacher user
+        $teacher = User::firstOrCreate([
+            'email' => 'guru@example.com',
+        ], [
+            'name' => 'Guru SMP',
+            'password' => bcrypt('password'),
+        ]);
 
-        //assign permission to role
-        $role->syncPermissions($permissions);
+        $teacherRole = Role::where('name', 'guru')->first();
+        if ($teacherRole) {
+            $teacher->assignRole($teacherRole);
+        }
 
-        //assign role to user
-        $user->assignRole($role);
+        // Create student user
+        $student = User::firstOrCreate([
+            'email' => 'siswa@example.com',
+        ], [
+            'name' => 'Siswa SMP',
+            'password' => bcrypt('password'),
+        ]);
+
+        $studentRole = Role::where('name', 'siswa')->first();
+        if ($studentRole) {
+            $student->assignRole($studentRole);
+        }
     }
 }

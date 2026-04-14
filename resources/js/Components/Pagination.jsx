@@ -1,31 +1,53 @@
-import React from 'react'
-import { Link } from '@inertiajs/react';
-import { IconChevronRight, IconChevronLeft } from '@tabler/icons-react';
+import { Link } from "@inertiajs/react";
+import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
+import React from "react";
+import clsx from "clsx";
+
+const navBtn =
+    "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-500 transition-colors hover:bg-stone-50 hover:text-stone-800";
+
+const pageBtn =
+    "min-w-[2.25rem] rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-600 transition-colors hover:bg-stone-50";
+
 export default function Pagination({ links }) {
-
-    const style = 'p-1 text-sm border rounded-md bg-white text-gray-500 hover:bg-gray-100'
-
     return (
-        <>
-            <ul className="mt-2 lg:mt-5 justify-end flex items-center gap-1">
-                {links.map((item, i) => {
-                    return item.url != null ? (
-                        item.label.includes('Previous') ? (
-                            <Link className={style} key={i} href={item.url}>
-                                <IconChevronLeft size={'20'} strokeWidth={'1.5'}/>
+        <ul className="flex flex-wrap items-center justify-end gap-1">
+            {links.map((item, i) => {
+                if (item.url == null) return null;
+
+                if (item.label.includes("Previous")) {
+                    return (
+                        <li key={i}>
+                            <Link className={navBtn} href={item.url} aria-label="Halaman sebelumnya">
+                                <IconChevronLeft className="h-5 w-5" strokeWidth={1.5} />
                             </Link>
-                        ) : item.label.includes('Next') ? (
-                            <Link className={style} key={i} href={item.url}>
-                                <IconChevronRight size={'20'} strokeWidth={'1.5'}/>
+                        </li>
+                    );
+                }
+                if (item.label.includes("Next")) {
+                    return (
+                        <li key={i}>
+                            <Link className={navBtn} href={item.url} aria-label="Halaman berikutnya">
+                                <IconChevronRight className="h-5 w-5" strokeWidth={1.5} />
                             </Link>
-                        ) : (
-                            <Link className={`px-2 py-1 text-sm border  rounded-md text-gray-500 hover:bg-gray-100 ${item.active ? 'bg-white text-gray-700' : 'bg-white'}`} key={i} href={item.url}>
-                                {item.label}
-                            </Link>
-                        )
-                    ) : null;
-                })}
-            </ul>
-        </>
-    )
+                        </li>
+                    );
+                }
+                return (
+                    <li key={i}>
+                        <Link
+                            className={clsx(
+                                pageBtn,
+                                item.active &&
+                                    "border-stone-800 bg-stone-900 font-medium text-white hover:bg-stone-800"
+                            )}
+                            href={item.url}
+                        >
+                            <span dangerouslySetInnerHTML={{ __html: item.label }} />
+                        </Link>
+                    </li>
+                );
+            })}
+        </ul>
+    );
 }

@@ -1,33 +1,68 @@
-import { useForm } from '@inertiajs/react';
-import { IconSearch } from '@tabler/icons-react';
-import React from 'react'
-export default function Search({url, placeholder}) {
+import { useForm } from "@inertiajs/react";
+import { IconSearch } from "@tabler/icons-react";
+import React from "react";
 
-    // define use form inertia
-    const {data, setData, get} = useForm({
-        search : '',
-    })
+const inputClass =
+    "block w-full rounded-xl border border-stone-200 bg-white py-2.5 pl-4 pr-11 text-sm text-stone-800 placeholder:text-stone-400 shadow-sm transition-colors focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-400";
 
-    // define method searchData
-    const handleSearchData = (e) => {
-        e.preventDefault();
-
-        get(`${url}?search=${data.search}`)
+/**
+ * Server search: pass `url` (and optional `filter` for initial query).
+ * Client filter: pass `value` and `onSearch` (onChange handler receiving string).
+ */
+export default function Search({
+    url,
+    placeholder,
+    filter,
+    value,
+    onSearch,
+    className = "",
+}) {
+    if (onSearch != null && value != null) {
+        return (
+            <div className={`relative ${className}`}>
+                <input
+                    type="text"
+                    value={value}
+                    onChange={(e) => onSearch(e.target.value)}
+                    className={inputClass}
+                    placeholder={placeholder}
+                    aria-label={placeholder ?? "Cari"}
+                />
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-stone-400">
+                    <IconSearch className="h-4 w-4" strokeWidth={1.5} />
+                </div>
+            </div>
+        );
     }
 
+    const { data, setData, get } = useForm({
+        search: filter?.search ?? "",
+    });
+
+    const handleSearchData = (e) => {
+        e.preventDefault();
+        if (!url) {
+            return;
+        }
+        const q = encodeURIComponent(data.search ?? "");
+        get(`${url}?search=${q}`);
+    };
+
     return (
-        <form onSubmit={handleSearchData}>
-            <div className='relative'>
+        <form onSubmit={handleSearchData} className={className}>
+            <div className="relative">
                 <input
-                    type='text'
+                    type="text"
                     value={data.search}
-                    onChange={e => setData('search', e.target.value)}
-                    className='py-2 px-4 pr-11 block w-full rounded-lg text-sm border focus:outline-none focus:ring-0 focus:ring-gray-400 text-gray-700 bg-white border-gray-200 focus:border-gray-200'
-                    placeholder={placeholder}/>
-                <div className='absolute inset-y-0 right-0 flex items-center pointer-events-none pr-4'>
-                    <IconSearch size={18} strokeWidth={1.5}/>
+                    onChange={(e) => setData("search", e.target.value)}
+                    className={inputClass}
+                    placeholder={placeholder}
+                    aria-label={placeholder ?? "Cari"}
+                />
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-stone-400">
+                    <IconSearch className="h-4 w-4" strokeWidth={1.5} />
                 </div>
             </div>
         </form>
-    )
+    );
 }

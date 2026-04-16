@@ -119,4 +119,46 @@ class ClassSubject extends Model
             && $this->subject->teacher_id !== null
             && (int) $this->subject->teacher_id === (int) $user->id;
     }
+
+    /**
+     * Guru pengampu slot kelas–mapel (class_subjects.teacher_id).
+     * Dipakai untuk otorisasi create/update/delete materi, tugas, kuis, ujian.
+     */
+    public function isAssignedSlotTeacher(User $user): bool
+    {
+        return $this->teacher_id !== null
+            && (int) $this->teacher_id === (int) $user->id;
+    }
+
+    /**
+     * Wali kelas boleh melihat nilai; mengubah/menghitung nilai hanya jika mengampu mapel ini (slot atau guru mapel non-wali).
+     */
+    public function userCanManageGrades(User $user): bool
+    {
+        $this->loadMissing('schoolClass');
+        $class = $this->schoolClass;
+        if (! $class) {
+            return false;
+        }
+
+        if ((int) $class->teacher_id === (int) $user->id && ! $this->isAssignedSlotTeacher($user)) {
+            return false;
+        }
+
+        return $this->isTaughtBy($user);
+    }
+
+    /**
+     * Guru dapat melihat konten (read-only untuk wali kelas; pengampu/slot/guru mapel sesuai isTaughtBy).
+     */
+    public function isVisibleToTeacher(User $user): bool
+    {
+        $this->loadMissing('schoolClass', 'subject');
+
+        if ($this->schoolClass && (int) $this->schoolClass->teacher_id === (int) $user->id) {
+            return true;
+        }
+
+        return $this->isTaughtBy($user);
+    }
 }

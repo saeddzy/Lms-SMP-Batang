@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\ClassSubject;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -29,14 +30,29 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $user = $request->user();
+        $hasTeachingSlot = $user && $user->hasRole('guru')
+            ? ClassSubject::where('teacher_id', $user->id)->exists()
+            : (bool) $user?->hasRole('admin');
+
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $request->user(),
-                'permissions' => $request->user() ? $request->user()->getUserPermissions() : [],
-                'roles' => $request->user()
-                    ? $request->user()->getRoleNames()->values()->all()
+                'user' => $user,
+                'permissions' => $user ? $user->getUserPermissions() : [],
+                'roles' => $user
+                    ? $user->getRoleNames()->values()->all()
                     : [],
+                /** Guru pengampu minimal satu slot kelas–mapel — bukan sekadar wali tanpa pengampuan */
+                'canMutateTeachingContent' => $user
+                    ? ($user->hasRole('admin') || ($user->hasRole('guru') && $hasTeachingSlot))
+                    : false,
+                'canInputGrades' => $user
+                    ? ($user->hasRole('admin')
+                        || ($user->hasRole('guru')
+                            && $user->can('grades calculate')
+                            && ClassSubject::where('teacher_id', $user->id)->exists()))
+                    : false,
             ],
         ];
     }

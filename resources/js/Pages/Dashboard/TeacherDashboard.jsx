@@ -29,8 +29,14 @@ function Panel({ title, children }) {
 }
 
 export default function TeacherDashboard() {
-    const { stats, recentActivities, classPerformance, pendingTasks } =
-        usePage().props;
+    const {
+        stats,
+        recentActivities,
+        classPerformance,
+        pendingTasks,
+        auth = {},
+    } = usePage().props;
+    const canMutate = auth.canMutateTeachingContent ?? false;
 
     return (
         <DashboardLayout title="Dashboard Guru">
@@ -178,6 +184,7 @@ export default function TeacherDashboard() {
                 </Panel>
 
                 <Panel title="Aksi cepat">
+                    {canMutate ? (
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                         <a
                             href={route("tasks.create")}
@@ -264,6 +271,14 @@ export default function TeacherDashboard() {
                             </div>
                         </a>
                     </div>
+                    ) : (
+                        <p className="text-sm text-stone-500">
+                            Anda terdaftar sebagai wali kelas tanpa slot mengajar di
+                            kelas–mapel manapun. Untuk menambah materi/tugas/kuis, admin
+                            harus menetapkan Anda sebagai guru pengampu pada mapel
+                            tersebut di halaman edit kelas.
+                        </p>
+                    )}
                 </Panel>
             </div>
         </DashboardLayout>

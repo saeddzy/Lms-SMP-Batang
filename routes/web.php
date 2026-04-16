@@ -57,6 +57,7 @@ Route::middleware('auth')->group(function () {
     // Classes
     Route::resource('classes', ClassController::class);
     Route::post('classes/{class}/enroll-students', [ClassController::class, 'enrollStudents'])->name('classes.enroll-students');
+    Route::post('classes/{class}/promote-students', [ClassController::class, 'promoteStudents'])->name('classes.promote-students');
     Route::delete('classes/{class}/remove-student/{student}', [ClassController::class, 'removeStudent'])->name('classes.remove-student');
     Route::patch('classes/{class}/toggle-active', [ClassController::class, 'toggleActive'])->name('classes.toggle-active');
 
@@ -113,6 +114,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/student/dashboard', [StudentDashboardController::class, 'index'])->name('student.dashboard');
     Route::get('/student/classes', [StudentDashboardController::class, 'myClasses'])->name('student.classes');
     Route::get('/student/grades', [StudentDashboardController::class, 'grades'])->name('student.grades');
+    Route::get('/student/enrollment-history', [StudentDashboardController::class, 'enrollmentHistory'])->name('student.enrollment-history');
     Route::get('/student/tasks', [StudentDashboardController::class, 'tasks'])->name('student.tasks');
     Route::get('/student/quizzes', [StudentDashboardController::class, 'quizzes'])->name('student.quizzes');
     Route::get('/student/exams', [StudentDashboardController::class, 'exams'])->name('student.exams');

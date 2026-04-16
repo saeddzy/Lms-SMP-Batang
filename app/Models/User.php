@@ -88,11 +88,23 @@ class User extends Authenticatable
     }
 
     /**
-     * Get the classes this student is enrolled in.
+     * Get the classes this student is enrolled in (hanya enrollment aktif — akses pembelajaran).
      */
     public function enrolledClasses()
     {
-        return $this->hasManyThrough(SchoolClass::class, StudentEnrollment::class, 'student_id', 'id', 'id', 'class_id');
+        return $this->hasManyThrough(SchoolClass::class, StudentEnrollment::class, 'student_id', 'id', 'id', 'class_id')
+            ->where('student_enrollments.status', 'active');
+    }
+
+    /**
+     * Riwayat enrollment (naik kelas / pindah) — tidak untuk akses konten kelas lama.
+     */
+    public function enrollmentHistory(): HasMany
+    {
+        return $this->hasMany(StudentEnrollment::class, 'student_id')
+            ->where('status', '!=', 'active')
+            ->orderByDesc('left_at')
+            ->orderByDesc('updated_at');
     }
 
     /**

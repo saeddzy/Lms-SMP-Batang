@@ -1,12 +1,43 @@
-import React from "react";
+import React, { useState } from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import Table from "@/Components/Table";
 import Button from "@/Components/Button";
-import { Head, usePage } from "@inertiajs/react";
+import { Head, Link, router, usePage } from "@inertiajs/react";
 import hasAnyPermission from "@/Utils/Permissions";
 
 export default function Show() {
-    const { schoolClass, showTeacherOnlySubjects } = usePage().props;
+    const {
+        schoolClass,
+        showTeacherOnlySubjects,
+        stats = {},
+        promotionTargets = [],
+        canPromoteStudents = false,
+    } = usePage().props;
+
+    const [targetClassId, setTargetClassId] = useState("");
+    const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+
+    const toggleStudent = (id) => {
+        setSelectedStudentIds((prev) =>
+            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+        );
+    };
+
+    const postPromote = (promoteAll) => {
+        if (!targetClassId) {
+            alert("Pilih kelas tujuan terlebih dahulu.");
+            return;
+        }
+        if (!promoteAll && selectedStudentIds.length === 0) {
+            alert("Pilih minimal satu siswa, atau gunakan “Naikkan semua”.");
+            return;
+        }
+        router.post(route("classes.promote-students", schoolClass.id), {
+            target_class_id: targetClassId,
+            student_ids: promoteAll ? [] : selectedStudentIds,
+            promote_all: promoteAll,
+        });
+    };
 
     return (
         <DashboardLayout title={`Detail Kelas: ${schoolClass.name}`}>
@@ -87,7 +118,11 @@ export default function Show() {
                                     Jumlah Siswa
                                 </label>
                                 <p className="mt-1 text-sm text-gray-900">
-                                    {schoolClass.students?.length || 0} siswa
+                                    {schoolClass.student_count ??
+                                        schoolClass.enrollments?.length ??
+                                        schoolClass.students?.length ??
+                                        0}{" "}
+                                    siswa
                                 </p>
                             </div>
                         </div>
@@ -106,11 +141,11 @@ export default function Show() {
                     </h3>
                     {schoolClass.class_subjects && schoolClass.class_subjects.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {schoolClass.class_subjects.map((classSubject, i) => (
-                                <div
-                                    key={i}
-                                    className="bg-white overflow-hidden shadow-sm sm:rounded-lg border border-gray-200 hover:shadow-md transition-shadow cursor-pointer"
-                                    onClick={() => window.location.href = route('subjects.show', classSubject.subject.id) + '?class_subject_id=' + classSubject.id}
+                            {schoolClass.class_subjects.map((classSubject) => (
+                                <Link
+                                    key={classSubject.id}
+                                    href={`${route("subjects.show", classSubject.subject.id)}?class_subject_id=${classSubject.id}`}
+                                    className="block bg-white overflow-hidden shadow-sm sm:rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
                                 >
                                     <div className="p-6">
                                         <div className="flex items-start justify-between">
@@ -123,15 +158,15 @@ export default function Show() {
                                                         Kode: {classSubject.subject.code}
                                                     </p>
                                                 )}
-                                                <div className="space-y-2">
+                                                    <div className="space-y-2">
                                                     <div>
-                                                        <span className="text-sm font-medium text-gray-700">Guru Pengajar:</span>
+                                                        <span className="text-sm font-medium text-gray-700">Guru pengampu:</span>
                                                         <p className="text-sm text-gray-900">
-                                                            {classSubject.teacher?.name || classSubject.subject?.teacher?.name || 'Belum ditentukan'}
+                                                            {classSubject.teacher?.name || 'Belum ditentukan'}
                                                         </p>
-                                                        {(classSubject.teacher?.email || classSubject.subject?.teacher?.email) && (
+                                                        {classSubject.teacher?.email && (
                                                             <p className="text-xs text-gray-500">
-                                                                {classSubject.teacher?.email || classSubject.subject?.teacher?.email}
+                                                                {classSubject.teacher.email}
                                                             </p>
                                                         )}
                                                     </div>
@@ -146,7 +181,7 @@ export default function Show() {
                                             </span>
                                         </div>
                                     </div>
-                                </div>
+                                </Link>
                             ))}
                         </div>
                     ) : (
@@ -160,11 +195,62 @@ export default function Show() {
                     )}
                 </div>
 
+                {canPromoteStudents && promotionTargets.length > 0 && (
+                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/80 p-6 shadow-sm">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                            Naik / pindah kelas
+                        </h3>
+                        <p className="mt-1 text-sm text-gray-600">
+                            Pindahkan siswa ke kelas tujuan. Data tugas, kuis, dan nilai di
+                            kelas ini tetap tersimpan; siswa tidak lagi mengakses pembelajaran
+                            kelas ini.
+                        </p>
+                        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                            <div className="min-w-[200px]">
+                                <label className="block text-xs font-medium text-gray-700">
+                                    Kelas tujuan
+                                </label>
+                                <select
+                                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    value={targetClassId}
+                                    onChange={(e) => setTargetClassId(e.target.value)}
+                                >
+                                    <option value="">— Pilih kelas —</option>
+                                    {promotionTargets.map((c) => (
+                                        <option key={c.id} value={c.id}>
+                                            {c.name} ({c.academic_year})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => postPromote(false)}
+                                disabled={!targetClassId}
+                                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Pindahkan terpilih
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => postPromote(true)}
+                                disabled={!targetClassId}
+                                className="rounded-md border border-indigo-200 bg-white px-4 py-2 text-sm font-medium text-indigo-800 shadow-sm hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Naikkan semua siswa
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Students List */}
-                <Table.Card title={`Daftar Siswa (${schoolClass.students?.length || 0})`}>
+                <Table.Card title={`Daftar Siswa (${schoolClass.enrollments?.length ?? schoolClass.student_count ?? schoolClass.students?.length ?? 0})`}>
                     <Table>
                         <Table.Thead>
                             <tr>
+                                {canPromoteStudents && promotionTargets.length > 0 && (
+                                    <Table.Th className="w-10">Pilih</Table.Th>
+                                )}
                                 <Table.Th>#</Table.Th>
                                 <Table.Th>Nama Siswa</Table.Th>
                                 <Table.Th>Email</Table.Th>
@@ -175,20 +261,40 @@ export default function Show() {
                             </tr>
                         </Table.Thead>
                         <Table.Tbody>
-                            {schoolClass.students && schoolClass.students.length > 0 ? (
-                                schoolClass.students.map((student, i) => (
-                                    <tr key={i}>
+                            {schoolClass.enrollments && schoolClass.enrollments.length > 0 ? (
+                                schoolClass.enrollments.map((enrollment, i) => (
+                                    <tr key={enrollment.id ?? i}>
+                                        {canPromoteStudents && promotionTargets.length > 0 && (
+                                            <Table.Td>
+                                                <input
+                                                    type="checkbox"
+                                                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                                    checked={selectedStudentIds.includes(
+                                                        enrollment.student?.id
+                                                    )}
+                                                    onChange={() =>
+                                                        toggleStudent(enrollment.student?.id)
+                                                    }
+                                                    disabled={!enrollment.student?.id}
+                                                />
+                                            </Table.Td>
+                                        )}
                                         <Table.Td>{i + 1}</Table.Td>
-                                        <Table.Td>{student.name}</Table.Td>
-                                        <Table.Td>{student.email}</Table.Td>
+                                        <Table.Td>{enrollment.student?.name ?? "—"}</Table.Td>
+                                        <Table.Td>{enrollment.student?.email ?? "—"}</Table.Td>
                                         <Table.Td>
-                                            {new Date(student.created_at).toLocaleDateString('id-ID')}
+                                            {enrollment.enrolled_at
+                                                ? new Date(enrollment.enrolled_at).toLocaleDateString("id-ID")
+                                                : "—"}
                                         </Table.Td>
                                         {hasAnyPermission(["classes manage_students"]) && (
                                             <Table.Td>
                                                 <Button
                                                     type={"delete"}
-                                                    url={route("classes.remove-student", [schoolClass.id, student.id])}
+                                                    url={route("classes.remove-student", [
+                                                        schoolClass.id,
+                                                        enrollment.student?.id,
+                                                    ])}
                                                     confirmMessage="Apakah Anda yakin ingin menghapus siswa ini dari kelas?"
                                                 />
                                             </Table.Td>
@@ -197,7 +303,14 @@ export default function Show() {
                                 ))
                             ) : (
                                 <tr>
-                                    <Table.Td colSpan={hasAnyPermission(["classes manage_students"]) ? 5 : 4} className="text-center py-8">
+                                    <Table.Td
+                                        colSpan={
+                                            (canPromoteStudents && promotionTargets.length > 0 ? 1 : 0) +
+                                            4 +
+                                            (hasAnyPermission(["classes manage_students"]) ? 1 : 0)
+                                        }
+                                        className="text-center py-8"
+                                    >
                                         <div className="text-gray-500">
                                             Belum ada siswa yang terdaftar di kelas ini
                                         </div>
@@ -232,7 +345,9 @@ export default function Show() {
                                 <div className="ml-4">
                                     <h3 className="text-lg font-medium text-gray-900">Materi</h3>
                                     <p className="text-sm text-gray-500">Materi pembelajaran yang tersedia</p>
-                                    <p className="text-2xl font-bold text-blue-600">0</p>
+                                    <p className="text-2xl font-bold text-blue-600">
+                                        {stats.materials_count ?? 0}
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -251,7 +366,9 @@ export default function Show() {
                                 <div className="ml-4">
                                     <h3 className="text-lg font-medium text-gray-900">Tugas</h3>
                                     <p className="text-sm text-gray-500">Tugas yang diberikan</p>
-                                    <p className="text-2xl font-bold text-green-600">0</p>
+                                    <p className="text-2xl font-bold text-green-600">
+                                        {stats.tasks_count ?? 0}
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -268,9 +385,13 @@ export default function Show() {
                                     </div>
                                 </div>
                                 <div className="ml-4">
-                                    <h3 className="text-lg font-medium text-gray-900">Nilai Rata-rata</h3>
-                                    <p className="text-sm text-gray-500">Nilai rata-rata kelas</p>
-                                    <p className="text-2xl font-bold text-purple-600">-</p>
+                                    <h3 className="text-lg font-medium text-gray-900">Nilai rata-rata</h3>
+                                    <p className="text-sm text-gray-500">Rata-rata nilai akhir (semua mapel)</p>
+                                    <p className="text-2xl font-bold text-purple-600">
+                                        {stats.grades_average != null
+                                            ? `${stats.grades_average}%`
+                                            : "—"}
+                                    </p>
                                 </div>
                             </div>
                         </div>

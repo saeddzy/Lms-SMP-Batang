@@ -41,7 +41,9 @@ export default function Index() {
         filters = {},
         selectedClassId,
         selectedSubjectId,
+        auth = {},
     } = usePage().props;
+    const canInputGrades = auth.canInputGrades ?? false;
 
     const summary = useMemo(() => {
         if (classBoard.length === 0) {
@@ -82,7 +84,7 @@ export default function Index() {
                         >
                             Download CSV (Excel)
                         </a>
-                        {hasAnyPermission(["grades create"]) && (
+                        {canInputGrades && hasAnyPermission(["grades calculate"]) && (
                             <Button type="add" url={route("grades.create")} />
                         )}
                     </div>

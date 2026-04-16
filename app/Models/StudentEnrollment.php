@@ -14,12 +14,14 @@ class StudentEnrollment extends Model
         'student_id',
         'class_id',
         'enrolled_at',
+        'left_at',
         'status', // active, inactive, graduated, transferred
         'notes',
     ];
 
     protected $casts = [
         'enrolled_at' => 'datetime',
+        'left_at' => 'datetime',
     ];
 
     /**

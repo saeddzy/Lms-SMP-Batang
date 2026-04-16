@@ -253,8 +253,13 @@ class MaterialController extends Controller
             'classSubject',
         ]);
 
+        $cs = $material->classSubject;
+        $canManageMaterial = auth()->user()->hasRole('admin')
+            || ($cs && $cs->isAssignedSlotTeacher(auth()->user()));
+
         return Inertia::render('Materials/Show', [
             'material' => $material,
+            'canManageMaterial' => $canManageMaterial,
         ]);
     }
 
@@ -317,6 +322,8 @@ class MaterialController extends Controller
         if (!$classSubject) {
             return back()->withErrors(['subject_id' => 'Mata pelajaran tidak ditemukan untuk kelas ini.']);
         }
+
+        $this->authorizeClassSubjectSlotTeacher($classSubject);
 
         if ($validated['material_type'] === 'pdf' && !$request->hasFile('file') && !$material->file_path) {
             return back()->withErrors(['file' => 'File PDF wajib diunggah.']);

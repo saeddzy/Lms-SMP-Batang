@@ -11,7 +11,8 @@ const badge =
     "inline-flex items-center rounded-lg px-2.5 py-0.5 text-xs font-medium ring-1 ring-stone-200/80 bg-stone-50 text-stone-700";
 
 export default function Index() {
-    const { materials, filters = {} } = usePage().props;
+    const { materials, filters = {}, auth = {} } = usePage().props;
+    const canMutate = auth.canMutateTeachingContent ?? false;
     const searchQuery = filters.search ?? "";
     const totalMaterials = materials?.total ?? materials?.data?.length ?? 0;
 
@@ -91,7 +92,7 @@ export default function Index() {
                 </div>
 
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    {hasAnyPermission(["materials create"]) && (
+                    {canMutate && hasAnyPermission(["materials create"]) && (
                         <Button
                             type="add"
                             url={route("materials.create")}

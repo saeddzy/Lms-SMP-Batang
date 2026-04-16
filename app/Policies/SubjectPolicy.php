@@ -23,12 +23,18 @@ class SubjectPolicy
                 return true;
             }
 
-            return $subject->classSubjects()->where('teacher_id', $user->id)->exists();
+            if ($subject->classSubjects()->where('teacher_id', $user->id)->exists()) {
+                return true;
+            }
+
+            return $subject->classSubjects()
+                ->whereHas('schoolClass', fn ($q) => $q->where('teacher_id', $user->id))
+                ->exists();
         }
 
         if ($user->hasRole('siswa') && $user->hasPermissionTo('subjects view')) {
             return $subject->classSubjects()
-                ->whereHas('schoolClass.enrollments', fn ($q) => $q->where('student_id', $user->id))
+                ->whereHas('schoolClass.enrollments', fn ($q) => $q->where('student_id', $user->id)->where('status', 'active'))
                 ->exists();
         }
 

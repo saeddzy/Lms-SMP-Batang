@@ -6,24 +6,24 @@ import { Head, usePage, Link } from "@inertiajs/react";
 import hasAnyPermission from "@/Utils/Permissions";
 
 export default function Show() {
-    const { subject, classContext, classSubject } = usePage().props;
+    const { subject, classContext, classSubject, stats = {}, canManageLearning = false } = usePage().props;
     const [activeTab, setActiveTab] = useState('overview');
 
     const tabs = [
         { id: 'overview', label: 'Ringkasan', count: null },
-        { id: 'materials', label: 'Materi', count: subject.materials?.length || 0 },
-        { id: 'tasks', label: 'Tugas', count: subject.tasks?.length || 0 },
-        { id: 'quizzes', label: 'Kuis', count: subject.quizzes?.length || 0 },
-        { id: 'exams', label: 'Ujian', count: subject.exams?.length || 0 },
+        { id: 'materials', label: 'Materi', count: stats.materials_count ?? subject.materials?.length ?? 0 },
+        { id: 'tasks', label: 'Tugas', count: stats.tasks_count ?? subject.tasks?.length ?? 0 },
+        { id: 'quizzes', label: 'Kuis', count: stats.quizzes_count ?? subject.quizzes?.length ?? 0 },
+        { id: 'exams', label: 'Ujian', count: stats.exams_count ?? subject.exams?.length ?? 0 },
     ];
 
     const withClassContext = (url) => classSubject ? `${url}?class_subject_id=${classSubject.id}` : url;
 
     const actionButtons = {
-        materials: { create: hasAnyPermission(["materials create"]), url: withClassContext(route("materials.create")) },
-        tasks: { create: hasAnyPermission(["tasks create"]), url: withClassContext(route("tasks.create")) },
-        quizzes: { create: hasAnyPermission(["quizzes create"]), url: withClassContext(route("quizzes.create")) },
-        exams: { create: hasAnyPermission(["exams create"]), url: withClassContext(route("exams.create")) },
+        materials: { create: canManageLearning && hasAnyPermission(["materials create"]), url: withClassContext(route("materials.create")) },
+        tasks: { create: canManageLearning && hasAnyPermission(["tasks create"]), url: withClassContext(route("tasks.create")) },
+        quizzes: { create: canManageLearning && hasAnyPermission(["quizzes create"]), url: withClassContext(route("quizzes.create")) },
+        exams: { create: canManageLearning && hasAnyPermission(["exams create"]), url: withClassContext(route("exams.create")) },
     };
 
     return (
@@ -127,7 +127,7 @@ export default function Show() {
                         <div className="bg-white shadow-sm sm:rounded-lg overflow-hidden">
                             <div className="px-6 py-4 border-b border-gray-200">
                                 <h3 className="text-lg font-semibold text-gray-900">
-                                    Daftar Kelas ({subject.classes?.length || 0})
+                                    Daftar Kelas ({subject.class_subjects?.length ?? 0})
                                 </h3>
                             </div>
                             <Table>
@@ -135,7 +135,7 @@ export default function Show() {
                                     <tr>
                                         <Table.Th>#</Table.Th>
                                         <Table.Th>Nama Kelas</Table.Th>
-                                        <Table.Th>Guru Pengajar</Table.Th>
+                                        <Table.Th>Wali Kelas</Table.Th>
                                         <Table.Th>Tahun Ajaran</Table.Th>
                                         <Table.Th>Jumlah Siswa</Table.Th>
                                         <Table.Th>Status</Table.Th>
@@ -145,24 +145,26 @@ export default function Show() {
                                     </tr>
                                 </Table.Thead>
                                 <Table.Tbody>
-                                    {subject.classes && subject.classes.length > 0 ? (
-                                        subject.classes.map((schoolClass, i) => (
-                                            <tr key={i}>
+                                    {subject.class_subjects && subject.class_subjects.length > 0 ? (
+                                        subject.class_subjects.map((cs, i) => {
+                                            const schoolClass = cs.school_class ?? cs.schoolClass;
+                                            return (
+                                            <tr key={cs.id}>
                                                 <Table.Td>{i + 1}</Table.Td>
-                                                <Table.Td>{schoolClass.name}</Table.Td>
-                                                <Table.Td>{schoolClass.teacher?.name || '-'}</Table.Td>
-                                                <Table.Td>{schoolClass.academic_year}</Table.Td>
-                                                <Table.Td>{schoolClass.students?.length || 0}</Table.Td>
+                                                <Table.Td>{schoolClass?.name ?? "—"}</Table.Td>
+                                                <Table.Td>{schoolClass?.teacher?.name ?? "—"}</Table.Td>
+                                                <Table.Td>{schoolClass?.academic_year ?? "—"}</Table.Td>
+                                                <Table.Td>{schoolClass?.students_count ?? 0}</Table.Td>
                                                 <Table.Td>
                                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                                        schoolClass.is_active
+                                                        schoolClass?.is_active
                                                             ? 'bg-green-100 text-green-700'
                                                             : 'bg-red-100 text-red-700'
                                                     }`}>
-                                                        {schoolClass.is_active ? 'Aktif' : 'Tidak Aktif'}
+                                                        {schoolClass?.is_active ? 'Aktif' : 'Tidak Aktif'}
                                                     </span>
                                                 </Table.Td>
-                                                {hasAnyPermission(["classes view"]) && (
+                                                {hasAnyPermission(["classes view"]) && schoolClass?.id && (
                                                     <Table.Td>
                                                         <Button
                                                             type={"view"}
@@ -171,7 +173,7 @@ export default function Show() {
                                                     </Table.Td>
                                                 )}
                                             </tr>
-                                        ))
+                                        );})
                                     ) : (
                                         <tr>
                                             <Table.Td colSpan={hasAnyPermission(["classes view"]) ? 7 : 6} className="text-center py-8">
@@ -191,7 +193,7 @@ export default function Show() {
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <p className="text-sm text-gray-600 font-medium">Total Materi</p>
-                                        <p className="text-3xl font-bold text-gray-900 mt-2">{subject.materials?.length || 0}</p>
+                                        <p className="text-3xl font-bold text-gray-900 mt-2">{stats.materials_count ?? subject.materials?.length ?? 0}</p>
                                     </div>
                                     <div className="text-4xl text-blue-100">📚</div>
                                 </div>
@@ -200,7 +202,7 @@ export default function Show() {
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <p className="text-sm text-gray-600 font-medium">Total Tugas</p>
-                                        <p className="text-3xl font-bold text-gray-900 mt-2">{subject.tasks?.length || 0}</p>
+                                        <p className="text-3xl font-bold text-gray-900 mt-2">{stats.tasks_count ?? subject.tasks?.length ?? 0}</p>
                                     </div>
                                     <div className="text-4xl text-green-100">✓</div>
                                 </div>
@@ -218,7 +220,7 @@ export default function Show() {
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <p className="text-sm text-gray-600 font-medium">Total Ujian</p>
-                                        <p className="text-3xl font-bold text-gray-900 mt-2">{subject.exams?.length || 0}</p>
+                                        <p className="text-3xl font-bold text-gray-900 mt-2">{stats.exams_count ?? subject.exams?.length ?? 0}</p>
                                     </div>
                                     <div className="text-4xl text-red-100">📋</div>
                                 </div>
@@ -232,7 +234,7 @@ export default function Show() {
                     <div className="bg-white shadow-sm sm:rounded-lg overflow-hidden">
                         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                             <h3 className="text-lg font-semibold text-gray-900">
-                                Daftar Materi ({subject.materials?.length || 0})
+                                Daftar Materi ({stats.materials_count ?? subject.materials?.length ?? 0})
                             </h3>
                             {actionButtons.materials.create && (
                                 <Link href={actionButtons.materials.url} className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors">
@@ -328,12 +330,17 @@ export default function Show() {
                                                 <div>
                                                     <h4 className="font-semibold text-gray-900">{task.title}</h4>
                                                     <p className="text-sm text-gray-600 mt-1">{task.description}</p>
-                                                    <div className="mt-3 flex gap-4 text-xs text-gray-500">
-                                                        <span>Due: {new Date(task.due_date).toLocaleDateString('id-ID')}</span>
+                                                    <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-500">
+                                                        <span>
+                                                            Tenggat:{" "}
+                                                            {task.due_date
+                                                                ? new Date(task.due_date).toLocaleDateString("id-ID")
+                                                                : "—"}
+                                                        </span>
                                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full font-medium ${
-                                                            task.status === 'published' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                                            task.is_active ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"
                                                         }`}>
-                                                            {task.status === 'published' ? 'Dipublikasikan' : 'Draft'}
+                                                            {task.is_active ? "Aktif" : "Tidak aktif"}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -361,7 +368,7 @@ export default function Show() {
                     <div className="bg-white shadow-sm sm:rounded-lg overflow-hidden">
                         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                             <h3 className="text-lg font-semibold text-gray-900">
-                                Daftar Kuis ({subject.quizzes?.length || 0})
+                                Daftar Kuis ({stats.quizzes_count ?? subject.quizzes?.length ?? 0})
                             </h3>
                             {actionButtons.quizzes.create && (
                                 <Link href={actionButtons.quizzes.url} className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors">
@@ -411,7 +418,7 @@ export default function Show() {
                     <div className="bg-white shadow-sm sm:rounded-lg overflow-hidden">
                         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                             <h3 className="text-lg font-semibold text-gray-900">
-                                Daftar Ujian ({subject.exams?.length || 0})
+                                Daftar Ujian ({stats.exams_count ?? subject.exams?.length ?? 0})
                             </h3>
                             {actionButtons.exams.create && (
                                 <Link href={actionButtons.exams.url} className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors">
@@ -429,7 +436,14 @@ export default function Show() {
                                                     <h4 className="font-semibold text-gray-900">{exam.title}</h4>
                                                     <p className="text-sm text-gray-600 mt-1">{exam.description}</p>
                                                     <div className="mt-3 flex gap-4 text-xs text-gray-500">
-                                                        <span>Tanggal: {new Date(exam.exam_date).toLocaleDateString('id-ID')}</span>
+                                                        <span>
+                                                            Tanggal:{" "}
+                                                            {exam.exam_date
+                                                                ? new Date(exam.exam_date).toLocaleDateString("id-ID")
+                                                                : exam.scheduled_date
+                                                                  ? new Date(exam.scheduled_date).toLocaleDateString("id-ID")
+                                                                  : "—"}
+                                                        </span>
                                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full font-medium ${
                                                             exam.is_active ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                                                         }`}>

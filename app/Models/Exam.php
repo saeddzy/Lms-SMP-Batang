@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 class Exam extends Model
 {
@@ -16,14 +15,10 @@ class Exam extends Model
         'title',
         'description',
         'instructions',
-        'rules',
         'exam_date',
         'start_time',
         'end_time',
-        'duration', // in minutes (legacy)
-        'scheduled_date',
-        'duration_minutes',
-        'total_questions',
+        'duration', // in minutes
         'total_marks',
         'passing_marks',
         'class_id',
@@ -31,27 +26,16 @@ class Exam extends Model
         'created_by',
         'is_active',
         'exam_type', // mid_term, final, quiz, etc.
-        'is_cancelled',
-        'max_attempts',
-        'requires_supervision',
-        'allow_review',
     ];
 
     protected $casts = [
         'exam_date' => 'date',
         'start_time' => 'datetime',
         'end_time' => 'datetime',
-        'scheduled_date' => 'datetime',
         'duration' => 'integer',
-        'duration_minutes' => 'integer',
-        'total_questions' => 'integer',
         'total_marks' => 'decimal:2',
         'passing_marks' => 'decimal:2',
         'is_active' => 'boolean',
-        'is_cancelled' => 'boolean',
-        'max_attempts' => 'integer',
-        'requires_supervision' => 'boolean',
-        'allow_review' => 'boolean',
     ];
 
     /**
@@ -71,21 +55,6 @@ class Exam extends Model
     }
 
     /**
-     * Mata pelajaran lewat class_subject (untuk eager load subject).
-     */
-    public function subject(): HasOneThrough
-    {
-        return $this->hasOneThrough(
-            Subject::class,
-            ClassSubject::class,
-            'id',
-            'id',
-            'class_subject_id',
-            'subject_id'
-        );
-    }
-
-    /**
      * Get the user who created this exam.
      */
     public function creator(): BelongsTo
@@ -96,7 +65,7 @@ class Exam extends Model
     /**
      * Get the teacher who owns this exam through class subject.
      */
-    public function teacher(): HasOneThrough
+    public function teacher(): BelongsTo
     {
         return $this->hasOneThrough(User::class, ClassSubject::class, 'id', 'id', 'class_subject_id', 'teacher_id');
     }
@@ -107,22 +76,6 @@ class Exam extends Model
     public function examScores(): HasMany
     {
         return $this->hasMany(ExamScore::class, 'exam_id');
-    }
-
-    /**
-     * Soal ujian.
-     */
-    public function questions(): HasMany
-    {
-        return $this->hasMany(ExamQuestion::class, 'exam_id');
-    }
-
-    /**
-     * Percobaan mengikuti ujian (siswa).
-     */
-    public function attempts(): HasMany
-    {
-        return $this->hasMany(ExamAttempt::class, 'exam_id');
     }
 
     /**

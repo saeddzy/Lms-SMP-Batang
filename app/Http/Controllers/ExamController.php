@@ -191,6 +191,8 @@ class ExamController extends Controller
             return back()->withErrors(['subject_id' => 'Mata pelajaran tidak ditemukan untuk kelas ini.']);
         }
 
+        $this->authorizeClassSubjectSlotTeacher($classSubject);
+
         $examType = match ($validated['type']) {
             'midterm' => 'mid_term',
             'final' => 'final',
@@ -241,6 +243,7 @@ class ExamController extends Controller
             $load[] = 'schoolClass.students';
         }
         $exam->load($load);
+        $exam->loadMissing('classSubject');
 
         // Load attempts for teachers and admins
         if (auth()->user()->can('exams view') && !auth()->user()->hasRole('siswa')) {
@@ -269,9 +272,14 @@ class ExamController extends Controller
                 ->get();
         }
 
+        $cs = $exam->classSubject;
+        $canManageExam = auth()->user()->hasRole('admin')
+            || ($cs && $cs->isAssignedSlotTeacher(auth()->user()));
+
         return Inertia::render('Exams/Show', [
             'exam' => $exam,
             'attempts' => $attempts ?? [],
+            'canManageExam' => $canManageExam,
         ]);
     }
 
@@ -334,6 +342,8 @@ class ExamController extends Controller
         if (! $classSubject) {
             return back()->withErrors(['subject_id' => 'Mata pelajaran tidak ditemukan untuk kelas ini.']);
         }
+
+        $this->authorizeClassSubjectSlotTeacher($classSubject);
 
         $examType = match ($validated['type']) {
             'midterm' => 'mid_term',

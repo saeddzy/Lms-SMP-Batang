@@ -6,6 +6,10 @@ use App\Models\ClassSubject;
 use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\User;
+use App\Models\Material;
+use App\Models\Task;
+use App\Models\Quiz;
+use App\Models\Exam;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
@@ -32,7 +36,8 @@ class SubjectController extends Controller
                 $u = $request->user();
                 $query->where(function ($q) use ($u) {
                     $q->where('teacher_id', $u->id)
-                        ->orWhereHas('classSubjects', fn ($cs) => $cs->forTeacher($u));
+                        ->orWhereHas('classSubjects', fn ($cs) => $cs->forTeacher($u))
+                        ->orWhereHas('classSubjects.schoolClass', fn ($sc) => $sc->where('teacher_id', $u->id));
                 });
             }
         }
@@ -122,8 +127,8 @@ class SubjectController extends Controller
                 ->first();
 
             if ($classSubject && auth()->user()->hasRole('guru')) {
-                if (!$classSubject->isTaughtBy(auth()->user())) {
-                    abort(403, 'Anda tidak mengampu mapel ini di kelas tersebut.');
+                if (! $classSubject->isVisibleToTeacher(auth()->user())) {
+                    abort(403, 'Anda tidak memiliki akses ke mata pelajaran ini di kelas tersebut.');
                 }
             }
 
@@ -139,38 +144,97 @@ class SubjectController extends Controller
                     ->first();
 
                 if ($classSubject && auth()->user()->hasRole('guru')) {
-                    if (!$classSubject->isTaughtBy(auth()->user())) {
-                        abort(403, 'Anda tidak mengampu mapel ini di kelas tersebut.');
+                    if (! $classSubject->isVisibleToTeacher(auth()->user())) {
+                        abort(403, 'Anda tidak memiliki akses ke mata pelajaran ini di kelas tersebut.');
                     }
                 }
             }
         }
 
         $subject->load([
-            'gradeComponents' => function($query) {
+            'gradeComponents' => function ($query) {
                 $query->orderBy('weight', 'desc');
             },
-            'classSubjects.schoolClass',
-            'classSubjects.teacher',
+            'classSubjects' => function ($query) {
+                $query->with([
+                    'subject',
+                    'schoolClass' => function ($q) {
+                        $q->with('teacher')->withCount('enrollments as students_count');
+                    },
+                    'teacher',
+                ]);
+            },
             'teacher',
-            'materials' => function($query) {
-                $query->latest()->take(10);
-            },
-            'tasks' => function($query) {
-                $query->latest()->take(10);
-            },
-            'quizzes' => function($query) {
-                $query->latest()->take(10);
-            },
-            'exams' => function($query) {
-                $query->latest()->take(10);
-            }
         ]);
+
+        $csId = $classSubject?->id;
+
+        if ($csId) {
+            $subject->setRelation(
+                'materials',
+                Material::where('class_subject_id', $csId)->latest()->limit(50)->get()
+            );
+            $subject->setRelation(
+                'tasks',
+                Task::where('class_subject_id', $csId)->latest()->limit(50)->get()
+            );
+            $subject->setRelation(
+                'quizzes',
+                Quiz::where('class_subject_id', $csId)->latest()->limit(50)->get()
+            );
+            $subject->setRelation(
+                'exams',
+                Exam::where('class_subject_id', $csId)->latest()->limit(50)->get()
+            );
+            $stats = [
+                'materials_count' => Material::where('class_subject_id', $csId)->count(),
+                'tasks_count' => Task::where('class_subject_id', $csId)->count(),
+                'quizzes_count' => Quiz::where('class_subject_id', $csId)->count(),
+                'exams_count' => Exam::where('class_subject_id', $csId)->count(),
+            ];
+        } else {
+            $subject->load([
+                'materials' => function ($query) {
+                    $query->latest()->limit(50);
+                },
+                'tasks' => function ($query) {
+                    $query->latest()->limit(50);
+                },
+                'quizzes' => function ($query) {
+                    $query->latest()->limit(50);
+                },
+                'exams' => function ($query) {
+                    $query->latest()->limit(50);
+                },
+            ]);
+            $stats = [
+                'materials_count' => $subject->materials()->count(),
+                'tasks_count' => $subject->tasks()->count(),
+                'quizzes_count' => $subject->quizzes()->count(),
+                'exams_count' => $subject->exams()->count(),
+            ];
+        }
+
+        if (auth()->user()->hasRole('guru')) {
+            $guru = auth()->user();
+            $subject->setRelation(
+                'classSubjects',
+                $subject->classSubjects->filter(function ($cs) use ($guru) {
+                    return $cs->isVisibleToTeacher($guru);
+                })->values()
+            );
+        }
+
+        $user = $request->user();
+        $canManageLearning = $user->hasRole('admin')
+            || ($classSubject && $classSubject->isAssignedSlotTeacher($user));
 
         return Inertia::render('Subjects/Show', [
             'subject' => $subject,
             'classContext' => $classContext,
             'classSubject' => $classSubject,
+            'stats' => $stats,
+            'canManageLearning' => $canManageLearning,
         ]);
     }
 

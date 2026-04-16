@@ -37,7 +37,7 @@ function downloadHref(fileUrl, isRemote) {
 }
 
 export default function Show() {
-    const { material } = usePage().props;
+    const { material, canManageMaterial = false } = usePage().props;
     const isStudent = hasRole("siswa");
 
     const fileUrl = material.file_public_url || null;
@@ -162,13 +162,13 @@ export default function Show() {
                                         </a>
                                     </>
                                 )}
-                                {hasAnyPermission(["materials edit"]) && (
+                                {canManageMaterial && hasAnyPermission(["materials edit"]) && (
                                     <Button
                                         type="edit"
                                         url={route("materials.edit", material.id)}
                                     />
                                 )}
-                                {hasAnyPermission(["materials delete"]) && (
+                                {canManageMaterial && hasAnyPermission(["materials delete"]) && (
                                     <Button
                                         type="delete"
                                         url={route("materials.destroy", material.id)}

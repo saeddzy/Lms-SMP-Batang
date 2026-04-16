@@ -19,6 +19,7 @@ import {
     IconBrain,
     IconChartBar,
     IconTestPipe,
+    IconHistory,
 } from "@tabler/icons-react";
 
 const iconProps = { stroke: 1.5, className: "h-5 w-5 shrink-0" };
@@ -130,6 +131,12 @@ export default function Sidebar({
                 active: route().current("student.grades"),
             });
         }
+        navItems.push({
+            href: route("student.enrollment-history"),
+            label: "Riwayat kelas",
+            icon: IconHistory,
+            active: route().current("student.enrollment-history"),
+        });
     }
 
     /** Guru & admin: dashboard mengajar / admin */

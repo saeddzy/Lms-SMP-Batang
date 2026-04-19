@@ -5,6 +5,7 @@ import Pagination from "@/Components/Pagination";
 import { Head, router, usePage } from "@inertiajs/react";
 import Search from "@/Components/Search";
 import hasAnyPermission, { hasRole } from "@/Utils/Permissions";
+import ClassCardThumbnail from "@/Components/ClassCardThumbnail";
 
 export default function Index() {
     const { classes, filters } = usePage().props;
@@ -26,9 +27,9 @@ export default function Index() {
                     </div>
                 </div>
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-                    {classes.data.map((schoolClass, i) => (
+                    {classes.data.map((schoolClass) => (
                         <div
-                            key={i}
+                            key={schoolClass.id}
                             role="button"
                             tabIndex={0}
                             onClick={() =>
@@ -44,8 +45,10 @@ export default function Index() {
                                     );
                                 }
                             }}
-                            className="flex cursor-pointer flex-col rounded-2xl border border-stone-200/80 bg-white p-6 shadow-sm transition-colors hover:border-stone-300 hover:bg-stone-50/50"
+                            className="flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-sm transition-colors hover:border-stone-300 hover:bg-stone-50/50"
                         >
+                            <ClassCardThumbnail classId={schoolClass.id} />
+                            <div className="flex flex-col p-6">
                             <div className="mb-4 flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                     <h3 className="text-lg font-semibold tracking-tight text-stone-900">
@@ -138,6 +141,7 @@ export default function Index() {
                                         )}
                                     />
                                 )}
+                            </div>
                             </div>
                         </div>
                     ))}

@@ -44,7 +44,7 @@ function examWindow(exam) {
 }
 
 export default function Show() {
-    const { exam, attempts = [] } = usePage().props;
+    const { exam, attempts = [], canManageExam = false } = usePage().props;
     const isStudent = hasRole("siswa");
     const sc = exam.school_class ?? exam.schoolClass;
 
@@ -455,13 +455,13 @@ export default function Show() {
                         Aksi guru
                     </p>
                     <div className="flex flex-wrap gap-2">
-                        {hasAnyPermission(["exams edit"]) && (
+                        {canManageExam && hasAnyPermission(["exams edit"]) && (
                             <Button
                                 type="edit"
                                 url={route("exams.edit", exam.id)}
                             />
                         )}
-                        {hasAnyPermission(["exams delete"]) && (
+                        {canManageExam && hasAnyPermission(["exams delete"]) && (
                             <Button
                                 type="delete"
                                 url={route("exams.destroy", exam.id)}
@@ -478,7 +478,7 @@ export default function Show() {
                     mode="exam"
                     entityId={exam.id}
                     questions={exam.questions ?? []}
-                    canManage={hasAnyPermission(["exams edit"])}
+                    canManage={canManageExam && hasAnyPermission(["exams edit"])}
                     entityLabel="ujian"
                 />
             )}

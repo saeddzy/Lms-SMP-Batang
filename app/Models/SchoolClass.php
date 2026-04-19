@@ -41,11 +41,20 @@ class SchoolClass extends Model
     }
 
     /**
-     * Get the students through enrollments.
+     * Siswa dengan enrollment aktif di kelas ini (untuk roster & akses pembelajaran).
      */
     public function students(): HasManyThrough
     {
-        return $this->hasManyThrough(User::class, StudentEnrollment::class, 'class_id', 'id', 'id', 'student_id');
+        return $this->hasManyThrough(User::class, StudentEnrollment::class, 'class_id', 'id', 'id', 'student_id')
+            ->where('student_enrollments.status', 'active');
+    }
+
+    /**
+     * Semua baris enrollment (termasuk riwayat transferred) — untuk admin/audit.
+     */
+    public function allStudentEnrollments(): HasMany
+    {
+        return $this->enrollments();
     }
 
     /**

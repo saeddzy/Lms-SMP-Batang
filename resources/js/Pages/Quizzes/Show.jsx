@@ -36,7 +36,7 @@ function quizWindowLabel(quiz) {
 }
 
 export default function Show() {
-    const { quiz, attempts = [] } = usePage().props;
+    const { quiz, attempts = [], canManageQuiz = false } = usePage().props;
     const isStudent = hasRole("siswa");
     const sc = quiz.school_class ?? quiz.schoolClass;
 
@@ -483,13 +483,13 @@ export default function Show() {
                         Aksi guru
                     </p>
                     <div className="flex flex-wrap gap-2">
-                        {hasAnyPermission(["quizzes edit"]) && (
+                        {canManageQuiz && hasAnyPermission(["quizzes edit"]) && (
                             <Button
                                 type="edit"
                                 url={route("quizzes.edit", quiz.id)}
                             />
                         )}
-                        {hasAnyPermission(["quizzes delete"]) && (
+                        {canManageQuiz && hasAnyPermission(["quizzes delete"]) && (
                             <Button
                                 type="delete"
                                 url={route("quizzes.destroy", quiz.id)}
@@ -506,7 +506,7 @@ export default function Show() {
                     mode="quiz"
                     entityId={quiz.id}
                     questions={quiz.questions ?? []}
-                    canManage={hasAnyPermission(["quizzes edit"])}
+                    canManage={canManageQuiz && hasAnyPermission(["quizzes edit"])}
                     entityLabel="kuis"
                 />
             )}

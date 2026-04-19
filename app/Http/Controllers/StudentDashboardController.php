@@ -65,7 +65,10 @@ class StudentDashboardController extends Controller
         $classes = auth()->user()
             ->enrolledClasses()
             ->with(['teacher'])
-            ->withCount(['enrollments as student_count', 'classSubjects as class_subjects_count'])
+            ->withCount([
+                'enrollments as student_count' => fn ($q) => $q->where('status', 'active'),
+                'classSubjects as class_subjects_count',
+            ])
             ->orderBy('name')
             ->paginate(12)
             ->withQueryString();
@@ -187,7 +190,7 @@ class StudentDashboardController extends Controller
     private function getUpcomingQuizzes($user)
     {
         return Quiz::whereHas('schoolClass.enrollments', function ($query) use ($user) {
-            $query->where('student_id', $user->id);
+            $query->where('student_id', $user->id)->where('status', 'active');
         })
             ->where('is_active', true)
             ->where(function ($q) {
@@ -232,7 +235,7 @@ class StudentDashboardController extends Controller
     {
         $quizzes = Quiz::query()
             ->whereHas('schoolClass.enrollments', function ($q) use ($user) {
-                $q->where('student_id', $user->id);
+                $q->where('student_id', $user->id)->where('status', 'active');
             })
             ->where('is_active', true)
             ->with(['subject', 'schoolClass', 'teacher'])
@@ -371,35 +374,35 @@ class StudentDashboardController extends Controller
             $query->where('users.id', $user->id);
         })->count();
 
-        $completedTasks = TaskSubmission::whereHas('task.schoolClass.students', function ($query) use ($user) {
-            $query->where('users.id', $user->id);
-        })->where('student_id', $user->id)->count();
+        $completedTasks = TaskSubmission::where('student_id', $user->id)
+            ->whereNotNull('submitted_at')
+            ->count();
 
         // Quiz stats
         $totalQuizzes = Quiz::whereHas('schoolClass.students', function ($query) use ($user) {
             $query->where('users.id', $user->id);
         })->count();
 
-        $completedQuizzes = QuizAttempt::whereHas('quiz.schoolClass.students', function ($query) use ($user) {
-            $query->where('users.id', $user->id);
-        })->where('student_id', $user->id)->count();
+        $completedQuizzes = QuizAttempt::where('student_id', $user->id)
+            ->whereNotNull('finished_at')
+            ->count();
 
-        $passedQuizzes = QuizAttempt::whereHas('quiz.schoolClass.students', function ($query) use ($user) {
-            $query->where('users.id', $user->id);
-        })->where('student_id', $user->id)->where('passed', true)->count();
+        $passedQuizzes = QuizAttempt::where('student_id', $user->id)
+            ->where('passed', true)
+            ->count();
 
         // Exam stats
         $totalExams = Exam::whereHas('schoolClass.students', function ($query) use ($user) {
             $query->where('users.id', $user->id);
         })->count();
 
-        $completedExams = ExamAttempt::whereHas('exam.schoolClass.students', function ($query) use ($user) {
-            $query->where('users.id', $user->id);
-        })->where('student_id', $user->id)->count();
+        $completedExams = ExamAttempt::where('student_id', $user->id)
+            ->whereNotNull('finished_at')
+            ->count();
 
-        $passedExams = ExamAttempt::whereHas('exam.schoolClass.students', function ($query) use ($user) {
-            $query->where('users.id', $user->id);
-        })->where('student_id', $user->id)->where('passed', true)->count();
+        $passedExams = ExamAttempt::where('student_id', $user->id)
+            ->where('passed', true)
+            ->count();
 
         // Average grades
         $averageGrade = FinalGrade::where('student_id', $user->id)->avg('score') ?? 0;
@@ -542,7 +545,7 @@ class StudentDashboardController extends Controller
 
         $query = Task::query()
             ->whereHas('schoolClass.enrollments', function ($q) use ($user) {
-                $q->where('student_id', $user->id);
+                $q->where('student_id', $user->id)->where('status', 'active');
             })
             ->where('is_active', true)
             ->with([
@@ -628,6 +631,106 @@ class StudentDashboardController extends Controller
             'attempts' => $attempts,
             'summary' => $summary,
             'filters' => [],
+        ]);
+    }
+
+    /**
+     * Riwayat kelas (setelah naik kelas / pindah — tidak bisa akses lagi ke kelas lama).
+     * Sertakan nilai (FinalGrade) per kelas agar siswa melihat rekap di kelas tersebut.
+     */
+    public function enrollmentHistory()
+    {
+        abort_unless(auth()->user()->hasRole('siswa'), 403);
+
+        $studentId = auth()->id();
+
+        $enrollments = auth()->user()
+            ->enrollmentHistory()
+            ->with('schoolClass.teacher')
+            ->get();
+
+        $history = $enrollments->map(function ($enrollment) use ($studentId) {
+            $finalGrades = FinalGrade::query()
+                ->where('student_id', $studentId)
+                ->where('class_id', $enrollment->class_id)
+                ->with(['subject', 'component'])
+                ->orderBy('subject_id')
+                ->orderBy('component_id')
+                ->get();
+
+            $taskScores = TaskSubmission::query()
+                ->where('student_id', $studentId)
+                ->whereNotNull('score')
+                ->whereHas('task', fn ($q) => $q->where('class_id', $enrollment->class_id))
+                ->with('task.subject')
+                ->latest('graded_at')
+                ->get()
+                ->map(fn ($x) => [
+                    'id' => 'task-'.$x->id,
+                    'type' => 'Tugas',
+                    'title' => $x->task?->title ?? 'Tugas',
+                    'subject' => $x->task?->subject?->name ?? '—',
+                    'score' => $x->score,
+                    'assessed_at' => $x->graded_at ?? $x->submitted_at,
+                ]);
+
+            $quizScores = QuizAttempt::query()
+                ->where('student_id', $studentId)
+                ->whereNotNull('score')
+                ->whereHas('quiz', fn ($q) => $q->where('class_id', $enrollment->class_id))
+                ->with('quiz.subject')
+                ->latest('finished_at')
+                ->get()
+                ->map(fn ($x) => [
+                    'id' => 'quiz-'.$x->id,
+                    'type' => 'Kuis',
+                    'title' => $x->quiz?->title ?? 'Kuis',
+                    'subject' => $x->quiz?->subject?->name ?? '—',
+                    'score' => $x->score,
+                    'assessed_at' => $x->finished_at,
+                ]);
+
+            $examScores = ExamAttempt::query()
+                ->where('student_id', $studentId)
+                ->whereNotNull('score')
+                ->whereHas('exam', fn ($q) => $q->where('class_id', $enrollment->class_id))
+                ->with('exam.subject')
+                ->latest('finished_at')
+                ->get()
+                ->map(fn ($x) => [
+                    'id' => 'exam-'.$x->id,
+                    'type' => 'Ujian',
+                    'title' => $x->exam?->title ?? 'Ujian',
+                    'subject' => $x->exam?->subject?->name ?? '—',
+                    'score' => $x->score,
+                    'assessed_at' => $x->finished_at,
+                ]);
+
+            $activityScores = $taskScores
+                ->concat($quizScores)
+                ->concat($examScores)
+                ->sortByDesc('assessed_at')
+                ->values();
+
+            $combinedScores = collect($finalGrades->pluck('score'))
+                ->concat($activityScores->pluck('score'))
+                ->filter(fn ($v) => $v !== null);
+
+            return [
+                'enrollment_id' => $enrollment->id,
+                'left_at' => $enrollment->left_at,
+                'notes' => $enrollment->notes,
+                'school_class' => $enrollment->schoolClass,
+                'final_grades' => $finalGrades,
+                'activity_scores' => $activityScores,
+                'grades_average' => $combinedScores->isEmpty()
+                    ? null
+                    : round((float) $combinedScores->avg(), 1),
+            ];
+        });
+
+        return Inertia::render('Student/EnrollmentHistory', [
+            'history' => $history,
         ]);
     }
 

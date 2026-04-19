@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 class Quiz extends Model
 {
@@ -19,8 +18,6 @@ class Quiz extends Model
         'time_limit', // in minutes
         'total_questions',
         'max_score',
-        'passing_score',
-        'max_attempts',
         'start_time',
         'end_time',
         'class_id',
@@ -35,8 +32,6 @@ class Quiz extends Model
         'time_limit' => 'integer',
         'total_questions' => 'integer',
         'max_score' => 'decimal:2',
-        'passing_score' => 'decimal:2',
-        'max_attempts' => 'integer',
         'start_time' => 'datetime',
         'end_time' => 'datetime',
         'is_active' => 'boolean',
@@ -61,21 +56,6 @@ class Quiz extends Model
     }
 
     /**
-     * Mata pelajaran lewat class_subject (untuk eager load subject).
-     */
-    public function subject(): HasOneThrough
-    {
-        return $this->hasOneThrough(
-            Subject::class,
-            ClassSubject::class,
-            'id',
-            'id',
-            'class_subject_id',
-            'subject_id'
-        );
-    }
-
-    /**
      * Get the user who created this quiz.
      */
     public function creator(): BelongsTo
@@ -86,7 +66,7 @@ class Quiz extends Model
     /**
      * Get the teacher who owns this quiz through class subject.
      */
-    public function teacher(): HasOneThrough
+    public function teacher(): BelongsTo
     {
         return $this->hasOneThrough(User::class, ClassSubject::class, 'id', 'id', 'class_subject_id', 'teacher_id');
     }
@@ -105,14 +85,6 @@ class Quiz extends Model
     public function studentAnswers(): HasMany
     {
         return $this->hasMany(StudentQuizAnswer::class, 'quiz_id');
-    }
-
-    /**
-     * Percobaan mengerjakan kuis (siswa).
-     */
-    public function attempts(): HasMany
-    {
-        return $this->hasMany(QuizAttempt::class, 'quiz_id');
     }
 
     /**

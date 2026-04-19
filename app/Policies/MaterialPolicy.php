@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\ClassSubject;
 use App\Models\Material;
 use App\Models\User;
 
@@ -28,9 +29,7 @@ class MaterialPolicy
             if (!$material->classSubject) {
                 return false;
             }
-            $material->classSubject->loadMissing('subject');
-
-            return $material->classSubject->isTaughtBy($user);
+            return $material->classSubject->isVisibleToTeacher($user);
         }
 
         if ($user->hasRole('siswa') && $user->can('materials view')) {
@@ -47,7 +46,17 @@ class MaterialPolicy
 
     public function create(User $user): bool
     {
-        return $user->can('materials create');
+        if (! $user->can('materials create')) {
+            return false;
+        }
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+        if ($user->hasRole('guru')) {
+            return ClassSubject::where('teacher_id', $user->id)->exists();
+        }
+
+        return false;
     }
 
     public function update(User $user, Material $material): bool
@@ -56,13 +65,12 @@ class MaterialPolicy
             return true;
         }
 
-        if ($user->hasRole('guru')) {
+        if ($user->hasRole('guru') && $user->can('materials edit')) {
             if (!$material->classSubject) {
                 return false;
             }
-            $material->classSubject->loadMissing('subject');
 
-            return $material->classSubject->isTaughtBy($user);
+            return $material->classSubject->isAssignedSlotTeacher($user);
         }
 
         return false;
@@ -78,9 +86,8 @@ class MaterialPolicy
             if (!$material->classSubject) {
                 return false;
             }
-            $material->classSubject->loadMissing('subject');
 
-            return $material->classSubject->isTaughtBy($user);
+            return $material->classSubject->isAssignedSlotTeacher($user);
         }
 
         return false;

@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\ClassSubject;
 use App\Models\Quiz;
 use App\Models\User;
 
@@ -22,9 +23,7 @@ class QuizPolicy
             if (!$quiz->classSubject) {
                 return false;
             }
-            $quiz->classSubject->loadMissing('subject');
-
-            return $quiz->classSubject->isTaughtBy($user);
+            return $quiz->classSubject->isVisibleToTeacher($user);
         }
 
         if ($user->hasRole('siswa') && $user->can('quizzes view')) {
@@ -36,7 +35,17 @@ class QuizPolicy
 
     public function create(User $user): bool
     {
-        return $user->can('quizzes create');
+        if (! $user->can('quizzes create')) {
+            return false;
+        }
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+        if ($user->hasRole('guru')) {
+            return ClassSubject::where('teacher_id', $user->id)->exists();
+        }
+
+        return false;
     }
 
     public function update(User $user, Quiz $quiz): bool
@@ -49,9 +58,8 @@ class QuizPolicy
             if (!$quiz->classSubject) {
                 return false;
             }
-            $quiz->classSubject->loadMissing('subject');
 
-            return $quiz->classSubject->isTaughtBy($user);
+            return $quiz->classSubject->isAssignedSlotTeacher($user);
         }
 
         return false;
@@ -67,9 +75,8 @@ class QuizPolicy
             if (!$quiz->classSubject) {
                 return false;
             }
-            $quiz->classSubject->loadMissing('subject');
 
-            return $quiz->classSubject->isTaughtBy($user);
+            return $quiz->classSubject->isAssignedSlotTeacher($user);
         }
 
         return false;

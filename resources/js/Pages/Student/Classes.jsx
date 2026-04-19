@@ -9,6 +9,7 @@ import {
     IconBook,
     IconChevronRight,
 } from "@tabler/icons-react";
+import ClassCardThumbnail from "@/Components/ClassCardThumbnail";
 
 export default function StudentClasses() {
     const { classes } = usePage().props;
@@ -51,76 +52,83 @@ export default function StudentClasses() {
                                             )
                                         )
                                     }
-                                    className="group flex flex-col rounded-2xl border border-slate-200/90 bg-white p-6 text-left shadow-sm transition hover:border-indigo-300 hover:shadow-lg hover:shadow-indigo-500/10"
+                                    className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white text-left shadow-sm transition hover:border-indigo-300 hover:shadow-lg hover:shadow-indigo-500/10"
                                 >
-                                    <div className="flex items-start justify-between gap-3">
-                                        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/25">
+                                    <div className="relative">
+                                        <ClassCardThumbnail
+                                            classId={schoolClass.id}
+                                        />
+                                        <span className="absolute left-4 top-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/95 text-indigo-600 shadow-md backdrop-blur-sm ring-1 ring-white/60">
                                             <IconSchool
                                                 className="h-6 w-6"
                                                 stroke={1.5}
                                             />
                                         </span>
-                                        <span
-                                            className={
-                                                schoolClass.is_active
-                                                    ? "rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-200/80"
-                                                    : "rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200/80"
-                                            }
-                                        >
-                                            {schoolClass.is_active
-                                                ? "Aktif"
-                                                : "Nonaktif"}
-                                        </span>
                                     </div>
-                                    <h3 className="mt-4 text-xl font-bold tracking-tight text-slate-900 group-hover:text-indigo-800">
-                                        {schoolClass.name}
-                                    </h3>
-                                    <p className="text-sm text-slate-500">
-                                        {schoolClass.academic_year ?? "—"}
-                                    </p>
-                                    <p className="mt-3 text-sm text-slate-600">
-                                        <span className="text-slate-400">
-                                            Wali kelas:{" "}
-                                        </span>
-                                        <span className="font-medium text-slate-900">
-                                            {schoolClass.teacher?.name ?? "—"}
-                                        </span>
-                                    </p>
-                                    <div className="mt-6 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 text-sm">
-                                        <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-slate-700">
-                                            <IconUsers
-                                                className="h-4 w-4 text-indigo-500"
-                                                stroke={1.5}
-                                            />
-                                            <span>
-                                                <span className="font-semibold tabular-nums text-slate-900">
-                                                    {schoolClass.student_count ??
-                                                        0}
-                                                </span>{" "}
-                                                siswa
+                                    <div className="flex flex-col p-6">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <h3 className="min-w-0 text-xl font-bold tracking-tight text-slate-900 group-hover:text-indigo-800">
+                                                {schoolClass.name}
+                                            </h3>
+                                            <span
+                                                className={
+                                                    schoolClass.is_active
+                                                        ? "shrink-0 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-200/80"
+                                                        : "shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200/80"
+                                                }
+                                            >
+                                                {schoolClass.is_active
+                                                    ? "Aktif"
+                                                    : "Nonaktif"}
                                             </span>
                                         </div>
-                                        <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-slate-700">
-                                            <IconBook
-                                                className="h-4 w-4 text-violet-500"
+                                        <p className="mt-1 text-sm text-slate-500">
+                                            {schoolClass.academic_year ?? "—"}
+                                        </p>
+                                        <p className="mt-3 text-sm text-slate-600">
+                                            <span className="text-slate-400">
+                                                Wali kelas:{" "}
+                                            </span>
+                                            <span className="font-medium text-slate-900">
+                                                {schoolClass.teacher?.name ?? "—"}
+                                            </span>
+                                        </p>
+                                        <div className="mt-6 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 text-sm">
+                                            <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-slate-700">
+                                                <IconUsers
+                                                    className="h-4 w-4 text-indigo-500"
+                                                    stroke={1.5}
+                                                />
+                                                <span>
+                                                    <span className="font-semibold tabular-nums text-slate-900">
+                                                        {schoolClass.student_count ??
+                                                            0}
+                                                    </span>{" "}
+                                                    siswa
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-slate-700">
+                                                <IconBook
+                                                    className="h-4 w-4 text-violet-500"
+                                                    stroke={1.5}
+                                                />
+                                                <span>
+                                                    <span className="font-semibold tabular-nums text-slate-900">
+                                                        {schoolClass.class_subjects_count ??
+                                                            0}
+                                                    </span>{" "}
+                                                    mapel
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-indigo-600">
+                                            Buka detail
+                                            <IconChevronRight
+                                                className="h-4 w-4 transition group-hover:translate-x-0.5"
                                                 stroke={1.5}
                                             />
-                                            <span>
-                                                <span className="font-semibold tabular-nums text-slate-900">
-                                                    {schoolClass.class_subjects_count ??
-                                                        0}
-                                                </span>{" "}
-                                                mapel
-                                            </span>
-                                        </div>
+                                        </span>
                                     </div>
-                                    <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-indigo-600">
-                                        Buka detail
-                                        <IconChevronRight
-                                            className="h-4 w-4 transition group-hover:translate-x-0.5"
-                                            stroke={1.5}
-                                        />
-                                    </span>
                                 </button>
                             ))}
                         </div>

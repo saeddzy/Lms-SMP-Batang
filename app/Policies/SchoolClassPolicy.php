@@ -18,13 +18,20 @@ class SchoolClassPolicy
             return true;
         }
 
-        // Guru: kelas punya minimal satu mapel yang diampu (jadwal) atau jadi guru mapel di master
+        // Guru: wali kelas, atau punya minimal satu mapel yang diampu / guru mapel master
         if ($user->hasRole('guru') && $user->hasPermissionTo('classes view')) {
+            if ((int) $schoolClass->teacher_id === (int) $user->id) {
+                return true;
+            }
+
             return $schoolClass->classSubjects()->forTeacher($user)->exists();
         }
 
         if ($user->hasRole('siswa') && $user->hasPermissionTo('classes view')) {
-            return $schoolClass->enrollments()->where('student_id', $user->id)->exists();
+            return $schoolClass->enrollments()
+                ->where('student_id', $user->id)
+                ->where('status', 'active')
+                ->exists();
         }
 
         return false;

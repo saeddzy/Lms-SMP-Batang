@@ -40,9 +40,9 @@ function statusMeta(status) {
 }
 
 function shortDateTime(value) {
-    if (!value) return "—";
+    if (!value) return "?";
     const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return "—";
+    if (Number.isNaN(d.getTime())) return "?";
     return d.toLocaleString("id-ID", {
         day: "2-digit",
         month: "short",
@@ -53,7 +53,8 @@ function shortDateTime(value) {
 }
 
 export default function Index() {
-    const { quizzes, filters = {} } = usePage().props;
+    const { quizzes, filters = {}, auth = {} } = usePage().props;
+    const canMutate = auth.canMutateTeachingContent ?? false;
     const searchQuery = filters.search ?? "";
     const totalQuiz = quizzes?.total ?? quizzes?.data?.length ?? 0;
 
@@ -104,7 +105,7 @@ export default function Index() {
                     <div className="text-sm text-stone-600">
                         Gunakan pencarian untuk menemukan kuis lebih cepat.
                     </div>
-                    {hasAnyPermission(["quizzes create"]) && (
+                    {canMutate && hasAnyPermission(["quizzes create"]) && (
                         <Button type="add" url={route("quizzes.create")} />
                     )}
                 </div>
@@ -145,13 +146,13 @@ export default function Index() {
                                         <div className="flex justify-between gap-2">
                                             <dt>Kelas</dt>
                                             <dd className="font-medium text-stone-900 text-right">
-                                                {quiz.school_class?.name ?? quiz.schoolClass?.name ?? "—"}
+                                                {quiz.school_class?.name ?? quiz.schoolClass?.name ?? "?"}
                                             </dd>
                                         </div>
                                         <div className="flex justify-between gap-2">
                                             <dt>Mapel</dt>
                                             <dd className="font-medium text-stone-900 text-right">
-                                                {quiz.subject?.name ?? "—"}
+                                                {quiz.subject?.name ?? "?"}
                                             </dd>
                                         </div>
                                         <div className="flex justify-between gap-2">
@@ -160,7 +161,7 @@ export default function Index() {
                                                 Durasi
                                             </dt>
                                             <dd className="font-medium text-stone-900">
-                                                {quiz.duration ?? quiz.time_limit ?? "—"} menit
+                                                {quiz.duration ?? quiz.time_limit ?? "?"} menit
                                             </dd>
                                         </div>
                                         <div className="flex justify-between gap-2">

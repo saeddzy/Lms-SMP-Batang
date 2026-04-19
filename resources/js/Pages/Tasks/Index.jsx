@@ -30,9 +30,9 @@ function statusMeta(status) {
 }
 
 function shortDateTime(value) {
-    if (!value) return "—";
+    if (!value) return "?";
     const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return "—";
+    if (Number.isNaN(d.getTime())) return "?";
     return d.toLocaleString("id-ID", {
         day: "2-digit",
         month: "short",
@@ -43,7 +43,8 @@ function shortDateTime(value) {
 }
 
 export default function Index() {
-    const { tasks, filters = {} } = usePage().props;
+    const { tasks, filters = {}, auth = {} } = usePage().props;
+    const canMutate = auth.canMutateTeachingContent ?? false;
 
     return (
         <DashboardLayout title="Tugas">
@@ -58,7 +59,7 @@ export default function Index() {
                             peserta, dan progres pengumpulan.
                         </p>
                     </div>
-                    {hasAnyPermission(["tasks create"]) && (
+                    {canMutate && hasAnyPermission(["tasks create"]) && (
                         <Button type="add" url={route("tasks.create")} />
                     )}
                 </div>
@@ -96,13 +97,13 @@ export default function Index() {
                                         <div className="flex justify-between gap-2">
                                             <dt>Kelas</dt>
                                             <dd className="text-right font-medium text-stone-900">
-                                                {task.school_class?.name ?? task.schoolClass?.name ?? "—"}
+                                                {task.school_class?.name ?? task.schoolClass?.name ?? "?"}
                                             </dd>
                                         </div>
                                         <div className="flex justify-between gap-2">
                                             <dt>Mapel</dt>
                                             <dd className="text-right font-medium text-stone-900">
-                                                {task.subject?.name ?? "—"}
+                                                {task.subject?.name ?? "?"}
                                             </dd>
                                         </div>
                                         <div className="flex justify-between gap-2">

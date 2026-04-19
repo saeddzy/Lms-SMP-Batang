@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\ClassSubject;
 use App\Models\FinalGrade;
 use App\Models\User;
 
@@ -31,7 +32,17 @@ class GradePolicy
 
     public function create(User $user): bool
     {
-        return $user->can('grades calculate');
+        if (! $user->can('grades calculate')) {
+            return false;
+        }
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+        if ($user->hasRole('guru')) {
+            return ClassSubject::where('teacher_id', $user->id)->exists();
+        }
+
+        return false;
     }
 
     public function update(User $user, FinalGrade $grade): bool
@@ -41,7 +52,7 @@ class GradePolicy
         }
 
         if ($user->hasRole('guru') && $user->can('grades calculate')) {
-            return $this->teacherTeachesGradeContext($user, $grade);
+            return $this->teacherCanManageGradeContext($user, $grade);
         }
 
         return false;
@@ -54,7 +65,7 @@ class GradePolicy
         }
 
         if ($user->hasRole('guru') && $user->can('grades calculate')) {
-            return $this->teacherTeachesGradeContext($user, $grade);
+            return $this->teacherCanManageGradeContext($user, $grade);
         }
 
         return false;
@@ -78,6 +89,28 @@ class GradePolicy
             ->where('subject_id', $grade->subject_id)
             ->forTeacher($user)
             ->exists();
+    }
+
+    /**
+     * Wali kelas boleh melihat nilai, tetapi hanya guru pengampu slot (atau guru mapel non-wali)
+     * yang boleh menghitung/mengubah nilai untuk mapel tersebut.
+     */
+    private function teacherCanManageGradeContext(User $user, FinalGrade $grade): bool
+    {
+        $class = $grade->schoolClass;
+        if (! $class) {
+            return false;
+        }
+
+        $classSubject = $class->classSubjects()
+            ->where('subject_id', $grade->subject_id)
+            ->first();
+
+        if (! $classSubject) {
+            return false;
+        }
+
+        return $classSubject->userCanManageGrades($user);
     }
 
     public function restore(User $user, FinalGrade $grade): bool

@@ -193,6 +193,8 @@ class TaskController extends Controller
             return back()->withErrors(['subject_id' => 'Mata pelajaran tidak ditemukan untuk kelas ini.']);
         }
 
+        $this->authorizeClassSubjectSlotTeacher($classSubject);
+
         $task = Task::create([
             'title' => $validated['title'],
             'description' => $validated['description'],
@@ -226,6 +228,7 @@ class TaskController extends Controller
         }
 
         $task->load($with);
+        $task->loadMissing('classSubject');
 
         // Load submissions for teachers and admins
         if (auth()->user()->can('tasks view_submissions')) {
@@ -252,10 +255,15 @@ class TaskController extends Controller
             'avg_score' => round((float) ($submissions->whereNotNull('score')->avg('score') ?? 0), 1),
         ];
 
+        $cs = $task->classSubject;
+        $canManageTask = auth()->user()->hasRole('admin')
+            || ($cs && $cs->isAssignedSlotTeacher(auth()->user()));
+
         return Inertia::render('Tasks/Show', [
             'task' => $task,
             'submissions' => $submissions ?? [],
             'stats' => $stats,
+            'canManageTask' => $canManageTask,
         ]);
     }
 
@@ -319,6 +327,8 @@ class TaskController extends Controller
         if (!$classSubject) {
             return back()->withErrors(['subject_id' => 'Mata pelajaran tidak ditemukan untuk kelas ini.']);
         }
+
+        $this->authorizeClassSubjectSlotTeacher($classSubject);
 
         $task->update([
             'title' => $validated['title'],

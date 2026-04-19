@@ -12,7 +12,8 @@ import {
 } from "@tabler/icons-react";
 
 export default function Index() {
-    const { exams, filters = {} } = usePage().props;
+    const { exams, filters = {}, auth = {} } = usePage().props;
+    const canMutate = auth.canMutateTeachingContent ?? false;
     const searchQuery = filters.search ?? "";
     const totalExam = exams?.total ?? exams?.data?.length ?? 0;
 
@@ -126,7 +127,7 @@ export default function Index() {
                     <div className="text-sm text-stone-600">
                         Gunakan pencarian untuk menemukan ujian lebih cepat.
                     </div>
-                    {hasAnyPermission(["exams create"]) && (
+                    {canMutate && hasAnyPermission(["exams create"]) && (
                         <Button type="add" url={route("exams.create")} />
                     )}
                 </div>

@@ -212,6 +212,8 @@ class QuizController extends Controller
             return back()->withErrors(['subject_id' => 'Mata pelajaran tidak ditemukan untuk kelas ini.']);
         }
 
+        $this->authorizeClassSubjectSlotTeacher($classSubject);
+
         $quiz = Quiz::create([
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
@@ -253,6 +255,7 @@ class QuizController extends Controller
             $load[] = 'schoolClass.students';
         }
         $quiz->load($load);
+        $quiz->loadMissing('classSubject');
 
         // Load attempts for teachers and admins
         if (auth()->user()->can('quizzes view_results') && !auth()->user()->hasRole('siswa')) {
@@ -281,9 +284,14 @@ class QuizController extends Controller
                 ->get();
         }
 
+        $cs = $quiz->classSubject;
+        $canManageQuiz = auth()->user()->hasRole('admin')
+            || ($cs && $cs->isAssignedSlotTeacher(auth()->user()));
+
         return Inertia::render('Quizzes/Show', [
             'quiz' => $quiz,
             'attempts' => $attempts ?? [],
+            'canManageQuiz' => $canManageQuiz,
         ]);
     }
 
@@ -352,6 +360,8 @@ class QuizController extends Controller
         if (!$classSubject) {
             return back()->withErrors(['subject_id' => 'Mata pelajaran tidak ditemukan untuk kelas ini.']);
         }
+
+        $this->authorizeClassSubjectSlotTeacher($classSubject);
 
         $quiz->update([
             'title' => $validated['title'],

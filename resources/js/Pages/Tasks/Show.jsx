@@ -16,7 +16,8 @@ import {
 } from "@tabler/icons-react";
 
 export default function Show() {
-    const { task, submissions = [], stats = {} } = usePage().props;
+    const { task, submissions = [], stats = {}, canManageTask = false } =
+        usePage().props;
 
     const isStudent = hasRole("siswa");
     const sc = task.school_class ?? task.schoolClass;
@@ -405,13 +406,13 @@ export default function Show() {
                                     </p>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
-                                    {hasAnyPermission(["tasks edit"]) && (
+                                    {canManageTask && hasAnyPermission(["tasks edit"]) && (
                                         <Button
                                             type="edit"
                                             url={route("tasks.edit", task.id)}
                                         />
                                     )}
-                                    {hasAnyPermission(["tasks delete"]) && (
+                                    {canManageTask && hasAnyPermission(["tasks delete"]) && (
                                         <Button
                                             type="delete"
                                             url={route(

@@ -7,6 +7,8 @@ use App\Models\User;
 use App\Models\Subject;
 use App\Models\ClassSubject;
 use App\Models\StudentEnrollment;
+use App\Models\FinalGrade;
+use App\Services\StudentPromotionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
@@ -22,8 +24,17 @@ class ClassController extends Controller
     {
         Gate::authorize('viewAny', SchoolClass::class);
 
-        $query = SchoolClass::with(['teacher', 'classSubjects.subject', 'classSubjects.subject.teacher', 'classSubjects.teacher', 'enrollments'])
-            ->withCount(['enrollments as student_count', 'classSubjects as class_subjects_count']);
+        $query = SchoolClass::with([
+                'teacher',
+                'classSubjects.subject',
+                'classSubjects.subject.teacher',
+                'classSubjects.teacher',
+                'enrollments' => fn ($q) => $q->where('status', 'active'),
+            ])
+            ->withCount([
+                'enrollments as student_count' => fn ($q) => $q->where('status', 'active'),
+                'classSubjects as class_subjects_count',
+            ]);
 
         // Filter by academic year
         if ($request->filled('academic_year')) {
@@ -42,8 +53,11 @@ class ClassController extends Controller
             });
         } elseif (!auth()->user()->hasRole('admin')) {
             $user = auth()->user();
-            $query->whereHas('classSubjects', function ($q) use ($user) {
-                $q->forTeacher($user);
+            $query->where(function ($q) use ($user) {
+                $q->where('teacher_id', $user->id)
+                    ->orWhereHas('classSubjects', function ($cs) use ($user) {
+                        $cs->forTeacher($user);
+                    });
             });
         }
 
@@ -122,10 +136,11 @@ class ClassController extends Controller
         ]);
 
         foreach ($validated['subject_ids'] as $subjectId) {
+            $subject = Subject::find($subjectId);
             ClassSubject::create([
                 'class_id' => $schoolClass->id,
                 'subject_id' => $subjectId,
-                'teacher_id' => $homeroomTeacherId,
+                'teacher_id' => $subject?->teacher_id,
                 'is_active' => true,
             ]);
         }
@@ -157,7 +172,9 @@ class ClassController extends Controller
             'classSubjects.subject.teacher',
             'classSubjects.teacher',
             'students',
-            'enrollments.student',
+            'enrollments' => function ($q) {
+                $q->where('status', 'active')->with('student');
+            },
             'materials' => function($query) {
                 $query->latest()->take(5);
             },
@@ -172,7 +189,9 @@ class ClassController extends Controller
             }
         ]);
 
-        $class->loadCount(['enrollments as student_count']);
+        $class->loadCount([
+            'enrollments as student_count' => fn ($q) => $q->where('status', 'active'),
+        ]);
 
         $showTeacherOnlySubjects = false;
         if (auth()->user()->hasRole('guru')) {
@@ -185,10 +204,64 @@ class ClassController extends Controller
             $showTeacherOnlySubjects = true;
         }
 
+        $gradesAvg = FinalGrade::where('class_id', $class->id)->avg('score');
+
+        $stats = [
+            'materials_count' => $class->materials()->count(),
+            'tasks_count' => $class->tasks()->count(),
+            'quizzes_count' => $class->quizzes()->count(),
+            'exams_count' => $class->exams()->count(),
+            'grades_average' => $gradesAvg !== null ? round((float) $gradesAvg, 1) : null,
+        ];
+
+        $promotionTargets = SchoolClass::query()
+            ->where('id', '!=', $class->id)
+            ->where('is_active', true)
+            ->orderByDesc('academic_year')
+            ->orderBy('name')
+            ->get(['id', 'name', 'academic_year']);
+
+        $canPromoteStudents = auth()->user()->can('classes manage_students');
+
         return Inertia::render('Classes/Show', [
             'schoolClass' => $class,
             'showTeacherOnlySubjects' => $showTeacherOnlySubjects,
+            'stats' => $stats,
+            'promotionTargets' => $promotionTargets,
+            'canPromoteStudents' => $canPromoteStudents,
         ]);
+    }
+
+    /**
+     * Naik/pindah kelas: tutup enrollment di kelas ini, buka di kelas tujuan (data lama tetap).
+     */
+    public function promoteStudents(Request $request, SchoolClass $class, StudentPromotionService $promotion): RedirectResponse
+    {
+        Gate::authorize('manageStudents', $class);
+
+        $validated = $request->validate([
+            'target_class_id' => 'required|exists:school_classes,id',
+            'student_ids' => 'nullable|array',
+            'student_ids.*' => 'exists:users,id',
+            'promote_all' => 'boolean',
+        ]);
+
+        $toClass = SchoolClass::findOrFail((int) $validated['target_class_id']);
+
+        $result = $promotion->promote(
+            $class,
+            $toClass,
+            $validated['student_ids'] ?? [],
+            $request->boolean('promote_all'),
+            auth()->user()
+        );
+
+        $message = "{$result['promoted']} siswa berhasil dipindahkan ke {$toClass->name}.";
+        if ($result['skipped'] !== []) {
+            $message .= ' Catatan: '.implode('; ', $result['skipped']);
+        }
+
+        return redirect()->back()->with('message', $message);
     }
 
     /**
@@ -230,8 +303,6 @@ class ClassController extends Controller
             'is_active' => 'boolean',
         ]);
 
-        $subjectTeacherId = (int) ($class->teacher_id ?? auth()->id());
-
         $class->update([
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
@@ -252,10 +323,11 @@ class ClassController extends Controller
         }
 
         foreach ($subjectsToAdd as $subjectId) {
+            $subject = Subject::find($subjectId);
             ClassSubject::create([
                 'class_id' => $class->id,
                 'subject_id' => $subjectId,
-                'teacher_id' => $subjectTeacherId,
+                'teacher_id' => $subject?->teacher_id,
                 'is_active' => true,
             ]);
         }
@@ -275,7 +347,7 @@ class ClassController extends Controller
             }
         }
 
-        $currentStudentIds = $class->enrollments()->pluck('student_id')->toArray();
+        $currentStudentIds = $class->enrollments()->where('status', 'active')->pluck('student_id')->toArray();
         $newStudentIds = $validated['student_ids'] ?? [];
 
         $studentsToAdd = array_diff($newStudentIds, $currentStudentIds);

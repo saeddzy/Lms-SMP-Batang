@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\ClassSubject;
 use App\Models\Exam;
 use App\Models\User;
 
@@ -36,7 +37,17 @@ class ExamPolicy
 
     public function create(User $user): bool
     {
-        return $user->can('exams create');
+        if (! $user->can('exams create')) {
+            return false;
+        }
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+        if ($user->hasRole('guru')) {
+            return ClassSubject::where('teacher_id', $user->id)->exists();
+        }
+
+        return false;
     }
 
     public function update(User $user, Exam $exam): bool
@@ -49,9 +60,8 @@ class ExamPolicy
             if (!$exam->classSubject) {
                 return false;
             }
-            $exam->classSubject->loadMissing('subject');
 
-            return $exam->classSubject->isTaughtBy($user);
+            return $exam->classSubject->isAssignedSlotTeacher($user);
         }
 
         return false;
@@ -67,9 +77,8 @@ class ExamPolicy
             if (!$exam->classSubject) {
                 return false;
             }
-            $exam->classSubject->loadMissing('subject');
 
-            return $exam->classSubject->isTaughtBy($user);
+            return $exam->classSubject->isAssignedSlotTeacher($user);
         }
 
         return false;

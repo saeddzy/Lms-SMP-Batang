@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\ClassSubject;
 use App\Models\Task;
 use App\Models\User;
 
@@ -22,9 +23,7 @@ class TaskPolicy
             if (!$task->classSubject) {
                 return false;
             }
-            $task->classSubject->loadMissing('subject');
-
-            return $task->classSubject->isTaughtBy($user);
+            return $task->classSubject->isVisibleToTeacher($user);
         }
 
         if ($user->hasRole('siswa') && $user->can('tasks view')) {
@@ -36,7 +35,17 @@ class TaskPolicy
 
     public function create(User $user): bool
     {
-        return $user->can('tasks create');
+        if (! $user->can('tasks create')) {
+            return false;
+        }
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+        if ($user->hasRole('guru')) {
+            return ClassSubject::where('teacher_id', $user->id)->exists();
+        }
+
+        return false;
     }
 
     public function update(User $user, Task $task): bool
@@ -49,9 +58,8 @@ class TaskPolicy
             if (!$task->classSubject) {
                 return false;
             }
-            $task->classSubject->loadMissing('subject');
 
-            return $task->classSubject->isTaughtBy($user);
+            return $task->classSubject->isAssignedSlotTeacher($user);
         }
 
         return false;
@@ -67,9 +75,8 @@ class TaskPolicy
             if (!$task->classSubject) {
                 return false;
             }
-            $task->classSubject->loadMissing('subject');
 
-            return $task->classSubject->isTaughtBy($user);
+            return $task->classSubject->isAssignedSlotTeacher($user);
         }
 
         return false;

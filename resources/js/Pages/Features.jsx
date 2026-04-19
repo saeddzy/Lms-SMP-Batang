@@ -1,5 +1,7 @@
 import { Head, Link } from "@inertiajs/react";
 import { useState } from "react";
+import LandingNavbar from "@/Components/Landing/LandingNavbar";
+import LandingFooter from "@/Components/Landing/LandingFooter";
 import {
     IconSchool,
     IconBooks,
@@ -86,12 +88,6 @@ export default function Features({ auth }) {
     const [role, setRole] = useState("guru");
     const [openTile, setOpenTile] = useState(0);
 
-    const authButton = auth?.user
-        ? { href: route("dashboard"), label: "Dashboard" }
-        : { href: route("login"), label: "Login" };
-
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
     return (
         <>
             <Head>
@@ -137,87 +133,7 @@ export default function Features({ auth }) {
             </Head>
 
             <div className="min-h-screen text-slate-800">
-                <nav className="fixed inset-x-0 top-0 z-50 px-4 sm:px-6 py-3">
-                    <div className="bg-white/40 backdrop-blur-xl rounded-full w-full max-w-7xl mx-auto mt-6 px-6 sm:px-8 py-3 flex items-center justify-between gap-8 sm:gap-12 shadow-[0_20px_40px_rgba(0,7,103,0.06)]">
-                        <Link
-                            href="/"
-                            className="text-xl sm:text-2xl font-serif tracking-tighter text-indigo-900 hover:text-indigo-700 transition-colors flex-shrink-0"
-                        >
-                            LMS SMP N 3 Batang
-                        </Link>
-
-                        <div className="hidden md:flex items-center gap-8">
-                            <a
-                                className="text-xs uppercase tracking-widest font-sans text-slate-500 font-normal hover:text-indigo-700 transition-all duration-300 scale-105 active:scale-95"
-                                href="/"
-                            >
-                                Home
-                            </a>
-                            <span className="text-xs uppercase tracking-widest font-sans text-indigo-900 font-semibold">
-                                Fitur
-                            </span>
-                            <Link
-                                href={route("contact")}
-                                className="text-xs uppercase tracking-widest font-sans text-slate-500 font-normal hover:text-indigo-700 transition-all duration-300 scale-105 active:scale-95"
-                            >
-                                Kontak
-                            </Link>
-                        </div>
-
-                        <button
-                            type="button"
-                            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                            className="md:hidden text-indigo-900 hover:text-indigo-700 transition-colors flex-shrink-0"
-                            aria-label="Menu"
-                        >
-                            <span
-                                className={`material-symbols-outlined text-2xl hamburger-icon ${mobileMenuOpen ? "open" : ""}`}
-                            >
-                                {mobileMenuOpen ? "close" : "menu"}
-                            </span>
-                        </button>
-
-                        <Link
-                            href={authButton.href}
-                            className="hidden sm:block bg-primary text-on-primary px-6 py-2 rounded-full text-xs uppercase tracking-widest font-sans hover:opacity-90 transition-all active:scale-95 flex-shrink-0"
-                        >
-                            {authButton.label}
-                        </Link>
-                    </div>
-                </nav>
-
-                {mobileMenuOpen && (
-                    <div className="fixed top-20 left-0 right-0 z-40 md:hidden animate-in fade-in slide-in-from-top-2 duration-300">
-                        <div className="glass-card max-w-3xl mx-auto rounded-[2rem] border border-white/30 bg-white/15 backdrop-blur-3xl shadow-2xl shadow-slate-900/20 px-6 py-6 space-y-4">
-                            <Link
-                                href="/"
-                                className="block px-5 py-4 text-sm uppercase tracking-widest font-sans text-slate-600 hover:bg-white/20 rounded-3xl transition-all duration-300"
-                                onClick={() => setMobileMenuOpen(false)}
-                            >
-                                Home
-                            </Link>
-                            <span className="block px-5 py-4 text-sm uppercase tracking-widest font-sans text-indigo-900 font-semibold rounded-3xl">
-                                Fitur
-                            </span>
-                            <Link
-                                href={route("contact")}
-                                className="block px-5 py-4 text-sm uppercase tracking-widest font-sans text-slate-600 hover:bg-white/20 rounded-3xl transition-all duration-300"
-                                onClick={() => setMobileMenuOpen(false)}
-                            >
-                                Kontak
-                            </Link>
-                            <div className="pt-4 border-t border-white/20">
-                                <Link
-                                    href={authButton.href}
-                                    className="block w-full bg-primary/95 text-on-primary px-6 py-3 rounded-full text-xs uppercase tracking-widest font-sans hover:bg-primary transition-all duration-300 text-center"
-                                    onClick={() => setMobileMenuOpen(false)}
-                                >
-                                    {authButton.label}
-                                </Link>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                <LandingNavbar auth={auth} current="features" />
 
                 <header className="feature-hero-mesh relative overflow-hidden px-4 pb-20 pt-36 md:pb-28 md:pt-40">
                     <div className="pointer-events-none absolute -right-24 top-32 h-72 w-72 rounded-full bg-indigo-400/20 blur-3xl" />
@@ -464,6 +380,8 @@ export default function Features({ auth }) {
                         </Link>
                     </div>
                 </section>
+
+                <LandingFooter />
             </div>
         </>
     );

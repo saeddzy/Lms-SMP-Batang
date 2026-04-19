@@ -1,5 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
+import LandingNavbar from '@/Components/Landing/LandingNavbar';
+import LandingFooter from '@/Components/Landing/LandingFooter';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination, EffectCoverflow } from 'swiper/modules';
 import 'swiper/css';
@@ -11,9 +13,6 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
     const [activeSlide, setActiveSlide] = useState(0);
     const totalSlides = 3;
 
-    const authButton = auth?.user
-        ? { href: route('dashboard'), label: 'Dashboard' }
-        : { href: route('login'), label: 'Login' };
     const schoolImages = {
         building: '/images/gedung-depan-smp3-e1569509634282.jpg',
         medal: '/images/Penyerahan-Medali-KS_web.jpg',
@@ -288,55 +287,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                 }} />
             </Head>
             <div className="bg-surface text-on-surface overflow-x-hidden">
-                <nav className="fixed inset-x-0 top-0 z-50 px-4 sm:px-6 py-3">
-                    <div className="bg-white/40 backdrop-blur-xl rounded-full w-full max-w-7xl mx-auto mt-6 px-6 sm:px-8 py-3 flex items-center justify-between gap-8 sm:gap-12 shadow-[0_20px_40px_rgba(0,7,103,0.06)]">
-                        <Link href="/" className="text-xl sm:text-2xl font-serif tracking-tighter text-indigo-900 hover:text-indigo-700 transition-colors flex-shrink-0">LMS SMP N 3 Batang</Link>
-                        
-                        {/* Desktop Navigation */}
-                        <div className="hidden md:flex items-center gap-8">
-                            <a className="text-xs uppercase tracking-widest font-sans text-indigo-900 font-semibold hover:text-indigo-700 transition-all duration-300 scale-105 active:scale-95" href="/">Home</a>
-                            <Link href={route('features')} className="text-xs uppercase tracking-widest font-sans text-slate-500 font-normal hover:text-indigo-700 transition-all duration-300 scale-105 active:scale-95">Fitur</Link>
-                            <Link href={route('contact')} className="text-xs uppercase tracking-widest font-sans text-slate-500 font-normal hover:text-indigo-700 transition-all duration-300 scale-105 active:scale-95">Kontak</Link>
-                        </div>
-
-                        {/* Mobile Menu Button */}
-                        <button 
-                            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                            className="md:hidden text-indigo-900 hover:text-indigo-700 transition-colors flex-shrink-0"
-                        >
-                            <span className={`material-symbols-outlined text-2xl hamburger-icon ${mobileMenuOpen ? 'open' : ''}`}>
-                                {mobileMenuOpen ? 'close' : 'menu'}
-                            </span>
-                        </button>
-                        
-                        {/* Desktop Login Button */}
-                        <Link href={authButton.href} className="hidden sm:block bg-primary text-on-primary px-6 py-2 rounded-full text-xs uppercase tracking-widest font-sans hover:opacity-90 transition-all active:scale-95 flex-shrink-0">
-                            {authButton.label}
-                        </Link>
-                    </div>
-                </nav>
-
-                {/* Mobile Navigation Menu */}
-                {mobileMenuOpen && (
-                    <div className="fixed top-20 left-0 right-0 z-40 md:hidden animate-in fade-in slide-in-from-top-2 duration-300">
-                        <div className="glass-card max-w-3xl mx-auto rounded-[2rem] border border-white/30 bg-white/15 backdrop-blur-3xl shadow-2xl shadow-slate-900/20 px-6 py-6 space-y-4">
-                            <Link href="/" className="block px-5 py-4 text-sm uppercase tracking-widest font-sans text-indigo-900 font-semibold hover:bg-white/20 rounded-3xl transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
-                                Home
-                            </Link>
-                            <Link href={route('features')} className="block px-5 py-4 text-sm uppercase tracking-widest font-sans text-slate-600 hover:bg-white/20 rounded-3xl transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
-                                Fitur
-                            </Link>
-                            <Link href={route('contact')} className="block px-5 py-4 text-sm uppercase tracking-widest font-sans text-slate-600 hover:bg-white/20 rounded-3xl transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
-                                Kontak
-                            </Link>
-                            <div className="pt-4 border-t border-white/20">
-                                <Link href={authButton.href} className="block w-full bg-primary/95 text-on-primary px-6 py-3 rounded-full text-xs uppercase tracking-widest font-sans hover:bg-primary transition-all duration-300 text-center" onClick={() => setMobileMenuOpen(false)}>
-                                    {authButton.label}
-                                </Link>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                <LandingNavbar auth={auth} current="home" />
                 <main>
                     <section className="relative min-h-screen flex flex-col items-center justify-center pt-32 px-6 overflow-hidden">
                         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-[120px] -z-10"></div>
@@ -661,66 +612,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                         </div>
                     </section>
                 </main>
-                <footer className="bg-[#f4f3f1] w-full px-12 md:px-24 flex flex-col items-start gap-20 pt-32 pb-16">
-                    <div className="grid w-full grid-cols-1 gap-12 lg:grid-cols-2">
-                        <div className="space-y-10">
-                            <div className="space-y-6">
-                                <span className="text-4xl font-serif italic text-indigo-900">SMP 3 Batang</span>
-                                <p className="font-serif text-lg text-indigo-900 max-w-xs">Menjadi pusat pendidikan yang kuat dalam prestasi, karakter, dan kebanggaan daerah.</p>
-                            </div>
-                            <div className="space-y-1 text-sm text-slate-700">
-                                <p><span className="font-semibold text-indigo-900">Alamat:</span> Jl. Ki. Mangunsarkoro No. 6 Proyonanggan Selatan</p>
-                                <p>Batang - Jawa Tengah - Indonesia</p>
-                                <p><span className="font-semibold text-indigo-900">Kode Pos:</span> 51211</p>
-                                <p><span className="font-semibold text-indigo-900">Telepon:</span> 0285-391422</p>
-                                <p><span className="font-semibold text-indigo-900">Fax:</span> 0285-391422</p>
-                                <p><span className="font-semibold text-indigo-900">Posmail:</span> smptigabatang@gmail.cccom</p>
-                                <p>
-                                    <span className="font-semibold text-indigo-900">Website:</span>{" "}
-                                    <a
-                                        href="https://www.smpn3batang.sch.id"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-indigo-800 underline hover:text-indigo-600"
-                                    >
-                                        www.smpn3batang.sch.id
-                                    </a>
-                                </p>
-                                <p>
-                                    <span className="font-semibold text-indigo-900">Administrator:</span>{" "}
-                                    <a
-                                        href="mailto:madya15@gmail.com"
-                                        className="text-indigo-800 underline hover:text-indigo-600"
-                                    >
-                                        madya15@gmail.com
-                                    </a>
-                                </p>
-                            </div>
-                        </div>
-                        <div className="w-full">
-                            <p className="mb-4 font-sans tracking-tight text-slate-500 text-sm">
-                                Lokasi Sekolah
-                            </p>
-                            <div className="overflow-hidden rounded-2xl border border-indigo-100 shadow-sm">
-                                <iframe
-                                    title="Lokasi SMP N 3 Batang"
-                                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3960.7498867103236!2d109.72903811323248!3d-6.920475169654714!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x6b7184d9fc3822fd!2sSMP%20N%203%20BATANG!5e0!3m2!1sid!2sid!4v1569472653245!5m2!1sid!2sid"
-                                    className="h-[280px] w-full"
-                                    loading="lazy"
-                                    referrerPolicy="no-referrer-when-downgrade"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                    <div className="w-full pt-16 border-t border-outline-variant/20 flex flex-col md:flex-row justify-between items-center gap-6">
-                        <span className="text-slate-500 font-sans tracking-tight text-sm">© 2026 SMP Negeri 3 Batang. Pendidikan untuk Generasi Emas.</span>
-                        <div className="flex gap-8">
-                            <span className="material-symbols-outlined text-indigo-900/50">brush</span>
-                            <span className="material-symbols-outlined text-indigo-900/50">book</span>
-                            <span className="material-symbols-outlined text-indigo-900/50">school</span>
-                        </div>
-                    </div>
-                </footer>
+                <LandingFooter />
             </div>
         </>
     );

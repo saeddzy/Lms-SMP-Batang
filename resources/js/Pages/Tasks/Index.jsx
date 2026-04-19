@@ -3,8 +3,9 @@ import DashboardLayout from "@/Layouts/DashboardLayout";
 import Button from "@/Components/Button";
 import Search from "@/Components/Search";
 import Pagination from "@/Components/Pagination";
-import { Head, Link, usePage } from "@inertiajs/react";
+import { Head, Link, router, usePage } from "@inertiajs/react";
 import hasAnyPermission from "@/Utils/Permissions";
+import ToggleSwitch from "@/Components/ToggleSwitch";
 
 const chipBase =
     "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1";
@@ -123,6 +124,29 @@ export default function Index() {
                                     <div className="mt-4 rounded-lg border border-stone-100 bg-stone-50 px-3 py-2 text-xs text-stone-600">
                                         <p>Deadline: {shortDateTime(task.due_date)}</p>
                                     </div>
+
+                                    {canMutate &&
+                                        hasAnyPermission(["tasks edit"]) && (
+                                            <div className="mt-4 w-full max-w-md">
+                                                <ToggleSwitch
+                                                    checked={task.is_active}
+                                                    label="Tugas aktif"
+                                                    description="Matikan agar siswa tidak dapat mengumpulkan."
+                                                    onChange={() =>
+                                                        router.patch(
+                                                            route(
+                                                                "tasks.toggle-status",
+                                                                task.id
+                                                            ),
+                                                            {},
+                                                            {
+                                                                preserveScroll: true,
+                                                            }
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                        )}
 
                                     <div className="mt-4 flex items-center gap-2 border-t border-stone-100 pt-4">
                                         <Link

@@ -10,7 +10,10 @@ use App\Models\FinalGrade;
 use App\Models\TaskSubmission;
 use App\Models\QuizAttempt;
 use App\Models\ExamAttempt;
+use App\Models\User;
+use App\Support\AttemptStatusHelper;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
 use Carbon\Carbon;
 
@@ -460,80 +463,209 @@ class StudentDashboardController extends Controller
      */
     public function grades(Request $request)
     {
+        /** @var User $user */
         $user = auth()->user();
 
-        $query = FinalGrade::where('student_id', $user->id)
-            ->with(['subject', 'schoolClass', 'component']);
+        $rows = $this->buildUnifiedStudentGradeRows($user);
 
-        // Search functionality
         if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->whereHas('subject', function ($subjectQuery) use ($search) {
-                    $subjectQuery->where('name', 'like', "%{$search}%");
-                })
-                ->orWhereHas('component', function ($componentQuery) use ($search) {
-                    $componentQuery->where('name', 'like', "%{$search}%");
-                })
-                ->orWhere('remarks', 'like', "%{$search}%");
+            $search = mb_strtolower((string) $request->search);
+            $rows = $rows->filter(function (array $row) use ($search) {
+                $haystack = mb_strtolower(implode(' ', array_filter([
+                    $row['subject']->name ?? '',
+                    $row['class']->name ?? '',
+                    $row['assessment']['title'] ?? '',
+                    $row['assessment']['description'] ?? '',
+                    (string) ($row['feedback'] ?? ''),
+                    (string) ($row['assessment_type'] ?? ''),
+                ])));
+
+                return str_contains($haystack, $search);
             });
         }
 
-        // Filter by subject
         if ($request->filled('subject_id')) {
-            $query->where('subject_id', $request->subject_id);
+            $subjectId = (int) $request->subject_id;
+            $rows = $rows->filter(fn (array $row) => (int) ($row['subject']->id ?? 0) === $subjectId);
         }
 
-        // Filter by class
         if ($request->filled('class_id')) {
-            $query->where('class_id', $request->class_id);
+            $classId = (int) $request->class_id;
+            $rows = $rows->filter(fn (array $row) => (int) ($row['class']->id ?? 0) === $classId);
         }
 
-        $grades = $query->orderBy('created_at', 'desc')->paginate(15);
+        $rows = $rows->sortByDesc(function (array $row) {
+            $d = $row['created_at'] ?? null;
 
-        // Calculate statistics
-        $allGrades = FinalGrade::where('student_id', $user->id)->get();
-        $averageGrade = $allGrades->count() > 0 ? $allGrades->avg('score') : 0;
+            return $d instanceof Carbon ? $d->timestamp : 0;
+        })->values();
 
+        $scores = $rows->pluck('score')->filter(fn ($s) => $s !== null && $s !== '');
         $stats = [
-            'totalGrades' => $allGrades->count(),
-            'averageGrade' => round($averageGrade, 1),
-            'highestGrade' => $allGrades->max('score') ?? 0,
-            'lowestGrade' => $allGrades->min('score') ?? 0,
+            'totalGrades' => $rows->count(),
+            'averageGrade' => $scores->isEmpty() ? 0 : round((float) $scores->avg(), 1),
+            'highestGrade' => $scores->isEmpty() ? 0 : round((float) $scores->max(), 1),
+            'lowestGrade' => $scores->isEmpty() ? 0 : round((float) $scores->min(), 1),
         ];
 
-        // Get available subjects and classes for filters
+        $perPage = 15;
+        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $slice = $rows->slice(($currentPage - 1) * $perPage, $perPage)->values();
+
+        $grades = (new LengthAwarePaginator(
+            $slice,
+            $rows->count(),
+            $perPage,
+            $currentPage,
+            [
+                'path' => $request->url(),
+                'pageName' => 'page',
+            ]
+        ))->withQueryString();
+
         $subjects = $user->enrolledClasses->pluck('subjects')->flatten()->unique('id');
         $classes = $user->enrolledClasses;
-
-        // Transform grades data for the view
-        $transformedGrades = $grades->getCollection()->map(function ($grade) {
-            return [
-                'id' => $grade->id,
-                'student_id' => $grade->student_id,
-                'subject' => $grade->subject,
-                'class' => $grade->schoolClass,
-                'assessment_type' => $grade->component ? $grade->component->name : 'Final Grade',
-                'assessment' => [
-                    'title' => $grade->component ? $grade->component->name : 'Nilai Akhir',
-                    'description' => $grade->remarks,
-                ],
-                'score' => $grade->score,
-                'status' => 'published',
-                'feedback' => $grade->remarks,
-                'created_at' => $grade->created_at,
-            ];
-        });
-
-        $grades->setCollection($transformedGrades);
 
         return Inertia::render('Student/Grades', [
             'grades' => $grades,
             'stats' => $stats,
             'subjects' => $subjects,
             'classes' => $classes,
-            'filters' => $request->only(['search', 'subject_id', 'class_id'])
+            'filters' => $request->only(['search', 'subject_id', 'class_id']),
         ]);
+    }
+
+    /**
+     * Nilai akhir (FinalGrade) plus tugas terkoreksi, skor kuis, dan skor ujian (attempt).
+     *
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    private function buildUnifiedStudentGradeRows(User $user): \Illuminate\Support\Collection
+    {
+        $studentId = $user->id;
+
+        $finalRows = FinalGrade::query()
+            ->where('student_id', $studentId)
+            ->with(['subject', 'schoolClass', 'component'])
+            ->get()
+            ->map(function (FinalGrade $grade) {
+                $at = $grade->component ? $grade->component->name : 'Nilai akhir';
+
+                return [
+                    'id' => 'final-'.$grade->id,
+                    'student_id' => $grade->student_id,
+                    'subject' => $grade->subject,
+                    'class' => $grade->schoolClass,
+                    'assessment_type' => $at,
+                    'assessment' => [
+                        'title' => $grade->component ? $grade->component->name : 'Nilai akhir',
+                        'description' => $grade->remarks,
+                    ],
+                    'score' => $grade->score !== null ? round((float) $grade->score, 1) : null,
+                    'status' => 'published',
+                    'feedback' => $grade->remarks,
+                    'created_at' => $grade->calculated_at ?? $grade->created_at,
+                ];
+            });
+
+        $taskRows = TaskSubmission::query()
+            ->where('student_id', $studentId)
+            ->whereNotNull('score')
+            ->with(['task.subject', 'task.schoolClass'])
+            ->get()
+            ->map(function (TaskSubmission $sub) {
+                $task = $sub->task;
+                if (! $task) {
+                    return null;
+                }
+
+                $max = $task->max_score;
+                $raw = $sub->score;
+                $pct = ($max !== null && (float) $max > 0 && $raw !== null)
+                    ? round(((float) $raw / (float) $max) * 100, 1)
+                    : ($raw !== null ? round((float) $raw, 1) : null);
+
+                return [
+                    'id' => 'task-'.$sub->id,
+                    'student_id' => $sub->student_id,
+                    'subject' => $task->subject,
+                    'class' => $task->schoolClass,
+                    'assessment_type' => 'task',
+                    'assessment' => [
+                        'title' => $task->title,
+                        'description' => $task->description,
+                    ],
+                    'score' => $pct,
+                    'status' => 'published',
+                    'feedback' => $sub->feedback,
+                    'created_at' => $sub->graded_at ?? $sub->submitted_at ?? $sub->created_at,
+                ];
+            })
+            ->filter();
+
+        $quizRows = QuizAttempt::query()
+            ->where('student_id', $studentId)
+            ->whereNotNull('score')
+            ->with(['quiz.subject', 'quiz.schoolClass'])
+            ->get()
+            ->map(function (QuizAttempt $attempt) {
+                $quiz = $attempt->quiz;
+                if (! $quiz) {
+                    return null;
+                }
+
+                return [
+                    'id' => 'quiz-'.$attempt->id,
+                    'student_id' => $attempt->student_id,
+                    'subject' => $quiz->subject,
+                    'class' => $quiz->schoolClass,
+                    'assessment_type' => 'quiz',
+                    'assessment' => [
+                        'title' => $quiz->title,
+                        'description' => $quiz->description,
+                    ],
+                    'score' => round((float) $attempt->score, 1),
+                    'status' => 'published',
+                    'feedback' => null,
+                    'created_at' => $attempt->finished_at ?? $attempt->created_at,
+                ];
+            })
+            ->filter();
+
+        $examRows = ExamAttempt::query()
+            ->where('student_id', $studentId)
+            ->whereNotNull('score')
+            ->with(['exam.subject', 'exam.schoolClass'])
+            ->get()
+            ->map(function (ExamAttempt $attempt) {
+                $exam = $attempt->exam;
+                if (! $exam) {
+                    return null;
+                }
+
+                return [
+                    'id' => 'exam-'.$attempt->id,
+                    'student_id' => $attempt->student_id,
+                    'subject' => $exam->subject,
+                    'class' => $exam->schoolClass,
+                    'assessment_type' => 'exam',
+                    'assessment' => [
+                        'title' => $exam->title,
+                        'description' => $exam->description,
+                    ],
+                    'score' => round((float) $attempt->score, 1),
+                    'status' => 'published',
+                    'feedback' => null,
+                    'created_at' => $attempt->finished_at ?? $attempt->created_at,
+                ];
+            })
+            ->filter();
+
+        return $finalRows
+            ->concat($taskRows)
+            ->concat($quizRows)
+            ->concat($examRows)
+            ->values();
     }
 
     /**
@@ -595,6 +727,9 @@ class StudentDashboardController extends Controller
             ->latest('finished_at')
             ->paginate(15)
             ->withQueryString();
+        $attempts->setCollection(
+            AttemptStatusHelper::annotateQuizAttempts($attempts->getCollection())
+        );
 
         return Inertia::render('Student/Quizzes', [
             'attempts' => $attempts,
@@ -626,6 +761,9 @@ class StudentDashboardController extends Controller
             ->latest('finished_at')
             ->paginate(15)
             ->withQueryString();
+        $attempts->setCollection(
+            AttemptStatusHelper::annotateExamAttempts($attempts->getCollection())
+        );
 
         return Inertia::render('Student/Exams', [
             'attempts' => $attempts,

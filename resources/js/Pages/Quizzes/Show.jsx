@@ -19,9 +19,28 @@ import {
 } from "@tabler/icons-react";
 import QuestionBank from "@/Components/Lms/QuestionBank";
 
-function attemptRowStatus(att) {
-    if (att.finished_at) return "completed";
-    return "in_progress";
+/** Status progres percobaan (termasuk esai menunggu guru). */
+function attemptProgressBadge(att) {
+    if (!att.finished_at) {
+        return {
+            text: "Berlangsung",
+            className:
+                "bg-amber-50 text-amber-900 ring-amber-200/80",
+        };
+    }
+    if (
+        att.attempt_status === "menunggu_penilaian" ||
+        att.essay_grading_pending
+    ) {
+        return {
+            text: "Menunggu penilaian",
+            className: "bg-sky-50 text-sky-900 ring-sky-200/80",
+        };
+    }
+    return {
+        text: "Selesai",
+        className: "bg-emerald-50 text-emerald-900 ring-emerald-200/80",
+    };
 }
 
 /** Keadaan jendela waktu vs jam sekarang (bukan soal sudah diisi atau belum). */
@@ -177,7 +196,7 @@ export default function Show() {
                 <Table.Tbody>
                     {attempts.length > 0 ? (
                         attempts.map((att, i) => {
-                            const st = attemptRowStatus(att);
+                            const st = attemptProgressBadge(att);
                             return (
                                 <tr key={att.id}>
                                     <Table.Td>{i + 1}</Table.Td>
@@ -188,15 +207,9 @@ export default function Show() {
                                     )}
                                     <Table.Td>
                                         <span
-                                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${
-                                                st === "completed"
-                                                    ? "bg-emerald-50 text-emerald-900 ring-emerald-200/80"
-                                                    : "bg-amber-50 text-amber-900 ring-amber-200/80"
-                                            }`}
+                                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${st.className}`}
                                         >
-                                            {st === "completed"
-                                                ? "Selesai"
-                                                : "Berlangsung"}
+                                            {st.text}
                                         </span>
                                     </Table.Td>
                                     <Table.Td className="text-sm">
@@ -478,23 +491,30 @@ export default function Show() {
             )}
 
             {!isStudent && (
-                <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm">
-                    <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Aksi guru
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                        {canManageQuiz && hasAnyPermission(["quizzes edit"]) && (
-                            <Button
-                                type="edit"
-                                url={route("quizzes.edit", quiz.id)}
-                            />
-                        )}
-                        {canManageQuiz && hasAnyPermission(["quizzes delete"]) && (
-                            <Button
-                                type="delete"
-                                url={route("quizzes.destroy", quiz.id)}
-                            />
-                        )}
+                <div className="space-y-4">
+                    <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm">
+                        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Aksi guru
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                            {canManageQuiz &&
+                                hasAnyPermission(["quizzes edit"]) && (
+                                    <Button
+                                        type="edit"
+                                        url={route("quizzes.edit", quiz.id)}
+                                    />
+                                )}
+                            {canManageQuiz &&
+                                hasAnyPermission(["quizzes delete"]) && (
+                                    <Button
+                                        type="delete"
+                                        url={route(
+                                            "quizzes.destroy",
+                                            quiz.id
+                                        )}
+                                    />
+                                )}
+                        </div>
                     </div>
                 </div>
             )}

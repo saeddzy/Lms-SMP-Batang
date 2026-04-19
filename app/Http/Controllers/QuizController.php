@@ -10,6 +10,7 @@ use App\Models\QuizAttempt;
 use App\Models\QuizAttemptAnswer;
 use App\Models\QuizQuestion;
 use App\Support\AttemptScoreCalculator;
+use App\Support\AttemptStatusHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -27,7 +28,7 @@ class QuizController extends Controller
 
         $query = Quiz::with([
             'subject',
-            'schoolClass' => fn ($q) => $q->withCount('enrollments'),
+            'schoolClass' => fn ($q) => $q->withCount('students'),
             'teacher',
             'classSubject',
         ])->withCount(['questions', 'attempts']);
@@ -102,7 +103,7 @@ class QuizController extends Controller
             return array_merge($quiz->toArray(), [
                 'status' => $status,
                 'duration' => $quiz->time_limit,
-                'participants_count' => (int) ($quiz->schoolClass->enrollments_count ?? 0),
+                'participants_count' => (int) ($quiz->schoolClass->students_count ?? 0),
             ]);
         });
 
@@ -263,25 +264,13 @@ class QuizController extends Controller
                 ->with(['student', 'answers.question'])
                 ->orderBy('started_at', 'desc')
                 ->get();
-            $hasEssay = $quiz->questions->contains(fn ($q) => $q->question_type === 'essay');
-            $attempts = $attempts->map(function ($a) use ($hasEssay) {
-                $pending = $hasEssay
-                    && $a->finished_at
-                    && $a->answers->contains(
-                        fn ($ans) => $ans->question?->question_type === 'essay'
-                            && $ans->points_awarded === null
-                    );
-
-                return array_merge($a->toArray(), [
-                    'essay_grading_pending' => (bool) $pending,
-                ]);
-            });
+            $attempts = AttemptStatusHelper::annotateQuizAttempts($attempts);
         } else {
-            // For students, only show their own attempts
             $attempts = $quiz->attempts()
                 ->where('student_id', auth()->id())
                 ->with('student')
                 ->get();
+            $attempts = AttemptStatusHelper::annotateQuizAttempts($attempts);
         }
 
         $cs = $quiz->classSubject;

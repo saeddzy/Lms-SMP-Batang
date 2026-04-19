@@ -10,11 +10,15 @@ use App\Models\TaskSubmission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Carbon\Carbon;
 
 class TaskController extends Controller
 {
+    /** Ukuran maks. lampiran tugas (MB dikonversi ke KB untuk Laravel `max`). */
+    private const TASK_FILE_MAX_KB = 20480; // 20 MB
+
     /**
      * Display a listing of the resource.
      */
@@ -24,7 +28,7 @@ class TaskController extends Controller
 
         $query = Task::with([
             'subject',
-            'schoolClass' => fn ($q) => $q->withCount('enrollments'),
+            'schoolClass' => fn ($q) => $q->withCount('students'),
             'teacher',
             'classSubject',
         ])->withCount('submissions');
@@ -90,7 +94,7 @@ class TaskController extends Controller
 
             return array_merge($task->toArray(), [
                 'status' => $status,
-                'participants_count' => (int) ($task->schoolClass->enrollments_count ?? 0),
+                'participants_count' => (int) ($task->schoolClass->students_count ?? 0),
             ]);
         });
 
@@ -410,21 +414,51 @@ class TaskController extends Controller
         }
 
         $validated = $request->validate([
-            'content' => 'nullable|string',
-            'file' => 'nullable|file|max:15360',
+            'content' => 'nullable|string|max:50000',
+            'remove_file' => 'sometimes|boolean',
+            'youtube_url' => [
+                'nullable',
+                'string',
+                'max:500',
+                'regex:/^https?:\/\/(www\.)?(youtube\.com\/|youtu\.be\/).+/i',
+            ],
+            'file' => [
+                'nullable',
+                'file',
+                'max:'.self::TASK_FILE_MAX_KB,
+                'mimes:pdf,ppt,pptx,jpg,jpeg,png,gif,webp,xls,xlsx',
+            ],
         ]);
 
+        $existingSubmission = $task->submissions()->where('student_id', auth()->id())->first();
+        $removeFile = $request->boolean('remove_file');
+        $hasNewFile = $request->hasFile('file');
+
+        $hadStoredFile = $existingSubmission
+            && $existingSubmission->file_path
+            && ! str_starts_with((string) $existingSubmission->file_path, 'http');
+
+        $willStillHaveFileAfter = $hasNewFile || ($hadStoredFile && ! $removeFile);
+
+        $hasText = isset($validated['content']) && trim((string) $validated['content']) !== '';
+        $hasYoutube = ! empty($validated['youtube_url'] ?? null);
+
+        if (! $hasText && ! $hasYoutube && ! $willStillHaveFileAfter) {
+            throw ValidationException::withMessages([
+                'content' => 'Isi teks jawaban, unggah berkas, atau tautan video YouTube (minimal salah satu).',
+            ]);
+        }
+
         $data = [
-            'content' => $validated['content'] ?? null,
+            'content' => $hasText ? $validated['content'] : null,
+            'youtube_url' => $hasYoutube ? $validated['youtube_url'] : null,
             'submitted_at' => now(),
             'status' => 'submitted',
         ];
 
-        $existingSubmission = $task->submissions()->where('student_id', auth()->id())->first();
-
-        if ($request->hasFile('file')) {
+        if ($hasNewFile) {
             if ($existingSubmission?->file_path
-                && !str_starts_with($existingSubmission->file_path, 'http')) {
+                && ! str_starts_with((string) $existingSubmission->file_path, 'http')) {
                 Storage::disk('public')->delete($existingSubmission->file_path);
             }
             $file = $request->file('file');
@@ -432,6 +466,12 @@ class TaskController extends Controller
             $data['file_name'] = $file->getClientOriginalName();
             $data['file_size'] = $file->getSize();
             $data['mime_type'] = $file->getMimeType();
+        } elseif ($removeFile && $hadStoredFile) {
+            Storage::disk('public')->delete($existingSubmission->file_path);
+            $data['file_path'] = null;
+            $data['file_name'] = null;
+            $data['file_size'] = null;
+            $data['mime_type'] = null;
         }
 
         if ($existingSubmission) {

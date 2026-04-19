@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 class Exam extends Model
 {
@@ -55,6 +56,14 @@ class Exam extends Model
     }
 
     /**
+     * Get the subject for this exam through class subject (for eager loads like exam.subject).
+     */
+    public function subject()
+    {
+        return $this->hasOneThrough(Subject::class, ClassSubject::class, 'id', 'id', 'class_subject_id', 'subject_id');
+    }
+
+    /**
      * Get the user who created this exam.
      */
     public function creator(): BelongsTo
@@ -65,7 +74,7 @@ class Exam extends Model
     /**
      * Get the teacher who owns this exam through class subject.
      */
-    public function teacher(): BelongsTo
+    public function teacher(): HasOneThrough
     {
         return $this->hasOneThrough(User::class, ClassSubject::class, 'id', 'id', 'class_subject_id', 'teacher_id');
     }
@@ -76,6 +85,14 @@ class Exam extends Model
     public function examScores(): HasMany
     {
         return $this->hasMany(ExamScore::class, 'exam_id');
+    }
+
+    /**
+     * Student attempts (online attempts with scores; for teacher views, withCount).
+     */
+    public function attempts(): HasMany
+    {
+        return $this->hasMany(ExamAttempt::class, 'exam_id');
     }
 
     /**

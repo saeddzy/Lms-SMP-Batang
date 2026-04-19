@@ -62,12 +62,19 @@ export default function ExamAttempt({ exam, attempt, timeRemaining }) {
                 }
             );
             if (data.success) {
+                const waitingManual = Boolean(data.pending_manual_grading);
                 await Swal.fire({
                     title: "Selesai",
-                    html: `Nilai: <strong>${data.score}%</strong><br/>${
-                        data.passed ? "Lulus" : "Belum lulus"
-                    }`,
-                    icon: data.passed ? "success" : "info",
+                    html: waitingManual
+                        ? `Nilai sementara: <strong>${data.score}%</strong><br/>Menunggu guru memberi nilai esai.`
+                        : `Nilai: <strong>${data.score}%</strong><br/>${
+                              data.passed ? "Lulus" : "Belum lulus"
+                          }`,
+                    icon: waitingManual
+                        ? "info"
+                        : data.passed
+                          ? "success"
+                          : "info",
                     confirmButtonColor: "#1c1917",
                 });
                 router.visit(route("exams.show", exam.id));

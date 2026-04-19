@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 class Task extends Model
 {
@@ -46,6 +47,14 @@ class Task extends Model
     }
 
     /**
+     * Get the subject for this task through class subject (for eager loads like task.subject).
+     */
+    public function subject()
+    {
+        return $this->hasOneThrough(Subject::class, ClassSubject::class, 'id', 'id', 'class_subject_id', 'subject_id');
+    }
+
+    /**
      * Get the user who created this task.
      */
     public function creator(): BelongsTo
@@ -56,7 +65,7 @@ class Task extends Model
     /**
      * Get the teacher who owns this task through class subject.
      */
-    public function teacher(): BelongsTo
+    public function teacher(): HasOneThrough
     {
         return $this->hasOneThrough(User::class, ClassSubject::class, 'id', 'id', 'class_subject_id', 'teacher_id');
     }

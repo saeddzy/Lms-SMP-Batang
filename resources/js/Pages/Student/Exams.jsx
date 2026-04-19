@@ -139,7 +139,12 @@ export default function StudentExams() {
                                                     )}
                                                 </td>
                                                 <td className="px-5 py-4">
-                                                    {passed === true ? (
+                                                    {att.attempt_status ===
+                                                    "menunggu_penilaian" ? (
+                                                        <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-900 ring-1 ring-amber-200/80">
+                                                            Menunggu nilai esai
+                                                        </span>
+                                                    ) : passed === true ? (
                                                         <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-200/80">
                                                             Lulus
                                                         </span>

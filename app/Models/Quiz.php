@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 class Quiz extends Model
 {
@@ -56,6 +57,14 @@ class Quiz extends Model
     }
 
     /**
+     * Get the subject for this quiz through class subject (for eager loads like quiz.subject).
+     */
+    public function subject()
+    {
+        return $this->hasOneThrough(Subject::class, ClassSubject::class, 'id', 'id', 'class_subject_id', 'subject_id');
+    }
+
+    /**
      * Get the user who created this quiz.
      */
     public function creator(): BelongsTo
@@ -66,7 +75,7 @@ class Quiz extends Model
     /**
      * Get the teacher who owns this quiz through class subject.
      */
-    public function teacher(): BelongsTo
+    public function teacher(): HasOneThrough
     {
         return $this->hasOneThrough(User::class, ClassSubject::class, 'id', 'id', 'class_subject_id', 'teacher_id');
     }
@@ -77,6 +86,14 @@ class Quiz extends Model
     public function questions(): HasMany
     {
         return $this->hasMany(QuizQuestion::class, 'quiz_id');
+    }
+
+    /**
+     * Student attempts (for scores, teacher review, withCount).
+     */
+    public function attempts(): HasMany
+    {
+        return $this->hasMany(QuizAttempt::class, 'quiz_id');
     }
 
     /**

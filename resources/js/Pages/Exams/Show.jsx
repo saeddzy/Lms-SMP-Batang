@@ -18,6 +18,30 @@ import {
     IconListCheck,
 } from "@tabler/icons-react";
 import QuestionBank from "@/Components/Lms/QuestionBank";
+import ToggleSwitch from "@/Components/ToggleSwitch";
+
+function attemptProgressBadge(att) {
+    if (!att.finished_at) {
+        return {
+            text: "Berlangsung",
+            className:
+                "bg-amber-50 text-amber-900 ring-amber-200/80",
+        };
+    }
+    if (
+        att.attempt_status === "menunggu_penilaian" ||
+        att.essay_grading_pending
+    ) {
+        return {
+            text: "Menunggu penilaian",
+            className: "bg-sky-50 text-sky-900 ring-sky-200/80",
+        };
+    }
+    return {
+        text: "Selesai",
+        className: "bg-emerald-50 text-emerald-900 ring-emerald-200/80",
+    };
+}
 
 function examTypeLabel(t) {
     const m = {
@@ -196,15 +220,16 @@ export default function Show() {
                                     </Table.Td>
                                 )}
                                 <Table.Td>
-                                    <span
-                                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${
-                                            att.finished_at
-                                                ? "bg-emerald-50 text-emerald-900 ring-emerald-200/80"
-                                                : "bg-amber-50 text-amber-900 ring-amber-200/80"
-                                        }`}
-                                    >
-                                        {att.finished_at ? "Selesai" : "Berlangsung"}
-                                    </span>
+                                    {(() => {
+                                        const st = attemptProgressBadge(att);
+                                        return (
+                                            <span
+                                                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${st.className}`}
+                                            >
+                                                {st.text}
+                                            </span>
+                                        );
+                                    })()}
                                 </Table.Td>
                                 <Table.Td className="text-sm">
                                     {att.started_at
@@ -450,24 +475,49 @@ export default function Show() {
                 )}
 
             {!isStudent && (
-                <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm">
-                    <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Aksi guru
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                        {canManageExam && hasAnyPermission(["exams edit"]) && (
-                            <Button
-                                type="edit"
-                                url={route("exams.edit", exam.id)}
-                            />
-                        )}
-                        {canManageExam && hasAnyPermission(["exams delete"]) && (
-                            <Button
-                                type="delete"
-                                url={route("exams.destroy", exam.id)}
-                            />
-                        )}
+                <div className="space-y-4">
+                    <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm">
+                        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Aksi guru
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                            {canManageExam &&
+                                hasAnyPermission(["exams edit"]) && (
+                                    <Button
+                                        type="edit"
+                                        url={route("exams.edit", exam.id)}
+                                    />
+                                )}
+                            {canManageExam &&
+                                hasAnyPermission(["exams delete"]) && (
+                                    <Button
+                                        type="delete"
+                                        url={route(
+                                            "exams.destroy",
+                                            exam.id
+                                        )}
+                                    />
+                                )}
+                        </div>
                     </div>
+                    {canManageExam &&
+                        hasAnyPermission(["exams edit"]) && (
+                            <ToggleSwitch
+                                checked={exam.is_active}
+                                label="Ujian aktif"
+                                description="Nonaktifkan agar siswa tidak mengikuti ujian ini."
+                                onChange={() =>
+                                    router.patch(
+                                        route(
+                                            "exams.toggle-status",
+                                            exam.id
+                                        ),
+                                        {},
+                                        { preserveScroll: true }
+                                    )
+                                }
+                            />
+                        )}
                 </div>
             )}
 

@@ -10,6 +10,7 @@ use App\Models\ExamAttempt;
 use App\Models\ExamAttemptAnswer;
 use App\Models\ExamQuestion;
 use App\Support\AttemptScoreCalculator;
+use App\Support\AttemptStatusHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -251,25 +252,13 @@ class ExamController extends Controller
                 ->with(['student', 'answers.question'])
                 ->orderBy('started_at', 'desc')
                 ->get();
-            $hasEssay = $exam->questions->contains(fn ($q) => $q->question_type === 'essay');
-            $attempts = $attempts->map(function ($a) use ($hasEssay) {
-                $pending = $hasEssay
-                    && $a->finished_at
-                    && $a->answers->contains(
-                        fn ($ans) => $ans->question?->question_type === 'essay'
-                            && $ans->points_awarded === null
-                    );
-
-                return array_merge($a->toArray(), [
-                    'essay_grading_pending' => (bool) $pending,
-                ]);
-            });
+            $attempts = AttemptStatusHelper::annotateExamAttempts($attempts);
         } else {
-            // For students, only show their own attempts
             $attempts = $exam->attempts()
                 ->where('student_id', auth()->id())
                 ->with('student')
                 ->get();
+            $attempts = AttemptStatusHelper::annotateExamAttempts($attempts);
         }
 
         $cs = $exam->classSubject;
@@ -544,22 +533,32 @@ class ExamController extends Controller
         $totals = AttemptScoreCalculator::forExamAttempt($attempt);
         $totalQuestions = $exam->questions->count();
         $threshold = (float) ($exam->passing_marks ?? 60);
-        $passed = $totals['percent'] >= $threshold;
+        $hasEssay = $exam->questions->contains(fn ($q) => $q->question_type === 'essay');
+        $pendingManualGrading = $hasEssay
+            && $attempt->answers->contains(
+                fn ($ans) => $ans->question?->question_type === 'essay'
+                    && $ans->points_awarded === null
+            );
 
         $attempt->update([
             'finished_at' => now(),
             'score' => $totals['percent'],
-            'passed' => $passed,
+            'passed' => $pendingManualGrading
+                ? null
+                : ($totals['percent'] >= $threshold),
         ]);
 
         return response()->json([
             'success' => true,
             'score' => $totals['percent'],
-            'passed' => $passed,
+            'passed' => $pendingManualGrading
+                ? null
+                : ($totals['percent'] >= $threshold),
             'correct_answers' => $correctCount,
             'total_questions' => $totalQuestions,
             'earned_points' => $totals['earned'],
             'max_points' => $totals['max'],
+            'pending_manual_grading' => $pendingManualGrading,
         ]);
     }
 
@@ -664,6 +663,20 @@ class ExamController extends Controller
         ]);
 
         return back()->with('success', 'Nilai esai berhasil disimpan; nilai akhir percobaan diperbarui.');
+    }
+
+    /**
+     * Aktif / nonaktif ujian (guru pengampu / admin).
+     */
+    public function toggleStatus(Exam $exam)
+    {
+        Gate::authorize('update', $exam);
+
+        $exam->update(['is_active' => ! $exam->is_active]);
+
+        $status = $exam->is_active ? 'diaktifkan' : 'dinonaktifkan';
+
+        return back()->with('success', "Ujian berhasil {$status}.");
     }
 
     /**

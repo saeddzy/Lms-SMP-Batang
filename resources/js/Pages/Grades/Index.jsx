@@ -243,7 +243,9 @@ export default function Index() {
                     </div>
                 ) : (
                     <div className="rounded-2xl border border-dashed border-stone-200 bg-stone-50/60 p-10 text-center text-sm text-stone-500">
-                        Tidak ada data siswa / nilai untuk kelas terpilih.
+                        {!selectedClassId
+                            ? "Pilih salah satu kelas di atas untuk melihat daftar siswa dan rekap nilai tugas, kuis, dan ujian."
+                            : "Tidak ada siswa di kelas ini (atau tidak cocok dengan pencarian), atau belum ada nilai yang tercatat."}
                     </div>
                 )}
             </div>

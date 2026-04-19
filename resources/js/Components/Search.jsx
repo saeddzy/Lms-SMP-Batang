@@ -1,4 +1,4 @@
-import { useForm } from "@inertiajs/react";
+import { router, useForm } from "@inertiajs/react";
 import { IconSearch } from "@tabler/icons-react";
 import React from "react";
 
@@ -35,7 +35,7 @@ export default function Search({
         );
     }
 
-    const { data, setData, get } = useForm({
+    const { data, setData } = useForm({
         search: filter?.search ?? "",
     });
 
@@ -44,8 +44,18 @@ export default function Search({
         if (!url) {
             return;
         }
-        const q = encodeURIComponent(data.search ?? "");
-        get(`${url}?search=${q}`);
+        const query = { search: data.search ?? "" };
+        if (filter && typeof filter === "object") {
+            Object.entries(filter).forEach(([k, v]) => {
+                if (k === "search") {
+                    return;
+                }
+                if (v !== null && v !== undefined && String(v) !== "") {
+                    query[k] = v;
+                }
+            });
+        }
+        router.get(url, query, { preserveScroll: true });
     };
 
     return (

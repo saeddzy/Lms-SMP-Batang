@@ -194,6 +194,16 @@ export default function Show() {
                                     Unduh / buka lampiran
                                 </a>
                             ) : null}
+                            {mySubmission.youtube_url ? (
+                                <a
+                                    href={mySubmission.youtube_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex text-sm font-medium text-rose-600 hover:text-rose-800"
+                                >
+                                    Buka tautan YouTube
+                                </a>
+                            ) : null}
                             {mySubmission.score != null ? (
                                 <div className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-900 px-4 py-3 text-white">
                                     <span className="text-sm opacity-90">
@@ -405,22 +415,33 @@ export default function Show() {
                                         {task.subject?.name ?? "—"}
                                     </p>
                                 </div>
-                                <div className="flex flex-wrap gap-2">
-                                    {canManageTask && hasAnyPermission(["tasks edit"]) && (
-                                        <Button
-                                            type="edit"
-                                            url={route("tasks.edit", task.id)}
-                                        />
-                                    )}
-                                    {canManageTask && hasAnyPermission(["tasks delete"]) && (
-                                        <Button
-                                            type="delete"
-                                            url={route(
-                                                "tasks.destroy",
-                                                task.id
+                                <div className="flex w-full flex-col gap-4 sm:w-auto sm:min-w-[280px]">
+                                    <div className="flex flex-wrap gap-2">
+                                        {canManageTask &&
+                                            hasAnyPermission([
+                                                "tasks edit",
+                                            ]) && (
+                                                <Button
+                                                    type="edit"
+                                                    url={route(
+                                                        "tasks.edit",
+                                                        task.id
+                                                    )}
+                                                />
                                             )}
-                                        />
-                                    )}
+                                        {canManageTask &&
+                                            hasAnyPermission([
+                                                "tasks delete",
+                                            ]) && (
+                                                <Button
+                                                    type="delete"
+                                                    url={route(
+                                                        "tasks.destroy",
+                                                        task.id
+                                                    )}
+                                                />
+                                            )}
+                                    </div>
                                 </div>
                             </div>
                         </div>

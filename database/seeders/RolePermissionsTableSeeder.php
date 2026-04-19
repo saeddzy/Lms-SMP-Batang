@@ -31,7 +31,7 @@ class RolePermissionsTableSeeder extends Seeder
             'enrollments index', 'enrollments create', 'enrollments delete', 'enrollments view',
 
             // Materials
-            'materials index', 'materials create', 'materials delete', 'materials download', 'materials view',
+            'materials index', 'materials create', 'materials edit', 'materials delete', 'materials download', 'materials view',
 
             // Tasks
             'tasks index', 'tasks create', 'tasks edit', 'tasks delete', 'tasks grade', 'tasks view_submissions', 'tasks view',
@@ -67,7 +67,7 @@ class RolePermissionsTableSeeder extends Seeder
             'enrollments index', 'enrollments view',
 
             // Materials
-            'materials index', 'materials create', 'materials delete', 'materials download', 'materials view',
+            'materials index', 'materials create', 'materials edit', 'materials delete', 'materials download', 'materials view',
 
             // Tasks
             'tasks index', 'tasks create', 'tasks edit', 'tasks delete', 'tasks grade', 'tasks view_submissions', 'tasks view',

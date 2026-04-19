@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import Content from "@/Layouts/Dashboard/Content";
 import Header from "@/Layouts/Dashboard/Header";
 import Sidebar from "@/Layouts/Dashboard/Sidebar";
+import FlashBanner from "@/Components/FlashBanner";
 
 const STORAGE_KEY = "dashboard-sidebar-collapsed";
 
@@ -59,6 +60,7 @@ export default function DashboardLayout({
 
     return (
         <div className="min-h-screen bg-slate-50">
+            <FlashBanner />
             <Sidebar
                 collapsed={hydrated ? collapsed : false}
                 onToggleCollapse={toggleCollapsed}

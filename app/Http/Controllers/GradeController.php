@@ -2,14 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ExamAttempt;
 use App\Models\FinalGrade;
-use App\Models\StudentEnrollment;
+use App\Models\QuizAttempt;
 use App\Models\SchoolClass;
+use App\Models\StudentEnrollment;
 use App\Models\Subject;
 use App\Models\Task;
 use App\Models\Quiz;
 use App\Models\Exam;
 use App\Models\GradeComponent;
+use App\Models\TaskSubmission;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -23,66 +27,233 @@ class GradeController extends Controller
     {
         Gate::authorize('grades index');
 
-        $query = FinalGrade::with(['student', 'subject', 'schoolClass', 'calculator', 'component']);
+        /** @var User $user */
+        $user = auth()->user();
 
-        // Filter by class
-        if ($request->filled('class_id')) {
-            $query->where('class_id', $request->class_id);
+        $classes = $this->gradesIndexClassesForUser($user);
+
+        $selectedClassId = $request->filled('class_id') ? (int) $request->class_id : null;
+        $selectedSubjectId = $request->filled('subject_id') ? (int) $request->subject_id : null;
+
+        $classBoard = [];
+        $subjectsForClass = [];
+
+        if ($selectedClassId) {
+            $class = SchoolClass::query()
+                ->where('is_active', true)
+                ->whereKey($selectedClassId)
+                ->first();
+
+            if (! $class) {
+                abort(404);
+            }
+
+            if (! $this->teacherCanViewClassGrades($user, $class)) {
+                abort(403, 'Anda tidak memiliki akses ke nilai kelas ini.');
+            }
+
+            // Guru: hanya mapel yang diampu (slot / guru mapel). Admin: semua mapel di kelas.
+            $allowedClassSubjectIds = null;
+            if ($user->hasRole('guru')) {
+                if ($selectedSubjectId) {
+                    $taughtSubjectIds = $class->classSubjects()
+                        ->forTeacher($user)
+                        ->pluck('subject_id')
+                        ->unique()
+                        ->all();
+                    if (! in_array($selectedSubjectId, $taughtSubjectIds, true)) {
+                        abort(403, 'Anda tidak mengampu mapel ini di kelas ini.');
+                    }
+                }
+
+                $allowedClassSubjectIds = $class->classSubjects()
+                    ->forTeacher($user)
+                    ->pluck('id')
+                    ->all();
+
+                $subjectsForClass = $class->classSubjects()
+                    ->forTeacher($user)
+                    ->with('subject')
+                    ->get()
+                    ->pluck('subject')
+                    ->filter()
+                    ->unique('id')
+                    ->values()
+                    ->all();
+            } else {
+                $subjectsForClass = $class->classSubjects()
+                    ->with('subject')
+                    ->get()
+                    ->pluck('subject')
+                    ->filter()
+                    ->unique('id')
+                    ->values()
+                    ->all();
+            }
+
+            $classBoard = $this->buildClassBoard($request, $class, $selectedSubjectId, $allowedClassSubjectIds);
         }
-
-        // Filter by subject
-        if ($request->filled('subject_id')) {
-            $query->where('subject_id', $request->subject_id);
-        }
-
-        // Filter by student
-        if ($request->filled('student_id')) {
-            $query->where('student_id', $request->student_id);
-        }
-
-        // Filter by teacher (for teachers, only show grades for their subjects/classes)
-        if (auth()->user()->hasRole('guru')) {
-            $query->whereHas('schoolClass', function($q) {
-                $q->where('teacher_id', auth()->id());
-            });
-        }
-
-        // Filter by academic year
-        if ($request->filled('academic_year')) {
-            $query->where('academic_year', $request->academic_year);
-        }
-
-        // Filter by semester
-        if ($request->filled('semester')) {
-            $query->where('semester', $request->semester);
-        }
-
-        // Filter by grade component
-        if ($request->filled('component_id')) {
-            $query->where('grade_component_id', $request->component_id);
-        }
-
-        // Search by student name
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->whereHas('student', function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%");
-            });
-        }
-
-        $grades = $query->latest()->paginate(15);
-
-        $classes = SchoolClass::where('is_active', true)->get();
-        $subjects = Subject::where('is_active', true)->get();
-        $components = GradeComponent::where('is_active', true)->get();
 
         return Inertia::render('Grades/Index', [
-            'grades' => $grades,
+            'classBoard' => $classBoard,
             'classes' => $classes,
-            'subjects' => $subjects,
-            'components' => $components,
-            'filters' => $request->only(['class_id', 'subject_id', 'student_id', 'academic_year', 'semester', 'component_id', 'search'])
+            'subjectsForClass' => $subjectsForClass,
+            'selectedClassId' => $selectedClassId,
+            'selectedSubjectId' => $selectedSubjectId ?: null,
+            'filters' => $request->only(['class_id', 'subject_id', 'search']),
         ]);
+    }
+
+    /**
+     * Kelas yang boleh muncul di filter Manajemen Nilai (admin: semua; guru: wali atau pengampu mapel).
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, SchoolClass>
+     */
+    private function gradesIndexClassesForUser(User $user)
+    {
+        if ($user->hasRole('admin')) {
+            return SchoolClass::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get();
+        }
+
+        if ($user->hasRole('guru')) {
+            return SchoolClass::query()
+                ->where('is_active', true)
+                ->where(function ($q) use ($user) {
+                    $q->where('teacher_id', $user->id)
+                        ->orWhereHas('classSubjects', fn ($cs) => $cs->forTeacher($user));
+                })
+                ->orderBy('name')
+                ->get();
+        }
+
+        return SchoolClass::query()->whereRaw('1 = 0')->get();
+    }
+
+    private function teacherCanViewClassGrades(User $user, SchoolClass $class): bool
+    {
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+
+        if ($user->hasRole('guru')) {
+            if ((int) $class->teacher_id === (int) $user->id) {
+                return true;
+            }
+
+            return $class->classSubjects()->forTeacher($user)->exists();
+        }
+
+        return false;
+    }
+
+    /**
+     * Rekap per siswa: rata-rata % tugas, kuis, ujian (opsional filter mapel).
+     *
+     * @param  list<int>|null  $allowedClassSubjectIds  null = admin (semua slot kelas); array = batasi ke slot mapel guru
+     * @return list<array<string, mixed>>
+     */
+    private function buildClassBoard(Request $request, SchoolClass $class, ?int $subjectId, ?array $allowedClassSubjectIds = null): array
+    {
+        $classId = $class->id;
+
+        $studentsQuery = $class->students();
+        if ($request->filled('search')) {
+            $search = (string) $request->search;
+            $studentsQuery->where('name', 'like', '%'.$search.'%');
+        }
+
+        $students = $studentsQuery->orderBy('name')->get(['users.id', 'users.name', 'users.email']);
+        if ($students->isEmpty()) {
+            return [];
+        }
+
+        $studentIds = $students->pluck('id')->all();
+
+        $scopeActivity = function ($q) use ($classId, $subjectId, $allowedClassSubjectIds) {
+            $q->where('class_id', $classId);
+            if ($subjectId) {
+                $q->whereHas('classSubject', fn ($cs) => $cs->where('subject_id', $subjectId));
+            }
+            if ($allowedClassSubjectIds !== null) {
+                if ($allowedClassSubjectIds === []) {
+                    $q->whereRaw('1 = 0');
+                } else {
+                    $q->whereIn('class_subject_id', $allowedClassSubjectIds);
+                }
+            }
+        };
+
+        $taskSubs = TaskSubmission::query()
+            ->whereIn('student_id', $studentIds)
+            ->whereNotNull('score')
+            ->whereHas('task', $scopeActivity)
+            ->with('task')
+            ->get();
+
+        $quizAttempts = QuizAttempt::query()
+            ->whereIn('student_id', $studentIds)
+            ->whereNotNull('score')
+            ->whereHas('quiz', $scopeActivity)
+            ->get();
+
+        $examAttempts = ExamAttempt::query()
+            ->whereIn('student_id', $studentIds)
+            ->whereNotNull('score')
+            ->whereHas('exam', $scopeActivity)
+            ->get();
+
+        $taskByStudent = $taskSubs->groupBy('student_id');
+        $quizByStudent = $quizAttempts->groupBy('student_id');
+        $examByStudent = $examAttempts->groupBy('student_id');
+
+        $rows = [];
+        foreach ($students as $student) {
+            $sid = $student->id;
+
+            $taskPcts = collect($taskByStudent->get($sid, collect()))->map(function (TaskSubmission $sub) {
+                $t = $sub->task;
+                if (! $t || ! $t->max_score || (float) $t->max_score <= 0) {
+                    return null;
+                }
+
+                return ((float) $sub->score / (float) $t->max_score) * 100;
+            })->filter(fn ($v) => $v !== null);
+
+            $taskAvg = $taskPcts->isEmpty() ? 0 : round((float) $taskPcts->avg(), 1);
+
+            $quizScores = collect($quizByStudent->get($sid, collect()))->pluck('score');
+            $quizAvg = $quizScores->isEmpty() ? 0 : round((float) $quizScores->avg(), 1);
+
+            $examScores = collect($examByStudent->get($sid, collect()))->pluck('score');
+            $examAvg = $examScores->isEmpty() ? 0 : round((float) $examScores->avg(), 1);
+
+            $overallParts = collect();
+            if ($taskPcts->isNotEmpty()) {
+                $overallParts->push($taskAvg);
+            }
+            if ($quizScores->isNotEmpty()) {
+                $overallParts->push($quizAvg);
+            }
+            if ($examScores->isNotEmpty()) {
+                $overallParts->push($examAvg);
+            }
+            $overallAvg = $overallParts->isEmpty() ? 0 : round((float) $overallParts->avg(), 1);
+
+            $rows[] = [
+                'student_id' => $student->id,
+                'student_name' => $student->name,
+                'student_email' => $student->email ?? '',
+                'task_avg' => $taskAvg,
+                'quiz_avg' => $quizAvg,
+                'exam_avg' => $examAvg,
+                'overall_avg' => $overallAvg,
+            ];
+        }
+
+        return $rows;
     }
 
     /**

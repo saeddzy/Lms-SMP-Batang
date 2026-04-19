@@ -3,8 +3,9 @@ import DashboardLayout from "@/Layouts/DashboardLayout";
 import Button from "@/Components/Button";
 import Search from "@/Components/Search";
 import Pagination from "@/Components/Pagination";
-import { Head, Link, usePage } from "@inertiajs/react";
+import { Head, Link, router, usePage } from "@inertiajs/react";
 import hasAnyPermission from "@/Utils/Permissions";
+import ToggleSwitch from "@/Components/ToggleSwitch";
 import {
     IconClockHour4,
     IconListCheck,
@@ -194,6 +195,29 @@ export default function Index() {
                                         <p>Mulai: {shortDateTime(quiz.start_time)}</p>
                                         <p>Selesai: {shortDateTime(quiz.end_time)}</p>
                                     </div>
+
+                                    {canMutate &&
+                                        hasAnyPermission(["quizzes edit"]) && (
+                                            <div className="mt-4 w-full max-w-md">
+                                                <ToggleSwitch
+                                                    checked={quiz.is_active}
+                                                    label="Kuis aktif"
+                                                    description="Nonaktifkan agar siswa tidak melihat atau mengerjakan kuis ini."
+                                                    onChange={() =>
+                                                        router.patch(
+                                                            route(
+                                                                "quizzes.toggle-status",
+                                                                quiz.id
+                                                            ),
+                                                            {},
+                                                            {
+                                                                preserveScroll: true,
+                                                            }
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                        )}
 
                                     <div className="mt-4 flex items-center gap-2 border-t border-stone-100 pt-4">
                                         <Link

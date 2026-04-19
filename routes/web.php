@@ -99,6 +99,7 @@ Route::middleware('auth')->group(function () {
     Route::get('exams/{exam}/attempt/{attempt}', [ExamController::class, 'attempt'])->name('exams.attempt');
     Route::post('exams/{exam}/start-attempt', [ExamController::class, 'startAttempt'])->name('exams.start-attempt');
     Route::post('exams/{exam}/attempts/{attempt}/submit', [ExamController::class, 'submitAttempt'])->name('exams.submit-attempt');
+    Route::patch('exams/{exam}/toggle-status', [ExamController::class, 'toggleStatus'])->name('exams.toggle-status');
     Route::patch('exams/{exam}/cancel', [ExamController::class, 'cancel'])->name('exams.cancel');
     Route::patch('exams/{exam}/reschedule', [ExamController::class, 'reschedule'])->name('exams.reschedule');
 

@@ -453,6 +453,6 @@ class ClassController extends Controller
             ? 'Kelas dipublikasikan (aktif).'
             : 'Kelas tidak dipublikasikan (dinonaktifkan).';
 
-        return redirect()->back()->with('message', $msg);
+        return redirect()->back()->with('success', $msg);
     }
 }

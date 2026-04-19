@@ -20,6 +20,7 @@ class StudentSubmission extends Model
         'file_size',
         'mime_type',
         'content', // text submission content
+        'youtube_url',
         'score',
         'feedback',
         'graded_by',

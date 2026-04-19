@@ -6,6 +6,7 @@ import { Head, router, usePage } from "@inertiajs/react";
 import Search from "@/Components/Search";
 import hasAnyPermission, { hasRole } from "@/Utils/Permissions";
 import ClassCardThumbnail from "@/Components/ClassCardThumbnail";
+import ToggleSwitch from "@/Components/ToggleSwitch";
 
 export default function Index() {
     const { classes, filters } = usePage().props;
@@ -91,28 +92,27 @@ export default function Index() {
                             >
                                 {hasRole("admin") &&
                                     hasAnyPermission(["classes edit"]) && (
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                router.patch(
-                                                    route(
-                                                        "classes.toggle-active",
-                                                        schoolClass.id
-                                                    ),
-                                                    {},
-                                                    { preserveScroll: true }
-                                                )
-                                            }
-                                            className={
-                                                schoolClass.is_active
-                                                    ? "inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
-                                                    : "inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-900 hover:bg-emerald-100"
-                                            }
-                                        >
-                                            {schoolClass.is_active
-                                                ? "Nonaktifkan"
-                                                : "Publikasikan"}
-                                        </button>
+                                        <div className="w-full min-w-[200px] max-w-xs">
+                                            <ToggleSwitch
+                                                checked={schoolClass.is_active}
+                                                label="Kelas aktif"
+                                                description="Siswa hanya mengikuti kelas yang dipublikasikan."
+                                                activeLabel="Aktif"
+                                                inactiveLabel="Nonaktif"
+                                                onChange={() =>
+                                                    router.patch(
+                                                        route(
+                                                            "classes.toggle-active",
+                                                            schoolClass.id
+                                                        ),
+                                                        {},
+                                                        {
+                                                            preserveScroll: true,
+                                                        }
+                                                    )
+                                                }
+                                            />
+                                        </div>
                                     )}
                                 {hasAnyPermission(["classes view"]) && (
                                     <Button

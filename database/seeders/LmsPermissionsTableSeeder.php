@@ -38,6 +38,7 @@ class LmsPermissionsTableSeeder extends Seeder
             // Materials permissions
             'materials index',
             'materials create',
+            'materials edit',
             'materials delete',
             'materials download',
             'materials view',

@@ -73,8 +73,8 @@ export default function StudentGrades() {
     };
 
     const rows = grades.data ?? [];
-    const pageA = rows.filter((g) => g.score >= 90).length;
-    const pageLow = rows.filter((g) => g.score < 70).length;
+    const pageA = rows.filter((g) => Number(g.score) >= 90).length;
+    const pageLow = rows.filter((g) => Number(g.score) < 70).length;
 
     return (
         <DashboardLayout title="Nilai Saya">
@@ -83,7 +83,7 @@ export default function StudentGrades() {
             <StudentShell
                 eyebrow="Akademik"
                 title="Nilai & rapor ringkas"
-                subtitle="Data di bawah ini bersumber dari nilai akhir yang dipublikasikan untuk Anda."
+                subtitle="Gabungan nilai akhir, tugas yang sudah dinilai, skor kuis, dan skor ujian (persentase)."
             >
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <StudentStatCard
@@ -181,14 +181,28 @@ export default function StudentGrades() {
                                         </Table.Td>
                                         <Table.Td>
                                             <span className="text-lg font-bold tabular-nums text-slate-900">
-                                                {grade.score}%
+                                                {grade.score != null && grade.score !== ""
+                                                    ? `${grade.score}%`
+                                                    : "—"}
                                             </span>
                                         </Table.Td>
                                         <Table.Td>
                                             <span
-                                                className={`inline-flex items-center rounded-full px-2.5 py-1 text-sm font-bold ring-1 ${getGradeColor(grade.score)}`}
+                                                className={`inline-flex items-center rounded-full px-2.5 py-1 text-sm font-bold ring-1 ${
+                                                    grade.score != null &&
+                                                    grade.score !== ""
+                                                        ? getGradeColor(
+                                                              Number(grade.score)
+                                                          )
+                                                        : "bg-slate-100 text-slate-600 ring-slate-200/80"
+                                                }`}
                                             >
-                                                {getGradeLetter(grade.score)}
+                                                {grade.score != null &&
+                                                grade.score !== ""
+                                                    ? getGradeLetter(
+                                                          Number(grade.score)
+                                                      )
+                                                    : "—"}
                                             </span>
                                         </Table.Td>
                                         <Table.Td>
@@ -225,7 +239,8 @@ export default function StudentGrades() {
                                         colSpan={10}
                                         className="py-12 text-center text-slate-500"
                                     >
-                                        Belum ada nilai yang dipublikasikan.
+                                        Belum ada nilai (nilai akhir, tugas, kuis,
+                                        atau ujian dengan skor).
                                     </Table.Td>
                                 </tr>
                             )}
@@ -282,14 +297,17 @@ export default function StudentGrades() {
                                 {
                                     label: "A",
                                     range: "90–100",
-                                    n: rows.filter((g) => g.score >= 90).length,
+                                    n: rows.filter((g) => Number(g.score) >= 90)
+                                        .length,
                                     bg: "bg-emerald-50 text-emerald-900",
                                 },
                                 {
                                     label: "B",
                                     range: "80–89",
                                     n: rows.filter(
-                                        (g) => g.score >= 80 && g.score < 90
+                                        (g) =>
+                                            Number(g.score) >= 80 &&
+                                            Number(g.score) < 90
                                     ).length,
                                     bg: "bg-sky-50 text-sky-900",
                                 },
@@ -297,7 +315,9 @@ export default function StudentGrades() {
                                     label: "C",
                                     range: "70–79",
                                     n: rows.filter(
-                                        (g) => g.score >= 70 && g.score < 80
+                                        (g) =>
+                                            Number(g.score) >= 70 &&
+                                            Number(g.score) < 80
                                     ).length,
                                     bg: "bg-amber-50 text-amber-900",
                                 },
@@ -312,7 +332,8 @@ export default function StudentGrades() {
                                 {
                                     label: "E",
                                     range: "&lt;60",
-                                    n: rows.filter((g) => g.score < 60).length,
+                                    n: rows.filter((g) => Number(g.score) < 60)
+                                        .length,
                                     bg: "bg-rose-50 text-rose-900",
                                 },
                             ].map((cell) => (

@@ -1,236 +1,233 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
-import Card from "@/Components/Card";
-import { Head, router } from "@inertiajs/react";
-import axios from "axios";
-import Swal from "sweetalert2";
+import { Head, router, usePage } from "@inertiajs/react";
+import { IconClock, IconCheck, IconX, IconAlertTriangle } from "@tabler/icons-react";
 
-function getXsrfToken() {
-    const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
-    return match ? decodeURIComponent(match[1]) : "";
-}
-
-function formatTime(totalSeconds) {
-    const m = Math.floor(totalSeconds / 60);
-    const s = totalSeconds % 60;
-    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
-
-export default function ExamAttempt({ exam, attempt, timeRemaining }) {
-    const questions = useMemo(
-        () => [...(exam.questions ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
-        [exam.questions]
-    );
-
+export default function ExamAttempt() {
+    const { exam, attempt, questions, remainingMinutes, endTime } = usePage().props;
     const [answers, setAnswers] = useState({});
-    const [secondsLeft, setSecondsLeft] = useState(() => Math.max(0, Number(timeRemaining) || 0));
-    const [submitting, setSubmitting] = useState(false);
+    const [currentQuestion, setCurrentQuestion] = useState(0);
+    const [timeLeft, setTimeLeft] = useState(remainingMinutes);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // Timer effect
     useEffect(() => {
-        setSecondsLeft(Math.max(0, Number(timeRemaining) || 0));
-    }, [timeRemaining]);
-
-    useEffect(() => {
-        const id = setInterval(() => {
-            setSecondsLeft((s) => Math.max(0, s - 1));
+        const timer = setInterval(() => {
+            const now = new Date();
+            const end = new Date(endTime);
+            const diff = Math.max(0, Math.floor((end - now) / 1000 / 60));
+            
+            setTimeLeft(diff);
+            
+            if (diff === 0) {
+                handleSubmit(); // Auto submit when time is up
+            }
         }, 1000);
-        return () => clearInterval(id);
-    }, []);
 
-    const setAnswer = (questionId, value) => {
-        setAnswers((prev) => ({ ...prev, [questionId]: value }));
+        return () => clearInterval(timer);
+    }, [endTime]);
+
+    const handleAnswerChange = (questionId, answer, selectedOptions = null) => {
+        setAnswers(prev => ({
+            ...prev,
+            [questionId]: {
+                answer,
+                selected_options: selectedOptions,
+                time_spent_seconds: (prev[questionId]?.time_spent_seconds || 0) + 1
+            }
+        }));
     };
 
-    const submit = async () => {
-        setSubmitting(true);
+    const handleSubmit = async () => {
+        if (isSubmitting) return;
+        
+        setIsSubmitting(true);
+        
         try {
-            const url = route("exams.submit-attempt", {
-                exam: exam.id,
-                attempt: attempt.id,
-            });
-            const { data } = await axios.post(
-                url,
-                { answers },
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        Accept: "application/json",
-                        "X-XSRF-TOKEN": getXsrfToken(),
-                        "X-Requested-With": "XMLHttpRequest",
-                    },
-                    withCredentials: true,
-                }
-            );
-            if (data.success) {
-                const waitingManual = Boolean(data.pending_manual_grading);
-                await Swal.fire({
-                    title: "Selesai",
-                    html: waitingManual
-                        ? `Nilai sementara: <strong>${data.score}%</strong><br/>Menunggu guru memberi nilai esai.`
-                        : `Nilai: <strong>${data.score}%</strong><br/>${
-                              data.passed ? "Lulus" : "Belum lulus"
-                          }`,
-                    icon: waitingManual
-                        ? "info"
-                        : data.passed
-                          ? "success"
-                          : "info",
-                    confirmButtonColor: "#1c1917",
+            // Save all answers first
+            for (const [questionId, answerData] of Object.entries(answers)) {
+                await router.post(route('exams.attempt.save-answer', [exam.id, attempt.id]), {
+                    question_id: questionId,
+                    ...answerData
                 });
-                router.visit(route("exams.show", exam.id));
             }
-        } catch (e) {
-            const msg =
-                e.response?.data?.message ||
-                e.response?.data?.error ||
-                e.message ||
-                "Gagal mengirim jawaban.";
-            await Swal.fire({ title: "Gagal", text: msg, icon: "error" });
-        } finally {
-            setSubmitting(false);
+
+            // Then submit exam
+            await router.post(route('exams.attempt.submit', [exam.id, attempt.id]));
+            
+            router.visit(route('exams.attempt.result', [exam.id, attempt.id]));
+        } catch (error) {
+            console.error('Submit error:', error);
+            setIsSubmitting(false);
         }
     };
 
-    return (
-        <DashboardLayout title={`Ujian: ${exam.title}`}>
-            <Head title={`Ujian: ${exam.title}`} />
+    const formatTime = (minutes) => {
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+    };
 
-            <div className="mx-auto max-w-3xl space-y-6">
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                    <span>
-                        Sisa waktu: <strong className="tabular-nums">{formatTime(secondsLeft)}</strong>
-                    </span>
-                    {secondsLeft === 0 && (
-                        <span className="font-medium text-red-700">Waktu habis — kirim jawaban segera.</span>
-                    )}
+    const getStatusColor = () => {
+        if (timeLeft <= 5) return 'text-red-600 bg-red-50';
+        if (timeLeft <= 10) return 'text-yellow-600 bg-yellow-50';
+        return 'text-green-600 bg-green-50';
+    };
+
+    return (
+        <DashboardLayout title={`Mengerjakan: ${exam.title}`}>
+            <Head title={`Mengerjakan: ${exam.title}`} />
+
+            <div className="max-w-4xl mx-auto py-6">
+                {/* Header */}
+                <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <h1 className="text-xl font-bold text-slate-900">{exam.title}</h1>
+                            <p className="text-sm text-slate-600">
+                                Soal {currentQuestion + 1} dari {questions.length}
+                            </p>
+                        </div>
+                        <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor()}`}>
+                            <IconClock className="inline w-4 h-4 mr-1" />
+                            {formatTime(timeLeft)}
+                        </div>
+                    </div>
                 </div>
 
-                <Card>
-                    <Card.Header>
-                        <Card.Title>{exam.title}</Card.Title>
-                        {exam.instructions && (
-                            <Card.Description className="whitespace-pre-wrap">
-                                {exam.instructions}
-                            </Card.Description>
-                        )}
-                    </Card.Header>
+                {/* Progress Bar */}
+                <div className="mb-6">
+                    <div className="flex justify-between text-sm text-slate-600 mb-2">
+                        <span>Progress</span>
+                        <span>{Math.round(((currentQuestion + 1) / questions.length) * 100)}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-2">
+                        <div 
+                            className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}
+                        />
+                    </div>
+                </div>
 
-                    <Card.Content className="space-y-8">
-                        {questions.map((q, idx) => (
-                            <div
-                                key={q.id}
-                                className="border-b border-stone-200 pb-6 last:border-0 last:pb-0"
-                            >
-                                <p className="font-medium text-stone-900">
-                                    {idx + 1}. {q.question_text}
-                                </p>
-
-                                {q.question_type === "multiple_choice" && Array.isArray(q.options) && (
-                                    <div className="mt-3 space-y-2">
-                                        {q.options.map((opt, i) => (
-                                            <label
-                                                key={i}
-                                                className="flex cursor-pointer items-start gap-2 rounded-md border border-stone-200 p-3 hover:bg-stone-50"
-                                            >
-                                                <input
-                                                    type="radio"
-                                                    className="mt-1"
-                                                    name={`q-${q.id}`}
-                                                    value={String(i)}
-                                                    checked={answers[q.id] === String(i)}
-                                                    onChange={() => setAnswer(q.id, String(i))}
-                                                />
-                                                <span>
-                                                    <span className="font-medium text-stone-600">
-                                                        {String.fromCharCode(65 + i)}.{" "}
-                                                    </span>
-                                                    {opt}
-                                                </span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {q.question_type === "true_false" && (
-                                    <div className="mt-3 flex flex-wrap gap-4">
-                                        {["true", "false"].map((v) => (
-                                            <label
-                                                key={v}
-                                                className="flex cursor-pointer items-center gap-2"
-                                            >
-                                                <input
-                                                    type="radio"
-                                                    name={`q-${q.id}`}
-                                                    value={v}
-                                                    checked={answers[q.id] === v}
-                                                    onChange={() => setAnswer(q.id, v)}
-                                                />
-                                                {v === "true" ? "Benar" : "Salah"}
-                                            </label>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {q.question_type === "short_answer" && (
-                                    <textarea
-                                        className="mt-3 block w-full rounded-md border border-stone-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                        rows={4}
-                                        value={answers[q.id] ?? ""}
-                                        onChange={(e) => setAnswer(q.id, e.target.value)}
-                                        placeholder="Tulis jawaban singkat"
-                                    />
-                                )}
-
-                                {q.question_type === "essay" && (
-                                    <div className="mt-3 space-y-2">
-                                        <p className="text-xs text-stone-600">
-                                            Soal esai — dinilai guru setelah Anda
-                                            mengirim jawaban.
-                                        </p>
-                                        <textarea
-                                            className="block w-full rounded-md border border-stone-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                            rows={10}
-                                            value={answers[q.id] ?? ""}
-                                            onChange={(e) =>
-                                                setAnswer(
-                                                    q.id,
-                                                    e.target.value
-                                                )
-                                            }
-                                            placeholder="Tulis jawaban Anda di sini…"
-                                        />
-                                    </div>
-                                )}
+                {/* Question */}
+                {questions[currentQuestion] && (
+                    <div className="mb-6 rounded-lg border border-slate-200 bg-white p-6">
+                        <div className="mb-4">
+                            <div className="flex items-start gap-2 mb-2">
+                                <span className="flex-shrink-0 w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-sm font-medium">
+                                    {currentQuestion + 1}
+                                </span>
+                                <h2 className="text-lg font-medium text-slate-900 flex-1">
+                                    {questions[currentQuestion].question_text}
+                                </h2>
                             </div>
-                        ))}
+                            
+                            {questions[currentQuestion].question_image && (
+                                <img 
+                                    src={`/storage/${questions[currentQuestion].question_image}`}
+                                    alt="Question image"
+                                    className="mt-3 max-w-full h-auto rounded-lg border border-slate-200"
+                                />
+                            )}
+                        </div>
 
-                        {questions.length === 0 && (
-                            <p className="text-stone-600">
-                                Belum ada soal untuk ujian ini. Hubungi guru Anda.
-                            </p>
+                        {/* Options */}
+                        {questions[currentQuestion].options && questions[currentQuestion].options.length > 0 ? (
+                            <div className="space-y-3">
+                                {questions[currentQuestion].options.map((option, index) => (
+                                    <label 
+                                        key={option.id}
+                                        className="flex items-start gap-3 p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors"
+                                    >
+                                        <input
+                                            type="radio"
+                                            name={`question_${questions[currentQuestion].id}`}
+                                            value={option.id}
+                                            checked={answers[questions[currentQuestion].id]?.selected_options?.includes(option.id)}
+                                            onChange={(e) => {
+                                                const currentAnswers = answers[questions[currentQuestion].id]?.selected_options || [];
+                                                if (e.target.checked) {
+                                                    handleAnswerChange(
+                                                        questions[currentQuestion].id, 
+                                                        option.option_text, 
+                                                        [...currentAnswers, option.id]
+                                                    );
+                                                } else {
+                                                    handleAnswerChange(
+                                                        questions[currentQuestion].id, 
+                                                        option.option_text, 
+                                                        currentAnswers.filter(id => id !== option.id)
+                                                    );
+                                                }
+                                            }}
+                                            className="mt-1"
+                                        />
+                                        <div className="flex-1">
+                                            <span className="font-medium text-slate-900">
+                                                {String.fromCharCode(65 + index)}. {option.option_text}
+                                            </span>
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
+                        ) : (
+                            /* Essay question */
+                            <textarea
+                                rows={4}
+                                placeholder="Tulis jawaban Anda di sini..."
+                                value={answers[questions[currentQuestion].id]?.answer || ''}
+                                onChange={(e) => handleAnswerChange(questions[currentQuestion].id, e.target.value)}
+                                className="w-full rounded-lg border border-slate-200 p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
                         )}
-                    </Card.Content>
+                    </div>
+                )}
 
-                    <Card.Footer className="flex flex-wrap items-center justify-between gap-3">
-                        <button
-                            type="button"
-                            className="inline-flex rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
-                            onClick={() =>
-                                router.visit(route("exams.show", exam.id))
-                            }
-                        >
-                            Kembali
-                        </button>
-                        <button
-                            type="button"
-                            disabled={submitting || questions.length === 0}
-                            onClick={submit}
-                            className="inline-flex items-center rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white shadow hover:bg-stone-800 disabled:opacity-50"
-                        >
-                            {submitting ? "Mengirim…" : "Kirim jawaban"}
-                        </button>
-                    </Card.Footer>
-                </Card>
+                {/* Navigation */}
+                <div className="flex justify-between items-center">
+                    <button
+                        onClick={() => setCurrentQuestion(Math.max(0, currentQuestion - 1))}
+                        disabled={currentQuestion === 0}
+                        className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        Sebelumnya
+                    </button>
+
+                    <div className="flex gap-2">
+                        {questions.map((_, index) => (
+                            <button
+                                key={index}
+                                onClick={() => setCurrentQuestion(index)}
+                                className={`w-8 h-8 rounded-full text-sm font-medium transition-colors ${
+                                    index === currentQuestion 
+                                        ? 'bg-indigo-600 text-white' 
+                                        : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                                }`}
+                            >
+                                {index + 1}
+                            </button>
+                        ))}
+                    </div>
+
+                    <button
+                        onClick={() => setCurrentQuestion(Math.min(questions.length - 1, currentQuestion + 1))}
+                        disabled={currentQuestion === questions.length - 1}
+                        className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        Selanjutnya
+                    </button>
+                </div>
+
+                {/* Submit Button */}
+                <div className="mt-8 text-center">
+                    <button
+                        onClick={handleSubmit}
+                        disabled={isSubmitting || timeLeft === 0}
+                        className="px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                    >
+                        {isSubmitting ? 'Menyimpan...' : 'Kumpulkan Jawaban'}
+                    </button>
+                </div>
             </div>
         </DashboardLayout>
     );

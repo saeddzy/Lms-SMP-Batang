@@ -56,10 +56,18 @@ function examTypeLabel(t) {
 
 function examWindow(exam) {
     if (exam.is_cancelled) return "batal";
-    if (!exam.scheduled_date || exam.duration_minutes == null) return "invalid";
-    const start = new Date(exam.scheduled_date);
+    
+    // Gunakan duration_minutes atau duration sebagai fallback
+    const duration = exam.duration_minutes != null ? exam.duration_minutes : exam.duration;
+    if (!exam.scheduled_date || duration == null) return "invalid";
+    
+    // Gabungkan scheduled_date dengan start_time jika ada
+    const startTime = exam.start_time ? `${exam.scheduled_date}T${exam.start_time}` : exam.scheduled_date;
+    const start = new Date(startTime);
+    
+    // Hitung waktu akhir berdasarkan duration
     const end = new Date(
-        start.getTime() + Number(exam.duration_minutes) * 60 * 1000
+        start.getTime() + Number(duration) * 60 * 1000
     );
     const now = new Date();
     if (now < start) return "belum";
@@ -147,7 +155,9 @@ export default function Show() {
                 <p className="mt-1 font-medium text-slate-900">
                     {exam.duration_minutes != null
                         ? `${exam.duration_minutes} menit`
-                        : "—"}
+                        : exam.duration != null
+                            ? `${exam.duration} menit`
+                            : "—"}
                 </p>
             </div>
             <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 sm:col-span-2">
@@ -155,9 +165,13 @@ export default function Show() {
                     Mulai ujian
                 </p>
                 <p className="mt-1 text-sm font-medium text-slate-900">
-                    {exam.scheduled_date
-                        ? formatStudentDateTime(exam.scheduled_date)
-                        : "—"}
+                    {exam.start_time
+                        ? exam.scheduled_date
+                            ? formatStudentDateTime(`${exam.scheduled_date}T${exam.start_time}`)
+                            : formatStudentDateTime(exam.start_time)
+                        : exam.scheduled_date
+                            ? formatStudentDateTime(exam.scheduled_date)
+                            : "—"}
                 </p>
             </div>
             <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">

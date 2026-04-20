@@ -60,14 +60,14 @@ class ExamController extends Controller
         if ($request->filled('status')) {
             switch ($request->status) {
                 case 'scheduled':
-                    $query->where('scheduled_date', '>', now());
+                    $query->where('start_time', '>', now());
                     break;
                 case 'ongoing':
-                    $query->where('scheduled_date', '<=', now())
-                          ->whereRaw('DATE_ADD(scheduled_date, INTERVAL duration_minutes MINUTE) > ?', [now()]);
+                    $query->where('start_time', '<=', now())
+                          ->where('end_time', '>=', now());
                     break;
                 case 'completed':
-                    $query->whereRaw('DATE_ADD(scheduled_date, INTERVAL duration_minutes MINUTE) <= ?', [now()]);
+                    $query->where('end_time', '<', now());
                     break;
                 case 'cancelled':
                     $query->where('is_cancelled', true);
@@ -166,21 +166,38 @@ class ExamController extends Controller
     {
         Gate::authorize('exams create');
 
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'subject_id' => 'required|exists:subjects,id',
-            'class_id' => 'required|exists:school_classes,id',
-            'type' => 'required|in:midterm,final,quiz,practice',
-            'scheduled_date' => 'required|date|after:now',
-            'duration_minutes' => 'required|integer|min:30|max:240',
-            'total_questions' => 'required|integer|min:1|max:100',
-            'passing_score' => 'required|numeric|min:0|max:100',
-            'instructions' => 'nullable|string',
-            'rules' => 'nullable|string',
-            'requires_supervision' => 'boolean',
-            'allow_review' => 'boolean',
-            'max_attempts' => 'required|integer|min:1|max:3',
+        try {
+            // Log debugging
+            \Log::info('Exam store attempt', [
+                'user_id' => auth()->id(),
+                'user_role' => auth()->user()->role ?? 'unknown',
+                'user_permissions' => method_exists(auth()->user(), 'permissions') ? auth()->user()->permissions : [],
+                'request_data' => $request->all(),
+                'request_method' => $request->method(),
+            ]);
+
+            $validated = $request->validate([
+                'title' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'subject_id' => 'required|exists:subjects,id',
+                'class_id' => 'required|exists:school_classes,id',
+                'type' => 'required|in:midterm,final,quiz,practice',
+                'scheduled_date' => 'required|date',
+                'duration' => 'required|integer|min:1',
+                'total_questions' => 'nullable|integer|min:1|max:100',
+                'passing_score' => 'nullable|numeric|min:0|max:100',
+                'instructions' => 'nullable|string',
+                'rules' => 'nullable|string',
+                'supervision_required' => 'boolean',
+                'allow_review' => 'boolean',
+                'start_time' => 'required',
+                'end_time' => 'required',
+                'status' => 'nullable|string',
+            ]);
+
+        \Log::info('Validation passed', [
+            'validated_data' => $validated,
+            'user_id' => auth()->id(),
         ]);
 
         // Find the class_subject based on class_id and subject_id
@@ -202,28 +219,61 @@ class ExamController extends Controller
             default => 'quiz',
         };
 
+        // Combine date and time using Carbon
+        $startDateTime = \Carbon\Carbon::parse($validated['scheduled_date'] . ' ' . $validated['start_time']);
+        $endDateTime = \Carbon\Carbon::parse($validated['scheduled_date'] . ' ' . $validated['end_time']);
+
+        // Debug log untuk memastikan data masuk DB dengan benar
+        \Log::info('Exam datetime debug', [
+            'scheduled_date' => $validated['scheduled_date'],
+            'start_time_input' => $validated['start_time'],
+            'end_time_input' => $validated['end_time'],
+            'start_datetime' => $startDateTime,
+            'end_datetime' => $endDateTime,
+            'duration' => $validated['duration'],
+        ]);
+
+        // Create exam record
         $exam = Exam::create([
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
             'instructions' => $validated['instructions'] ?? null,
-            'rules' => $validated['rules'] ?? null,
             'class_id' => $validated['class_id'],
             'class_subject_id' => $classSubject->id,
             'exam_type' => $examType,
-            'scheduled_date' => $validated['scheduled_date'],
-            'duration_minutes' => $validated['duration_minutes'],
+            'scheduled_date' => $startDateTime,
+            'start_time' => $startDateTime,
+            'end_time' => $endDateTime,
+            'duration' => $validated['duration'],
+            'duration_minutes' => $validated['duration'],
             'total_questions' => $validated['total_questions'],
-            'passing_marks' => $validated['passing_score'],
+            'passing_marks' => $validated['passing_score'] ?? 0,
             'total_marks' => 100,
-            'max_attempts' => $validated['max_attempts'],
-            'requires_supervision' => $request->boolean('requires_supervision'),
+            'requires_supervision' => $request->boolean('supervision_required'),
             'allow_review' => $request->boolean('allow_review'),
             'created_by' => auth()->id(),
             'is_active' => true,
         ]);
 
+        \Log::info('Exam created successfully', [
+            'exam_id' => $exam->id,
+            'exam_title' => $exam->title,
+            'redirect_to' => 'exams.show',
+        ]);
+
         return redirect()->route('exams.show', $exam)
             ->with('success', 'Ujian berhasil dibuat. Sekarang tambahkan soal-soal.');
+
+        } catch (\Exception $e) {
+            \Log::error('Exam creation failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id(),
+                'request_data' => $request->all(),
+            ]);
+
+            return back()->withErrors(['error' => 'Terjadi kesalahan saat menyimpan data ujian: ' . $e->getMessage()]);
+        }
     }
 
     /**
@@ -238,8 +288,8 @@ class ExamController extends Controller
             'schoolClass',
             'teacher',
             'creator',
-            'questions' => fn ($q) => $q->orderBy('order'),
-        ];
+            'questions',
+                    ];
         if (auth()->user()->can('exams view') && !auth()->user()->hasRole('siswa')) {
             $load[] = 'schoolClass.students';
         }
@@ -293,8 +343,34 @@ class ExamController extends Controller
             $classes = SchoolClass::where('is_active', true)->get();
         }
 
+        // Format date and time for HTML inputs
+        $examData = $exam->toArray();
+        
+        // Handle scheduled_date formatting
+        if ($exam->scheduled_date) {
+            // Try different date formats
+            $date = \DateTime::createFromFormat('Y-m-d', $exam->scheduled_date);
+            if (!$date) {
+                $date = \DateTime::createFromFormat('Y-m-d H:i:s', $exam->scheduled_date);
+            }
+            if (!$date) {
+                $date = \DateTime::createFromFormat('Y-m-d\TH:i:s', $exam->scheduled_date);
+            }
+            if ($date) {
+                $examData['scheduled_date'] = $date->format('Y-m-d');
+            } else {
+                $examData['scheduled_date'] = null;
+            }
+        } else {
+            $examData['scheduled_date'] = null;
+        }
+        
+        // Handle time formatting
+        $examData['start_time'] = $exam->start_time ? date('H:i', strtotime($exam->start_time)) : null;
+        $examData['end_time'] = $exam->end_time ? date('H:i', strtotime($exam->end_time)) : null;
+
         return Inertia::render('Exams/Edit', [
-            'exam' => $exam,
+            'exam' => $examData,
             'subjects' => $subjects,
             'classes' => $classes,
         ]);
@@ -314,15 +390,16 @@ class ExamController extends Controller
             'class_id' => 'required|exists:school_classes,id',
             'type' => 'required|in:midterm,final,quiz,practice',
             'scheduled_date' => 'required|date',
-            'duration_minutes' => 'required|integer|min:30|max:240',
-            'total_questions' => 'required|integer|min:1|max:100',
-            'passing_score' => 'required|numeric|min:0|max:100',
+            'duration' => 'required|integer|min:1',
+            'total_questions' => 'nullable|integer|min:1|max:100',
+            'passing_score' => 'nullable|numeric|min:0|max:100',
             'instructions' => 'nullable|string',
             'rules' => 'nullable|string',
-            'requires_supervision' => 'boolean',
+            'supervision_required' => 'boolean',
             'allow_review' => 'boolean',
-            'max_attempts' => 'required|integer|min:1|max:3',
-        ]);
+            'start_time' => 'required',
+            'end_time' => 'required',
+                    ]);
 
         $classSubject = ClassSubject::where('class_id', $validated['class_id'])
             ->where('subject_id', $validated['subject_id'])
@@ -342,6 +419,20 @@ class ExamController extends Controller
             default => 'quiz',
         };
 
+        // Combine date and time using Carbon (same as store method)
+        $startDateTime = \Carbon\Carbon::parse($validated['scheduled_date'] . ' ' . $validated['start_time']);
+        $endDateTime = \Carbon\Carbon::parse($validated['scheduled_date'] . ' ' . $validated['end_time']);
+
+        // Debug log untuk memastikan data masuk DB dengan benar
+        \Log::info('Exam update datetime debug', [
+            'scheduled_date' => $validated['scheduled_date'],
+            'start_time_input' => $validated['start_time'],
+            'end_time_input' => $validated['end_time'],
+            'start_datetime' => $startDateTime,
+            'end_datetime' => $endDateTime,
+            'duration' => $validated['duration'],
+        ]);
+
         $exam->update([
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
@@ -350,12 +441,14 @@ class ExamController extends Controller
             'class_id' => $validated['class_id'],
             'class_subject_id' => $classSubject->id,
             'exam_type' => $examType,
-            'scheduled_date' => $validated['scheduled_date'],
-            'duration_minutes' => $validated['duration_minutes'],
+            'scheduled_date' => $startDateTime,
+            'start_time' => $startDateTime,
+            'end_time' => $endDateTime,
+            'duration' => $validated['duration'],
+            'duration_minutes' => $validated['duration'],
             'total_questions' => $validated['total_questions'],
-            'passing_marks' => $validated['passing_score'],
-            'max_attempts' => $validated['max_attempts'],
-            'requires_supervision' => $request->boolean('requires_supervision'),
+            'passing_marks' => $validated['passing_score'] ?? 0,
+            'requires_supervision' => $request->boolean('supervision_required'),
             'allow_review' => $request->boolean('allow_review'),
         ]);
 
@@ -399,15 +492,16 @@ class ExamController extends Controller
             return back()->with('error', 'Jadwal ujian belum lengkap.');
         }
 
-        // Check timing
-        $examEndTime = $exam->scheduled_date->copy()->addMinutes((int) $exam->duration_minutes);
+        // Check timing - use the actual start_time and end_time fields
+        $examStartTime = $exam->start_time;
+        $examEndTime = $exam->end_time;
 
-        if (now() < $exam->scheduled_date) {
-            return back()->with('error', 'Ujian belum dimulai.');
+        if (now() < $examStartTime) {
+            return back()->with('error', 'Ujian belum dimulai. Dimulai pada: ' . $examStartTime->format('d M Y H:i'));
         }
 
         if (now() > $examEndTime) {
-            return back()->with('error', 'Ujian sudah berakhir.');
+            return back()->with('error', 'Ujian sudah berakhir pada: ' . $examEndTime->format('d M Y H:i'));
         }
 
         // Check attempt limit
@@ -699,8 +793,8 @@ class ExamController extends Controller
         Gate::authorize('update', $exam);
 
         $validated = $request->validate([
-            'scheduled_date' => 'required|date|after:now',
-            'duration_minutes' => 'required|integer|min:30|max:240',
+            'scheduled_date' => 'required|date',
+            'duration' => 'required|integer|min:1',
         ]);
 
         $exam->update($validated);
@@ -715,12 +809,48 @@ class ExamController extends Controller
     {
         Gate::authorize('update', $exam);
 
-        $data = $this->prepareExamQuestionData($request);
-        $order = (int) ($exam->questions()->max('order') ?? 0) + 1;
-        $exam->questions()->create(array_merge($data, ['order' => $order]));
-        $exam->update(['total_questions' => $exam->questions()->count()]);
+        try {
+            \Log::info('Store question attempt', [
+                'exam_id' => $exam->id,
+                'request_data' => $request->all(),
+                'user_id' => auth()->id(),
+            ]);
 
-        return back()->with('success', 'Soal berhasil ditambahkan.');
+            $data = $this->prepareExamQuestionData($request);
+            
+            \Log::info('Question data prepared', [
+                'data' => $data,
+                'exam_id' => $exam->id,
+            ]);
+
+            $order = (int) ($exam->questions()->max('order') ?? 0) + 1;
+            $question = $exam->questions()->create(array_merge($data, ['order' => $order]));
+            
+            \Log::info('Question created', [
+                'question_id' => $question->id,
+                'exam_id' => $exam->id,
+                'order' => $order,
+            ]);
+
+            $exam->update(['total_questions' => $exam->questions()->count()]);
+            
+            \Log::info('Exam total_questions updated', [
+                'exam_id' => $exam->id,
+                'total_questions' => $exam->questions()->count(),
+            ]);
+
+            return back()->with('success', 'Soal berhasil ditambahkan.');
+        } catch (\Exception $e) {
+            \Log::error('Store question failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'exam_id' => $exam->id,
+                'request_data' => $request->all(),
+                'user_id' => auth()->id(),
+            ]);
+
+            return back()->withErrors(['error' => 'Terjadi kesalahan saat menambahkan soal: ' . $e->getMessage()]);
+        }
     }
 
     /**

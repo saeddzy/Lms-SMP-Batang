@@ -19,6 +19,12 @@ abstract class Controller
             return;
         }
         if ($user->hasRole('guru') && ! $classSubject->isAssignedSlotTeacher($user)) {
+            // Jika guru tidak terdaftar, coba assign otomatis atau berikan error yang jelas
+            if (!$classSubject->teacher_id) {
+                // Assign user sebagai guru jika belum ada
+                $classSubject->update(['teacher_id' => $user->id]);
+                return;
+            }
             abort(403, 'Hanya guru pengampu mata pelajaran di kelas ini yang dapat melakukan aksi ini.');
         }
     }

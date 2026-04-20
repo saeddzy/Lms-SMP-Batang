@@ -87,14 +87,17 @@ export default function Create() {
                                 <div>
                                     <Input.Label htmlFor="class_id" value="Kelas" />
                                     {selectedClassId ? (
-                                        <div className="px-3 py-2 bg-slate-50 rounded-md border border-slate-200">
-                                            {classes.find((schoolClass) => schoolClass.id === selectedClassId)?.name || 'Kelas terpilih'}
-                                        </div>
+                                        <>
+                                            <div className="px-3 py-2 bg-slate-50 rounded-md border border-slate-200">
+                                                {classes.find((schoolClass) => schoolClass.id === selectedClassId)?.name || 'Kelas terpilih'}
+                                            </div>
+                                            <input type="hidden" name="class_id" value={selectedClassId} />
+                                        </>
                                     ) : (
                                         <Select2
                                             id="class_id"
-                                            value={data.class_id}
-                                            onChange={(selected) => setData('class_id', selected)}
+                                            value={classOptions.find(option => option.value === data.class_id)}
+                                            onChange={(selected) => setData('class_id', selected ? selected.value : '')}
                                             options={classOptions}
                                             placeholder="Pilih kelas"
                                             required
@@ -106,14 +109,17 @@ export default function Create() {
                                 <div>
                                     <Input.Label htmlFor="subject_id" value="Mata Pelajaran" />
                                     {selectedSubjectId ? (
-                                        <div className="px-3 py-2 bg-slate-50 rounded-md border border-slate-200">
-                                            {subjects.find((subject) => subject.id === selectedSubjectId)?.name || 'Mata pelajaran terpilih'}
-                                        </div>
+                                        <>
+                                            <div className="px-3 py-2 bg-slate-50 rounded-md border border-slate-200">
+                                                {subjects.find((subject) => subject.id === selectedSubjectId)?.name || 'Mata pelajaran terpilih'}
+                                            </div>
+                                            <input type="hidden" name="subject_id" value={selectedSubjectId} />
+                                        </>
                                     ) : (
                                         <Select2
                                             id="subject_id"
-                                            value={data.subject_id}
-                                            onChange={(selected) => setData('subject_id', selected)}
+                                            value={subjectOptions.find(option => option.value === data.subject_id)}
+                                            onChange={(selected) => setData('subject_id', selected ? selected.value : '')}
                                             options={subjectOptions}
                                             placeholder="Pilih mata pelajaran"
                                             required
@@ -126,8 +132,8 @@ export default function Create() {
                                     <Input.Label htmlFor="type" value="Tipe Ujian" />
                                     <Select2
                                         id="type"
-                                        value={data.type}
-                                        onChange={(selected) => setData('type', selected)}
+                                        value={typeOptions.find(option => option.value === data.type)}
+                                        onChange={(selected) => setData('type', selected ? selected.value : '')}
                                         options={typeOptions}
                                         placeholder="Pilih tipe ujian"
                                     />
@@ -271,13 +277,19 @@ export default function Create() {
 
                                 <div className="md:col-span-2">
                                     <Input.Label htmlFor="status" value="Status Ujian" />
-                                    <Select2
+                                    <select
                                         id="status"
                                         value={data.status}
-                                        onChange={(selected) => setData('status', selected)}
-                                        options={statusOptions}
-                                        placeholder="Pilih status"
-                                    />
+                                        onChange={(e) => setData('status', e.target.value)}
+                                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    >
+                                        <option value="">Pilih status</option>
+                                        {statusOptions.map(option => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
                                     <p className="text-xs text-gray-500 mt-1">
                                         {data.status === 'draft' ? 'Ujian akan disimpan sebagai draf dan belum dapat diakses siswa' : 'Ujian akan terjadwal dan dapat diakses siswa sesuai jadwal'}
                                     </p>

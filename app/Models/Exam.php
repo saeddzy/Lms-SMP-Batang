@@ -17,9 +17,11 @@ class Exam extends Model
         'description',
         'instructions',
         'exam_date',
+        'scheduled_date',
         'start_time',
         'end_time',
         'duration', // in minutes
+        'duration_minutes',
         'total_marks',
         'passing_marks',
         'class_id',
@@ -77,6 +79,14 @@ class Exam extends Model
     public function teacher(): HasOneThrough
     {
         return $this->hasOneThrough(User::class, ClassSubject::class, 'id', 'id', 'class_subject_id', 'teacher_id');
+    }
+
+    /**
+     * Get the questions for this exam.
+     */
+    public function questions(): HasMany
+    {
+        return $this->hasMany(ExamQuestion::class, 'exam_id')->orderBy('order');
     }
 
     /**

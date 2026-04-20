@@ -344,6 +344,29 @@ class StudentDashboardController extends Controller
     }
 
     /**
+     * Display available exams for the student
+     */
+    public function examsAvailable(Request $request)
+    {
+        $user = auth()->user();
+        
+        // Get student's enrolled classes
+        $enrolledClasses = $user->enrolledClasses()->pluck('school_classes.id');
+        
+        // Get available exams for student's classes
+        $exams = Exam::whereIn('class_id', $enrolledClasses)
+            ->where('is_cancelled', false)
+            ->where('is_active', true)
+            ->with(['subject', 'schoolClass', 'teacher'])
+            ->orderBy('created_at', 'desc') // Order by creation date since scheduled_date might be null
+            ->paginate(10);
+            
+        return Inertia::render('Student/ExamsAvailable', [
+            'exams' => $exams,
+        ]);
+    }
+
+    /**
      * Get recent grades for the student
      */
     private function getRecentGrades($user)
@@ -740,35 +763,25 @@ class StudentDashboardController extends Controller
     }
 
     /**
-     * Show student's exam attempts
+     * Show available exams for student
      */
     public function exams()
     {
         $user = auth()->user();
-        $studentId = $user->id;
-
-        $summary = [
-            'total_attempts' => ExamAttempt::where('student_id', $studentId)->count(),
-            'passed' => ExamAttempt::where('student_id', $studentId)->where('passed', true)->count(),
-            'avg_score' => round(
-                (float) (ExamAttempt::where('student_id', $studentId)->whereNotNull('score')->avg('score') ?? 0),
-                1
-            ),
-        ];
-
-        $attempts = ExamAttempt::where('student_id', $studentId)
-            ->with(['exam.subject', 'exam.schoolClass', 'exam.teacher'])
-            ->latest('finished_at')
-            ->paginate(15)
-            ->withQueryString();
-        $attempts->setCollection(
-            AttemptStatusHelper::annotateExamAttempts($attempts->getCollection())
-        );
-
-        return Inertia::render('Student/Exams', [
-            'attempts' => $attempts,
-            'summary' => $summary,
-            'filters' => [],
+        
+        // Get student's enrolled classes
+        $enrolledClasses = $user->enrolledClasses()->pluck('school_classes.id');
+        
+        // Get available exams for student's classes
+        $exams = Exam::whereIn('class_id', $enrolledClasses)
+            ->where('is_cancelled', false)
+            ->where('is_active', true)
+            ->with(['subject', 'schoolClass', 'teacher'])
+            ->orderBy('created_at', 'desc') // Order by creation date since scheduled_date might be null
+            ->paginate(10);
+            
+        return Inertia::render('Student/ExamsAvailable', [
+            'exams' => $exams,
         ]);
     }
 

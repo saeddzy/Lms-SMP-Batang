@@ -20,7 +20,7 @@ export default function Create() {
         start_time: '',
         end_time: '',
         duration: '',
-        total_questions: '',
+        max_attempts: 1,
         passing_score: '',
         instructions: '',
         supervision_required: true,
@@ -187,15 +187,15 @@ export default function Create() {
                                 </div>
 
                                 <div>
-                                    <Input.Label htmlFor="total_questions" value="Jumlah Soal" />
+                                    <Input.Label htmlFor="max_attempts" value="Percobaan Maksimal" />
                                     <Input.Number
-                                        id="total_questions"
-                                        value={data.total_questions}
-                                        onChange={(e) => setData('total_questions', e.target.value)}
-                                        placeholder="50"
+                                        id="max_attempts"
+                                        value={data.max_attempts}
+                                        onChange={(e) => setData('max_attempts', e.target.value)}
+                                        placeholder="1"
                                         min="1"
                                     />
-                                    <Input.Error message={errors.total_questions} />
+                                    <Input.Error message={errors.max_attempts} />
                                 </div>
 
                                 <div>

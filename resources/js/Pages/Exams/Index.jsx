@@ -53,6 +53,7 @@ export default function Index() {
 
     const getTypeColor = (type) => {
         switch (type) {
+            case 'mid_term':
             case 'midterm':
                 return 'bg-blue-100 text-blue-700';
             case 'final':
@@ -68,6 +69,7 @@ export default function Index() {
 
     const getTypeLabel = (type) => {
         switch (type) {
+            case 'mid_term':
             case 'midterm':
                 return 'UTS';
             case 'final':

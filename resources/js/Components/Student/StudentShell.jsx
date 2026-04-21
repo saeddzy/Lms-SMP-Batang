@@ -51,7 +51,12 @@ export default function StudentShell({
 export function formatStudentDateTime(iso) {
     if (!iso) return "—";
     try {
-        return new Date(iso).toLocaleString("id-ID", {
+        const parsed = new Date(iso);
+        if (Number.isNaN(parsed.getTime())) {
+            return "—";
+        }
+
+        return parsed.toLocaleString("id-ID", {
             dateStyle: "medium",
             timeStyle: "short",
         });
@@ -63,7 +68,12 @@ export function formatStudentDateTime(iso) {
 export function formatStudentDate(iso) {
     if (!iso) return "—";
     try {
-        return new Date(iso).toLocaleDateString("id-ID", {
+        const parsed = new Date(iso);
+        if (Number.isNaN(parsed.getTime())) {
+            return "—";
+        }
+
+        return parsed.toLocaleDateString("id-ID", {
             weekday: "short",
             day: "numeric",
             month: "short",

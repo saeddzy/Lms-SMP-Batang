@@ -75,6 +75,26 @@ function examWindow(exam) {
     return "buka";
 }
 
+function violationSummary(att) {
+    const count =
+        typeof att?.violations_count === "number"
+            ? att.violations_count
+            : Array.isArray(att?.attempt_data?.violations)
+              ? att.attempt_data.violations.length
+              : 0;
+    const latestTypes =
+        att?.violations_preview ||
+        (Array.isArray(att?.attempt_data?.violations)
+            ? att.attempt_data.violations
+                  .slice(-3)
+                  .map((v) => v?.type)
+                  .filter(Boolean)
+                  .join(", ")
+            : "");
+
+    return { count, latestTypes };
+}
+
 export default function Show() {
     const { exam, attempts = [], canManageExam = false } = usePage().props;
     const isStudent = hasRole("siswa");
@@ -112,14 +132,14 @@ export default function Show() {
     const startOrContinue = () => {
         if (unfinished) {
             router.visit(
-                route("exams.attempt", {
+                route("exams.attempt.take", {
                     exam: exam.id,
                     attempt: unfinished.id,
                 })
             );
             return;
         }
-        router.post(route("exams.start-attempt", exam.id));
+        router.post(route("exams.attempt.start", exam.id));
     };
 
     const metaBlock = (
@@ -166,9 +186,7 @@ export default function Show() {
                 </p>
                 <p className="mt-1 text-sm font-medium text-slate-900">
                     {exam.start_time
-                        ? exam.scheduled_date
-                            ? formatStudentDateTime(`${exam.scheduled_date}T${exam.start_time}`)
-                            : formatStudentDateTime(exam.start_time)
+                        ? formatStudentDateTime(exam.start_time)
                         : exam.scheduled_date
                             ? formatStudentDateTime(exam.scheduled_date)
                             : "—"}
@@ -217,6 +235,7 @@ export default function Show() {
                         <Table.Th>Selesai</Table.Th>
                         <Table.Th>Nilai</Table.Th>
                         <Table.Th>Lulus</Table.Th>
+                        {!isStudent && <Table.Th>Pelanggaran</Table.Th>}
                         {!isStudent &&
                             hasAnyPermission(["exams grade"]) && (
                                 <Table.Th>Aksi</Table.Th>
@@ -265,6 +284,24 @@ export default function Show() {
                                           ? "Tidak"
                                           : "—"}
                                 </Table.Td>
+                                {!isStudent && (
+                                    <Table.Td>
+                                        {(() => {
+                                            const { count, latestTypes } = violationSummary(att);
+                                            if (!count) {
+                                                return <span className="text-slate-500">0</span>;
+                                            }
+                                            return (
+                                                <span
+                                                    className="inline-flex rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-900 ring-1 ring-rose-200"
+                                                    title={latestTypes || "Pelanggaran anti-cheat"}
+                                                >
+                                                    {count}x
+                                                </span>
+                                            );
+                                        })()}
+                                    </Table.Td>
+                                )}
                                 {!isStudent &&
                                     hasAnyPermission([
                                         "exams grade",
@@ -275,12 +312,8 @@ export default function Show() {
                                                     <Button
                                                         type="view"
                                                         url={route(
-                                                            "exams.attempt",
-                                                            {
-                                                                exam: exam.id,
-                                                                attempt:
-                                                                    att.id,
-                                                            }
+                                                            "exams.results",
+                                                            exam.id
                                                         )}
                                                         text="Lihat"
                                                     />
@@ -318,8 +351,8 @@ export default function Show() {
                                         : hasAnyPermission([
                                                 "exams grade",
                                             ])
-                                          ? 8
-                                          : 7
+                                          ? 9
+                                          : 8
                                 }
                                 className="py-10 text-center text-slate-500"
                             >

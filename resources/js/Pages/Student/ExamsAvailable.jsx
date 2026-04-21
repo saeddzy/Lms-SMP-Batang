@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
-import StudentShell from "@/Components/Student/StudentShell";
+import StudentShell, { formatStudentDateTime } from "@/Components/Student/StudentShell";
 import StudentStatCard from "@/Components/Student/StudentStatCard";
 import Button from "@/Components/Button";
 import Pagination from "@/Components/Pagination";
@@ -28,6 +28,17 @@ export default function ExamsAvailable() {
         return types[type] || type;
     };
 
+    const formatExamDate = (value) => {
+        if (!value) return "—";
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return "—";
+        return d.toLocaleDateString("id-ID", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+        });
+    };
+
     const examWindow = (exam) => {
         if (!exam.scheduled_date || exam.duration_minutes == null) return "invalid";
         
@@ -41,12 +52,40 @@ export default function ExamsAvailable() {
         return "buka";
     };
 
+    const studentAttemptState = (exam) => {
+        const latestAttempt = exam.attempts?.[0];
+        if (!latestAttempt) {
+            return null;
+        }
+
+        if (
+            latestAttempt.finished_at ||
+            ["finished", "submitted", "timeout"].includes(
+                latestAttempt.attempt_status
+            )
+        ) {
+            return "selesai_siswa";
+        }
+
+        if (latestAttempt.attempt_status === "in_progress") {
+            return "berlangsung_siswa";
+        }
+
+        return null;
+    };
+
+    const examStatus = (exam) => {
+        return studentAttemptState(exam) ?? examWindow(exam);
+    };
+
     const getStatusBadge = (exam) => {
-        const status = examWindow(exam);
+        const status = examStatus(exam);
         const badges = {
             'belum': { color: 'blue', text: 'Belum Dimulai' },
             'buka': { color: 'green', text: 'Sedang Berlangsung' },
             'selesai': { color: 'gray', text: 'Selesai' },
+            'selesai_siswa': { color: 'gray', text: 'Selesai' },
+            'berlangsung_siswa': { color: 'amber', text: 'Belum Dikumpulkan' },
             'invalid': { color: 'red', text: 'Tidak Valid' },
         };
         const badge = badges[status] || badges.invalid;
@@ -107,7 +146,11 @@ export default function ExamsAvailable() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {rows.map((exam, i) => (
+                                    {rows.map((exam, i) => {
+                                        const status = examStatus(exam);
+                                        const latestAttempt = exam.attempts?.[0];
+
+                                        return (
                                         <tr
                                             key={exam.id}
                                             className="hover:bg-indigo-50/30"
@@ -128,15 +171,11 @@ export default function ExamsAvailable() {
                                             </td>
                                             <td className="whitespace-nowrap px-5 py-4 text-slate-600">
                                                 <div className="text-xs">
-                                                    {new Date(exam.scheduled_date).toLocaleDateString('id-ID', {
-                                                        day: 'numeric',
-                                                        month: 'long',
-                                                        year: 'numeric'
-                                                    })}
+                                                    {formatExamDate(exam.scheduled_date)}
                                                 </div>
                                                 {exam.start_time && (
                                                     <div className="text-xs text-slate-400">
-                                                        {exam.start_time}
+                                                        {formatStudentDateTime(exam.start_time)}
                                                     </div>
                                                 )}
                                             </td>
@@ -152,7 +191,17 @@ export default function ExamsAvailable() {
                                                 {getStatusBadge(exam)}
                                             </td>
                                             <td className="whitespace-nowrap px-5 py-4 text-right">
-                                                {examWindow(exam) === 'buka' ? (
+                                                {status === 'berlangsung_siswa' && latestAttempt ? (
+                                                    <Link
+                                                        href={route('exams.attempt.take', {
+                                                            exam: exam.id,
+                                                            attempt: latestAttempt.id,
+                                                        })}
+                                                        className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white shadow-sm transition-colors hover:bg-amber-700"
+                                                    >
+                                                        Lanjutkan
+                                                    </Link>
+                                                ) : status === 'buka' ? (
                                                     <Link
                                                         href={route('exams.show', exam.id)}
                                                         className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
@@ -165,12 +214,16 @@ export default function ExamsAvailable() {
                                                         size="sm"
                                                         disabled
                                                     >
-                                                        {examWindow(exam) === 'belum' ? 'Belum Dimulai' : 'Selesai'}
+                                                        {status === 'belum'
+                                                            ? 'Belum Dimulai'
+                                                            : status === 'selesai_siswa'
+                                                              ? 'Sudah Dikerjakan'
+                                                              : 'Selesai'}
                                                     </Button>
                                                 )}
                                             </td>
                                         </tr>
-                                    ))}
+                                    )})}
                                 </tbody>
                             </table>
                         </div>

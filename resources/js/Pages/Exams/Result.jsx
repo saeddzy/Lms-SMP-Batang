@@ -1,7 +1,7 @@
 import React from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import Card from "@/Components/Card";
-import { Head, usePage } from "@inertiajs/react";
+import { Head, router, usePage } from "@inertiajs/react";
 import { IconCheck, IconX, IconClock, IconPercentage } from "@tabler/icons-react";
 
 export default function ExamResult() {
@@ -150,6 +150,12 @@ export default function ExamResult() {
 
                 {/* Action Buttons */}
                 <div className="flex justify-center gap-4">
+                    <button
+                        onClick={() => router.visit(route("student.exams"))}
+                        className="px-6 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+                    >
+                        Kembali ke Daftar Ujian
+                    </button>
                     <button
                         onClick={() => window.history.back()}
                         className="px-6 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors"

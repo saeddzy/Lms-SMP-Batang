@@ -11,8 +11,10 @@ use App\Models\ExamAttemptAnswer;
 use App\Models\ExamQuestion;
 use App\Support\AttemptScoreCalculator;
 use App\Support\AttemptStatusHelper;
+use App\Helpers\ExamTimeHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Carbon\Carbon;
@@ -26,7 +28,12 @@ class ExamController extends Controller
     {
         Gate::authorize('exams index');
 
-        $query = Exam::with(['subject', 'schoolClass', 'teacher']);
+        $query = Exam::with(['subject', 'schoolClass', 'teacher'])
+            ->withCount([
+                'attempts as participants_count' => function ($q) {
+                    $q->select(DB::raw('COUNT(DISTINCT student_id)'));
+                },
+            ]);
 
         if (auth()->user()->hasRole('siswa')) {
             $query->whereHas('schoolClass.enrollments', function ($q) {
@@ -184,7 +191,7 @@ class ExamController extends Controller
                 'type' => 'required|in:midterm,final,quiz,practice',
                 'scheduled_date' => 'required|date',
                 'duration' => 'required|integer|min:1',
-                'total_questions' => 'nullable|integer|min:1|max:100',
+                'max_attempts' => 'nullable|integer|min:1|max:10',
                 'passing_score' => 'nullable|numeric|min:0|max:100',
                 'instructions' => 'nullable|string',
                 'rules' => 'nullable|string',
@@ -246,7 +253,7 @@ class ExamController extends Controller
             'end_time' => $endDateTime,
             'duration' => $validated['duration'],
             'duration_minutes' => $validated['duration'],
-            'total_questions' => $validated['total_questions'],
+            'max_attempts' => $validated['max_attempts'] ?? 1,
             'passing_marks' => $validated['passing_score'] ?? 0,
             'total_marks' => 100,
             'requires_supervision' => $request->boolean('supervision_required'),
@@ -311,6 +318,24 @@ class ExamController extends Controller
             $attempts = AttemptStatusHelper::annotateExamAttempts($attempts);
         }
 
+        $attempts = $attempts->map(function ($att) {
+            $violations = is_array($att->attempt_data['violations'] ?? null)
+                ? $att->attempt_data['violations']
+                : [];
+
+            $att->setAttribute('violations_count', count($violations));
+            $att->setAttribute(
+                'violations_preview',
+                collect($violations)
+                    ->pluck('type')
+                    ->filter()
+                    ->take(-3)
+                    ->implode(', ')
+            );
+
+            return $att;
+        });
+
         $cs = $exam->classSubject;
         $canManageExam = auth()->user()->hasRole('admin')
             || ($cs && $cs->isAssignedSlotTeacher(auth()->user()));
@@ -368,6 +393,15 @@ class ExamController extends Controller
         // Handle time formatting
         $examData['start_time'] = $exam->start_time ? date('H:i', strtotime($exam->start_time)) : null;
         $examData['end_time'] = $exam->end_time ? date('H:i', strtotime($exam->end_time)) : null;
+        $examData['passing_score'] = $exam->passing_marks;
+        $examData['type'] = match ($exam->exam_type) {
+            'mid_term' => 'midterm',
+            'final' => 'final',
+            'quiz' => 'quiz',
+            'practice' => 'practice',
+            default => 'quiz',
+        };
+        $examData['supervision_required'] = (bool) $exam->requires_supervision;
 
         return Inertia::render('Exams/Edit', [
             'exam' => $examData,
@@ -391,7 +425,7 @@ class ExamController extends Controller
             'type' => 'required|in:midterm,final,quiz,practice',
             'scheduled_date' => 'required|date',
             'duration' => 'required|integer|min:1',
-            'total_questions' => 'nullable|integer|min:1|max:100',
+            'max_attempts' => 'nullable|integer|min:1|max:10',
             'passing_score' => 'nullable|numeric|min:0|max:100',
             'instructions' => 'nullable|string',
             'rules' => 'nullable|string',
@@ -446,7 +480,7 @@ class ExamController extends Controller
             'end_time' => $endDateTime,
             'duration' => $validated['duration'],
             'duration_minutes' => $validated['duration'],
-            'total_questions' => $validated['total_questions'],
+            'max_attempts' => $validated['max_attempts'] ?? $exam->max_attempts ?? 1,
             'passing_marks' => $validated['passing_score'] ?? 0,
             'requires_supervision' => $request->boolean('supervision_required'),
             'allow_review' => $request->boolean('allow_review'),
@@ -517,7 +551,7 @@ class ExamController extends Controller
             ->first();
 
         if ($unfinishedAttempt) {
-            return redirect()->route('exams.attempt', [$exam, $unfinishedAttempt]);
+            return redirect()->route('exams.attempt.take', [$exam, $unfinishedAttempt]);
         }
 
         // Create new attempt
@@ -526,7 +560,7 @@ class ExamController extends Controller
             'started_at' => now(),
         ]);
 
-        return redirect()->route('exams.attempt', [$exam, $attempt]);
+        return redirect()->route('exams.attempt.take', [$exam, $attempt]);
     }
 
     /**
@@ -545,15 +579,9 @@ class ExamController extends Controller
                 ->with('error', 'Percobaan ujian sudah selesai.');
         }
 
-        if (! $exam->scheduled_date || ! $exam->duration_minutes) {
-            return redirect()->route('exams.show', $exam)
-                ->with('error', 'Jadwal ujian belum lengkap.');
-        }
-
-        // Check time limit
-        $examEndTime = $exam->scheduled_date->copy()->addMinutes((int) $exam->duration_minutes);
-        if (now() > $examEndTime) {
-            $attempt->update(['finished_at' => now()]);
+        // Check if attempt is expired using ExamTimeHelper
+        if (ExamTimeHelper::isExpired($attempt)) {
+            ExamTimeHelper::updateExpiredAttempt($attempt);
             return redirect()->route('exams.show', $exam)
                 ->with('error', 'Waktu pengerjaan ujian sudah habis.');
         }

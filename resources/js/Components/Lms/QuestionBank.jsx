@@ -96,6 +96,7 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
     const { data, setData, reset, clearErrors } = useForm(emptyForm());
     const pageErrors = usePage().props.errors ?? {};
     const [visitErrors, setVisitErrors] = useState({});
+    const [isSaving, setIsSaving] = useState(false);
     const mergedErrors = { ...pageErrors, ...visitErrors };
 
     const remainingCapacity = Math.max(0, MAX_QUESTIONS - sorted.length);
@@ -225,9 +226,27 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
             return;
         }
 
-        router.post(questionStoreUrl(mode, entityId), buildPayload(), {
+        const payload = buildPayload();
+
+        if (!payload.question_text || String(payload.question_text).trim() === "") {
+            setVisitErrors({ question_text: ["Pertanyaan wajib diisi."] });
+            return;
+        }
+        if (payload.question_type === "multiple_choice" && (!Array.isArray(payload.options) || payload.options.length < 2)) {
+            setVisitErrors({ options: ["Minimal isi 2 opsi untuk soal pilihan ganda."] });
+            return;
+        }
+        if (payload.question_type === "short_answer" && (!payload.correct_answer || String(payload.correct_answer).trim() === "")) {
+            setVisitErrors({ correct_answer: ["Kunci jawaban singkat wajib diisi."] });
+            return;
+        }
+
+        router.post(questionStoreUrl(mode, entityId), payload, {
             preserveScroll: true,
-            onBefore: () => setVisitErrors({}),
+            onBefore: () => {
+                setVisitErrors({});
+                setIsSaving(true);
+            },
             onSuccess: () => {
                 if (plannedTypes.length > 0 && activePlanIndex < plannedTypes.length - 1) {
                     const next = activePlanIndex + 1;
@@ -247,11 +266,14 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
                 } else {
                     resetFormAll();
                 }
+                setIsSaving(false);
             },
             onError: (errors) => {
                 setVisitErrors(errors ?? {});
+                setIsSaving(false);
                 window.scrollTo({ top: 0, behavior: "smooth" });
             },
+            onFinish: () => setIsSaving(false),
         });
     };
 
@@ -306,12 +328,39 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
         .map((s) => s.trim())
         .filter(Boolean);
 
+    const currentStepLabel =
+        composerStep === "closed"
+            ? "Belum mulai"
+            : composerStep === "plan"
+              ? "Langkah 1: Atur rencana soal"
+              : editing
+                ? "Langkah 2: Edit konten soal"
+                : "Langkah 2: Isi konten soal";
+
+    const correctAnswerPreview = (() => {
+        if (data.question_type === "multiple_choice") {
+            const idx = Number(data.correct_answer);
+            if (Number.isNaN(idx) || !mcOptions[idx]) return "Belum dipilih";
+            return `${String.fromCharCode(65 + idx)}. ${mcOptions[idx]}`;
+        }
+        if (data.question_type === "true_false") {
+            return data.correct_answer === "false" ? "Salah" : "Benar";
+        }
+        if (data.question_type === "short_answer") {
+            return data.correct_answer?.trim() ? "Kunci jawaban terisi" : "Belum diisi";
+        }
+        return "Dinilai manual guru";
+    })();
+
     return (
         <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm">
             <div className="mb-4 rounded-lg border border-slate-100 bg-slate-50/90 p-3 text-sm text-slate-700">
                 <p className="font-medium text-slate-900">
                     Mulai dari <strong>Tambah soal</strong>, atur jumlah soal dan komposisi tipe, lalu isi per nomor seperti ujian pada umumnya.
                 </p>
+                <div className="mt-2 inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-100">
+                    {currentStepLabel}
+                </div>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -452,42 +501,43 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
             )}
 
             {canManage && composerStep === "form" && (
-                <form
-                    noValidate
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        editing ? saveQuestionEdit() : saveNewQuestion();
-                    }}
-                    className="mt-6 space-y-4 rounded-xl border border-indigo-100 bg-indigo-50/40 p-4"
-                >
-                    {plannedTypes.length > 0 && !editing && (
-                        <div className="rounded-lg border border-indigo-200 bg-white p-3">
-                            <p className="mb-2 text-xs font-semibold uppercase text-slate-500">
-                                Progres input soal
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                                {plannedTypes.map((t, i) => {
-                                    const done = i < activePlanIndex;
-                                    const current = i === activePlanIndex;
-                                    return (
-                                        <span
-                                            key={`${t}-${i}`}
-                                            className={`inline-flex h-9 min-w-9 items-center justify-center rounded-lg px-2 text-xs font-semibold ring-1 ${
-                                                current
-                                                    ? "bg-indigo-600 text-white ring-indigo-600"
-                                                    : done
-                                                      ? "bg-emerald-50 text-emerald-800 ring-emerald-200"
-                                                      : "bg-slate-50 text-slate-600 ring-slate-200"
-                                            }`}
-                                            title={typeLabel(t)}
-                                        >
-                                            {i + 1} · {typeShort(t)}
-                                        </span>
-                                    );
-                                })}
+                <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+                    <form
+                        noValidate
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            editing ? saveQuestionEdit() : saveNewQuestion();
+                        }}
+                        className="space-y-4 rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 lg:col-span-2"
+                    >
+                        {plannedTypes.length > 0 && !editing && (
+                            <div className="rounded-lg border border-indigo-200 bg-white p-3">
+                                <p className="mb-2 text-xs font-semibold uppercase text-slate-500">
+                                    Progres input soal
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                    {plannedTypes.map((t, i) => {
+                                        const done = i < activePlanIndex;
+                                        const current = i === activePlanIndex;
+                                        return (
+                                            <span
+                                                key={`${t}-${i}`}
+                                                className={`inline-flex h-9 min-w-9 items-center justify-center rounded-lg px-2 text-xs font-semibold ring-1 ${
+                                                    current
+                                                        ? "bg-indigo-600 text-white ring-indigo-600"
+                                                        : done
+                                                          ? "bg-emerald-50 text-emerald-800 ring-emerald-200"
+                                                          : "bg-slate-50 text-slate-600 ring-slate-200"
+                                                }`}
+                                                title={typeLabel(t)}
+                                            >
+                                                {i + 1} · {typeShort(t)}
+                                            </span>
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
 
                     <p className="text-sm font-semibold text-indigo-950">
                         {editing
@@ -637,26 +687,62 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
                         />
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                        <button
-                            type="submit"
-                            className="inline-flex rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
-                        >
-                            {editing
-                                ? "Simpan perubahan"
-                                : activePlanIndex < plannedTypes.length - 1
-                                  ? "Simpan & lanjut nomor berikutnya"
-                                  : "Simpan soal terakhir"}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={resetFormAll}
-                            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                        >
-                            Batal
-                        </button>
-                    </div>
-                </form>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                type="submit"
+                                disabled={isSaving}
+                                className="inline-flex rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+                            >
+                                {editing
+                                    ? "Simpan perubahan"
+                                    : isSaving
+                                      ? "Menyimpan..."
+                                    : activePlanIndex < plannedTypes.length - 1
+                                      ? "Simpan & lanjut nomor berikutnya"
+                                      : "Simpan soal terakhir"}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={resetFormAll}
+                                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                            >
+                                Batal
+                            </button>
+                        </div>
+                    </form>
+
+                    <aside className="rounded-xl border border-slate-200 bg-white p-4">
+                        <p className="text-xs font-semibold uppercase text-slate-500">
+                            Preview Soal
+                        </p>
+                        <p className="mt-2 text-sm font-semibold text-slate-900">
+                            {data.question_text?.trim() || "Pertanyaan belum diisi"}
+                        </p>
+                        <div className="mt-3 space-y-2 text-xs text-slate-600">
+                            <p>
+                                <span className="font-semibold text-slate-700">Tipe:</span>{" "}
+                                {typeLabel(data.question_type)}
+                            </p>
+                            <p>
+                                <span className="font-semibold text-slate-700">Jawaban benar:</span>{" "}
+                                {correctAnswerPreview}
+                            </p>
+                            <p>
+                                <span className="font-semibold text-slate-700">Poin:</span>{" "}
+                                {data.points || "1"}
+                            </p>
+                        </div>
+                        {data.question_type === "multiple_choice" && mcOptions.length > 0 ? (
+                            <ul className="mt-3 space-y-1 rounded-lg bg-slate-50 p-2 text-xs text-slate-700">
+                                {mcOptions.map((opt, i) => (
+                                    <li key={i}>
+                                        {String.fromCharCode(65 + i)}. {opt}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : null}
+                    </aside>
+                </div>
             )}
 
             {sorted.length > 0 ? (

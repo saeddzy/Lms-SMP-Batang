@@ -13,6 +13,7 @@ class ExamAttempt extends Model
         'student_id',
         'started_at',
         'finished_at',
+        'attempt_end_time',
         'score',
         'passed',
         'attempt_status',
@@ -25,6 +26,7 @@ class ExamAttempt extends Model
     protected $casts = [
         'started_at' => 'datetime',
         'finished_at' => 'datetime',
+        'attempt_end_time' => 'datetime',
         'score' => 'decimal:2',
         'passed' => 'boolean',
         'attempt_data' => 'array',
@@ -92,7 +94,7 @@ class ExamAttempt extends Model
 
     public function calculateScore(): void
     {
-        $totalQuestions = $this->answers()->count();
+        $totalQuestions = $this->exam ? $this->exam->questions()->count() : 0;
         $correctAnswers = $this->answers()->where('is_correct', true)->count();
 
         $this->total_questions = $totalQuestions;

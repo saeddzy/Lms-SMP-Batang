@@ -35,10 +35,20 @@ trait MatchesStudentQuizAnswers
             return false;
         }
 
-        $a = strtolower(trim((string) $studentAnswer));
-        $b = strtolower(trim((string) $this->correct_answer));
+        $toCanonical = static function (string $value): ?string {
+            $value = strtolower(trim($value));
 
-        return $a === $b && in_array($a, ['true', 'false'], true);
+            return match ($value) {
+                'true', 't', '1', 'benar', 'b' => 'true',
+                'false', 'f', '0', 'salah', 's' => 'false',
+                default => null,
+            };
+        };
+
+        $a = $toCanonical((string) $studentAnswer);
+        $b = $toCanonical((string) $this->correct_answer);
+
+        return $a !== null && $b !== null && $a === $b;
     }
 
     protected function matchShortAnswer(?string $studentAnswer): bool

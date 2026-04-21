@@ -1,10 +1,9 @@
-import React, { useState } from "react";
+import React from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import Input from "@/Components/Input";
 import Button from "@/Components/Button";
 import Select2 from "@/Components/Select2";
 import { Head, useForm, usePage } from "@inertiajs/react";
-import hasAnyPermission from "@/Utils/Permissions";
 
 export default function Edit() {
     const { exam, classes, subjects } = usePage().props;
@@ -19,14 +18,11 @@ export default function Edit() {
         start_time: exam.start_time || '',
         end_time: exam.end_time || '',
         duration: exam.duration || '',
-        total_questions: exam.total_questions || '',
+        max_attempts: exam.max_attempts || 1,
         passing_score: exam.passing_score || '',
         supervision_required: exam.supervision_required || false,
         allow_review: exam.allow_review || false,
-        randomize_questions: exam.randomize_questions || false,
-        randomize_answers: exam.randomize_answers || false,
         instructions: exam.instructions || '',
-        status: exam.status || 'draft',
     });
 
     const handleSubmit = (e) => {
@@ -73,50 +69,66 @@ export default function Edit() {
                             </h3>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <Input
-                                    label="Judul Ujian"
+                                <div>
+                                    <Input.Label htmlFor="title" value="Judul Ujian" />
+                                    <Input.Text
+                                        id="title"
                                     value={data.title}
-                                    onChange={(value) => setData('title', value)}
-                                    error={errors.title}
-                                    required
-                                />
+                                        onChange={(e) => setData('title', e.target.value)}
+                                        required
+                                    />
+                                    <Input.Error message={errors.title} />
+                                </div>
 
-                                <Select2
-                                    label="Tipe Ujian"
-                                    value={data.type}
-                                    onChange={(value) => setData('type', value)}
-                                    options={examTypes}
-                                    error={errors.type}
-                                    required
-                                />
+                                <div>
+                                    <Input.Label htmlFor="type" value="Tipe Ujian" />
+                                    <Select2
+                                        id="type"
+                                        value={examTypes.find(option => option.value === data.type)}
+                                        onChange={(selected) => setData('type', selected ? selected.value : '')}
+                                        options={examTypes}
+                                        placeholder="Pilih tipe ujian"
+                                    />
+                                    <Input.Error message={errors.type} />
+                                </div>
 
-                                <Select2
-                                    label="Kelas"
-                                    value={data.class_id}
-                                    onChange={(value) => setData('class_id', value)}
-                                    options={classOptions}
-                                    error={errors.class_id}
-                                    required
-                                />
+                                <div>
+                                    <Input.Label htmlFor="class_id" value="Kelas" />
+                                    <Select2
+                                        id="class_id"
+                                        value={classOptions.find(option => option.value === data.class_id)}
+                                        onChange={(selected) => setData('class_id', selected ? selected.value : '')}
+                                        options={classOptions}
+                                        placeholder="Pilih kelas"
+                                        required
+                                    />
+                                    <Input.Error message={errors.class_id} />
+                                </div>
 
-                                <Select2
-                                    label="Mata Pelajaran"
-                                    value={data.subject_id}
-                                    onChange={(value) => setData('subject_id', value)}
-                                    options={subjectOptions}
-                                    error={errors.subject_id}
-                                    required
-                                />
+                                <div>
+                                    <Input.Label htmlFor="subject_id" value="Mata Pelajaran" />
+                                    <Select2
+                                        id="subject_id"
+                                        value={subjectOptions.find(option => option.value === data.subject_id)}
+                                        onChange={(selected) => setData('subject_id', selected ? selected.value : '')}
+                                        options={subjectOptions}
+                                        placeholder="Pilih mata pelajaran"
+                                        required
+                                    />
+                                    <Input.Error message={errors.subject_id} />
+                                </div>
 
                                 <div className="md:col-span-2">
-                                    <Input
-                                        label="Deskripsi"
-                                        type="textarea"
+                                    <Input.Label htmlFor="description" value="Deskripsi" />
+                                    <textarea
+                                        id="description"
                                         value={data.description}
-                                        onChange={(value) => setData('description', value)}
-                                        error={errors.description}
+                                        onChange={(e) => setData('description', e.target.value)}
+                                        rows={3}
+                                        className="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
                                         placeholder="Deskripsi singkat tentang ujian ini..."
                                     />
+                                    <Input.Error message={errors.description} />
                                 </div>
                             </div>
                         </div>
@@ -130,42 +142,49 @@ export default function Edit() {
                             </h3>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <Input
-                                    label="Tanggal Ujian"
-                                    type="date"
+                                <div>
+                                    <Input.Label htmlFor="scheduled_date" value="Tanggal Ujian" />
+                                    <Input.Date
+                                        id="scheduled_date"
                                     value={data.scheduled_date}
-                                    onChange={(value) => setData('scheduled_date', value)}
-                                    error={errors.scheduled_date}
-                                    required
-                                />
+                                        onChange={(e) => setData('scheduled_date', e.target.value)}
+                                        required
+                                    />
+                                    <Input.Error message={errors.scheduled_date} />
+                                </div>
 
-                                <Input
-                                    label="Durasi (menit)"
-                                    type="number"
-                                    value={data.duration}
-                                    onChange={(value) => setData('duration', value)}
-                                    error={errors.duration}
-                                    placeholder="Kosongkan jika tidak terbatas"
-                                    min="1"
-                                />
+                                <div>
+                                    <Input.Label htmlFor="duration" value="Durasi (menit)" />
+                                    <Input.Number
+                                        id="duration"
+                                        value={data.duration}
+                                        onChange={(e) => setData('duration', e.target.value)}
+                                        min="1"
+                                    />
+                                    <Input.Error message={errors.duration} />
+                                </div>
 
-                                <Input
-                                    label="Waktu Mulai"
-                                    type="time"
-                                    value={data.start_time}
-                                    onChange={(value) => setData('start_time', value)}
-                                    error={errors.start_time}
-                                    required
-                                />
+                                <div>
+                                    <Input.Label htmlFor="start_time" value="Waktu Mulai" />
+                                    <Input.Time
+                                        id="start_time"
+                                        value={data.start_time}
+                                        onChange={(e) => setData('start_time', e.target.value)}
+                                        required
+                                    />
+                                    <Input.Error message={errors.start_time} />
+                                </div>
 
-                                <Input
-                                    label="Waktu Selesai"
-                                    type="time"
-                                    value={data.end_time}
-                                    onChange={(value) => setData('end_time', value)}
-                                    error={errors.end_time}
-                                    required
-                                />
+                                <div>
+                                    <Input.Label htmlFor="end_time" value="Waktu Selesai" />
+                                    <Input.Time
+                                        id="end_time"
+                                        value={data.end_time}
+                                        onChange={(e) => setData('end_time', e.target.value)}
+                                        required
+                                    />
+                                    <Input.Error message={errors.end_time} />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -178,33 +197,28 @@ export default function Edit() {
                             </h3>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <Input
-                                    label="Jumlah Soal"
-                                    type="number"
-                                    value={data.total_questions}
-                                    onChange={(value) => setData('total_questions', value)}
-                                    error={errors.total_questions}
-                                    min="1"
-                                />
+                                <div>
+                                    <Input.Label htmlFor="max_attempts" value="Percobaan Maksimal" />
+                                    <Input.Number
+                                        id="max_attempts"
+                                        value={data.max_attempts}
+                                        onChange={(e) => setData('max_attempts', e.target.value)}
+                                        min="1"
+                                    />
+                                    <Input.Error message={errors.max_attempts} />
+                                </div>
 
-                                <Input
-                                    label="Nilai Kelulusan (%)"
-                                    type="number"
-                                    value={data.passing_score}
-                                    onChange={(value) => setData('passing_score', value)}
-                                    error={errors.passing_score}
-                                    min="0"
-                                    max="100"
-                                />
-
-                                <Select2
-                                    label="Status"
-                                    value={data.status}
-                                    onChange={(value) => setData('status', value)}
-                                    options={examStatuses}
-                                    error={errors.status}
-                                    required
-                                />
+                                <div>
+                                    <Input.Label htmlFor="passing_score" value="Nilai Kelulusan (%)" />
+                                    <Input.Number
+                                        id="passing_score"
+                                        value={data.passing_score}
+                                        onChange={(e) => setData('passing_score', e.target.value)}
+                                        min="0"
+                                        max="100"
+                                    />
+                                    <Input.Error message={errors.passing_score} />
+                                </div>
 
                                 <div className="space-y-3">
                                     <div className="flex items-center">
@@ -237,12 +251,12 @@ export default function Edit() {
                                         <input
                                             id="randomize_questions"
                                             type="checkbox"
-                                            checked={data.randomize_questions}
-                                            onChange={(e) => setData('randomize_questions', e.target.checked)}
+                                            checked={false}
                                             className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                                            disabled
                                         />
                                         <label htmlFor="randomize_questions" className="ml-2 block text-sm text-gray-900">
-                                            Acak Urutan Soal
+                                            Acak Urutan Soal (segera hadir)
                                         </label>
                                     </div>
 
@@ -250,12 +264,12 @@ export default function Edit() {
                                         <input
                                             id="randomize_answers"
                                             type="checkbox"
-                                            checked={data.randomize_answers}
-                                            onChange={(e) => setData('randomize_answers', e.target.checked)}
+                                            checked={false}
                                             className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                                            disabled
                                         />
                                         <label htmlFor="randomize_answers" className="ml-2 block text-sm text-gray-900">
-                                            Acak Urutan Jawaban
+                                            Acak Urutan Jawaban (segera hadir)
                                         </label>
                                     </div>
                                 </div>
@@ -270,15 +284,16 @@ export default function Edit() {
                                 Instruksi untuk Siswa
                             </h3>
 
-                            <Input
-                                label="Instruksi"
-                                type="textarea"
+                            <Input.Label htmlFor="instructions" value="Instruksi" />
+                            <textarea
+                                id="instructions"
                                 value={data.instructions}
-                                onChange={(value) => setData('instructions', value)}
-                                error={errors.instructions}
-                                placeholder="Instruksi khusus untuk siswa sebelum mengerjakan ujian..."
+                                onChange={(e) => setData('instructions', e.target.value)}
                                 rows={6}
+                                className="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                                placeholder="Instruksi khusus untuk siswa sebelum mengerjakan ujian..."
                             />
+                            <Input.Error message={errors.instructions} />
                         </div>
                     </div>
 

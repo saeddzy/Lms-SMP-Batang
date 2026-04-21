@@ -22,6 +22,7 @@ class Exam extends Model
         'end_time',
         'duration', // in minutes
         'duration_minutes',
+        'max_attempts',
         'total_marks',
         'passing_marks',
         'class_id',
@@ -36,6 +37,7 @@ class Exam extends Model
         'start_time' => 'datetime',
         'end_time' => 'datetime',
         'duration' => 'integer',
+        'max_attempts' => 'integer',
         'total_marks' => 'decimal:2',
         'passing_marks' => 'decimal:2',
         'is_active' => 'boolean',

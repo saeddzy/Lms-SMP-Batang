@@ -10,6 +10,7 @@ use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\QuizController;
 use App\Http\Controllers\ExamController;
+use App\Http\Controllers\ExamAttemptController;
 use App\Http\Controllers\GradeController;
 use App\Http\Controllers\StudentDashboardController;
 use App\Http\Controllers\TeacherDashboardController;
@@ -96,9 +97,8 @@ Route::middleware('auth')->group(function () {
     Route::get('exams/{exam}/attempts/{attempt}/manual-grade', [ExamController::class, 'manualGradeAttempt'])->name('exams.manual-grade');
     Route::post('exams/{exam}/attempts/{attempt}/manual-grade', [ExamController::class, 'saveManualGradeAttempt'])->name('exams.manual-grade.save');
     Route::resource('exams', ExamController::class);
-    Route::get('exams/{exam}/show', [ExamController::class, 'show'])->name('exams.show');
     Route::post('exams/{exam}/start-attempt', [ExamController::class, 'startAttempt'])->name('exams.start-attempt');
-    Route::post('exams/{exam}/attempts/{attempt}/submit', [ExamController::class, 'submitAttempt'])->name('exams.submit-attempt');
+    Route::post('exams/{exam}/attempt/{attempt}/submit', [ExamAttemptController::class, 'submit'])->name('exams.attempt.submit');
     Route::patch('exams/{exam}/toggle-status', [ExamController::class, 'toggleStatus'])->name('exams.toggle-status');
     Route::patch('exams/{exam}/cancel', [ExamController::class, 'cancel'])->name('exams.cancel');
     Route::patch('exams/{exam}/reschedule', [ExamController::class, 'reschedule'])->name('exams.reschedule');
@@ -107,7 +107,7 @@ Route::middleware('auth')->group(function () {
     Route::post('exams/{exam}/start', [ExamAttemptController::class, 'start'])->name('exams.attempt.start');
     Route::get('exams/{exam}/attempt/{attempt}', [ExamAttemptController::class, 'take'])->name('exams.attempt.take');
     Route::post('exams/{exam}/attempt/{attempt}/save-answer', [ExamAttemptController::class, 'saveAnswer'])->name('exams.attempt.save-answer');
-    Route::post('exams/{exam}/attempt/{attempt}/submit', [ExamAttemptController::class, 'submit'])->name('exams.attempt.submit');
+    Route::post('exams/{exam}/attempt/{attempt}/violation', [ExamAttemptController::class, 'violation'])->name('exams.attempt.violation');
     Route::get('exams/{exam}/attempt/{attempt}/result', [ExamAttemptController::class, 'result'])->name('exams.attempt.result');
     Route::get('exams/{exam}/results', [ExamAttemptController::class, 'results'])->name('exams.results');
 

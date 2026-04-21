@@ -357,7 +357,15 @@ class StudentDashboardController extends Controller
         $exams = Exam::whereIn('class_id', $enrolledClasses)
             ->where('is_cancelled', false)
             ->where('is_active', true)
-            ->with(['subject', 'schoolClass', 'teacher'])
+            ->with([
+                'subject',
+                'schoolClass',
+                'teacher',
+                'attempts' => function ($query) use ($user) {
+                    $query->where('student_id', $user->id)
+                        ->latest('created_at');
+                },
+            ])
             ->orderBy('created_at', 'desc') // Order by creation date since scheduled_date might be null
             ->paginate(10);
             
@@ -776,7 +784,15 @@ class StudentDashboardController extends Controller
         $exams = Exam::whereIn('class_id', $enrolledClasses)
             ->where('is_cancelled', false)
             ->where('is_active', true)
-            ->with(['subject', 'schoolClass', 'teacher'])
+            ->with([
+                'subject',
+                'schoolClass',
+                'teacher',
+                'attempts' => function ($query) use ($user) {
+                    $query->where('student_id', $user->id)
+                        ->latest('created_at');
+                },
+            ])
             ->orderBy('created_at', 'desc') // Order by creation date since scheduled_date might be null
             ->paginate(10);
             

@@ -312,8 +312,12 @@ export default function Show() {
                                                     <Button
                                                         type="view"
                                                         url={route(
-                                                            "exams.results",
-                                                            exam.id
+                                                            "exams.attempt.result",
+                                                            {
+                                                                exam: exam.id,
+                                                                attempt:
+                                                                    att.id,
+                                                            }
                                                         )}
                                                         text="Lihat"
                                                     />

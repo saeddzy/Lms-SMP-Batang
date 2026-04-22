@@ -32,6 +32,7 @@ export default function ExamAttempt() {
     const [currentQuestion, setCurrentQuestion] = useState(0);
     const [timeLeft, setTimeLeft] = useState(Math.floor(remainingSeconds / 60));
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isAutoSaving, setIsAutoSaving] = useState(false);
     const [violations, setViolations] = useState(0);
     const [violationMessage, setViolationMessage] = useState("");
     const [submitError, setSubmitError] = useState("");
@@ -66,6 +67,15 @@ export default function ExamAttempt() {
             await document.exitFullscreen();
         } catch (error) {
             // Abaikan jika browser menolak exit fullscreen.
+        }
+    };
+
+    const ensureExitFullscreen = async () => {
+        // Beberapa browser kadang butuh lebih dari sekali panggil.
+        await exitFullscreenIfActive();
+        if (document.fullscreenElement) {
+            await new Promise((resolve) => setTimeout(resolve, 120));
+            await exitFullscreenIfActive();
         }
     };
 
@@ -229,6 +239,61 @@ export default function ExamAttempt() {
         }));
     };
 
+    const hasAnswerForQuestion = (question) => {
+        const ans = answers[question.id];
+        if (!ans) return false;
+
+        if (Array.isArray(question.options) && question.options.length > 0) {
+            return (
+                Array.isArray(ans.selected_options) &&
+                ans.selected_options.length > 0
+            );
+        }
+
+        return typeof ans.answer === "string" && ans.answer.trim() !== "";
+    };
+
+    const saveQuestionAnswer = async (question) => {
+        const answerData = answers[question.id];
+        if (!answerData) return;
+
+        const answerValue =
+            typeof answerData.answer === "string"
+                ? answerData.answer.trim()
+                : "";
+
+        if (!answerValue) return;
+
+        await postJson(route("exams.attempt.save-answer", [exam.id, attempt.id]), {
+            question_id: question.id,
+            answer: answerValue,
+        });
+    };
+
+    const goToQuestion = async (targetIndex) => {
+        if (
+            targetIndex < 0 ||
+            targetIndex >= questions.length ||
+            targetIndex === currentQuestion ||
+            isSubmitting
+        ) {
+            return;
+        }
+
+        try {
+            setIsAutoSaving(true);
+            const current = questions[currentQuestion];
+            if (current) {
+                await saveQuestionAnswer(current);
+            }
+        } catch (_) {
+            // Jangan blok navigasi; jawaban tetap ada di state lokal.
+        } finally {
+            setIsAutoSaving(false);
+            setCurrentQuestion(targetIndex);
+        }
+    };
+
     const handleSubmit = async () => {
         if (isSubmitting) return;
         
@@ -250,7 +315,7 @@ export default function ExamAttempt() {
                 {}
             );
 
-            await exitFullscreenIfActive();
+            await ensureExitFullscreen();
             
             router.visit(
                 submitResult?.result_url || route('exams.attempt.result', [exam.id, attempt.id])
@@ -293,7 +358,7 @@ export default function ExamAttempt() {
         <DashboardLayout title={`Mengerjakan: ${exam.title}`}>
             <Head title={`Mengerjakan: ${exam.title}`} />
 
-            <div className="max-w-4xl mx-auto py-6">
+            <div className="max-w-6xl mx-auto py-6">
                 {/* Header */}
                 <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
                     <div className="flex justify-between items-center">
@@ -342,115 +407,126 @@ export default function ExamAttempt() {
 
                 {/* Question */}
                 {questions[currentQuestion] && (
-                    <div className="mb-6 rounded-lg border border-slate-200 bg-white p-6">
-                        <div className="mb-4">
-                            <div className="flex items-start gap-2 mb-2">
-                                <span className="flex-shrink-0 w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-sm font-medium">
-                                    {currentQuestion + 1}
-                                </span>
-                                <h2 className="text-lg font-medium text-slate-900 flex-1">
-                                    {questions[currentQuestion].question_text}
-                                </h2>
+                    <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_240px]">
+                        <div className="rounded-lg border border-slate-200 bg-white p-6">
+                            <div className="mb-4">
+                                <div className="flex items-start gap-2 mb-2">
+                                    <span className="flex-shrink-0 w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-sm font-medium">
+                                        {currentQuestion + 1}
+                                    </span>
+                                    <h2 className="text-lg font-medium text-slate-900 flex-1">
+                                        {questions[currentQuestion].question_text}
+                                    </h2>
+                                </div>
+                                
+                                {questions[currentQuestion].question_image && (
+                                    <img 
+                                        src={`/storage/${questions[currentQuestion].question_image}`}
+                                        alt="Question image"
+                                        className="mt-3 max-w-full h-auto rounded-lg border border-slate-200"
+                                    />
+                                )}
                             </div>
-                            
-                            {questions[currentQuestion].question_image && (
-                                <img 
-                                    src={`/storage/${questions[currentQuestion].question_image}`}
-                                    alt="Question image"
-                                    className="mt-3 max-w-full h-auto rounded-lg border border-slate-200"
+
+                            {/* Options */}
+                            {questions[currentQuestion].options && questions[currentQuestion].options.length > 0 ? (
+                                <div className="space-y-3">
+                                    {questions[currentQuestion].options.map((option, index) => (
+                                        <label 
+                                            key={index}
+                                            className="flex items-start gap-3 p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors"
+                                        >
+                                            <input
+                                                type="radio"
+                                                name={`question_${questions[currentQuestion].id}`}
+                                                value={index}
+                                                disabled={isLockedByViolation}
+                                                checked={answers[questions[currentQuestion].id]?.selected_options?.includes(index)}
+                                                onChange={(e) => {
+                                                    const question = questions[currentQuestion];
+                                                    const currentAnswers = answers[questions[currentQuestion].id]?.selected_options || [];
+                                                    if (e.target.checked) {
+                                                        handleAnswerChange(
+                                                            questions[currentQuestion].id, 
+                                                            question.question_type === "multiple_choice"
+                                                                ? String(index)
+                                                                : option,
+                                                            [index]
+                                                        );
+                                                    } else {
+                                                        handleAnswerChange(
+                                                            questions[currentQuestion].id, 
+                                                            question.question_type === "multiple_choice"
+                                                                ? String(index)
+                                                                : option,
+                                                            currentAnswers.filter(id => id !== index)
+                                                        );
+                                                    }
+                                                }}
+                                                className="mt-1"
+                                            />
+                                            <div className="flex-1">
+                                                <span className="font-medium text-slate-900">
+                                                    {String.fromCharCode(65 + index)}. {option}
+                                                </span>
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                            ) : (
+                                /* Essay question */
+                                <textarea
+                                    rows={4}
+                                    placeholder="Tulis jawaban Anda di sini..."
+                                    disabled={isLockedByViolation}
+                                    value={answers[questions[currentQuestion].id]?.answer || ''}
+                                    onChange={(e) => handleAnswerChange(questions[currentQuestion].id, e.target.value)}
+                                    className="w-full rounded-lg border border-slate-200 p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                 />
                             )}
                         </div>
 
-                        {/* Options */}
-                        {questions[currentQuestion].options && questions[currentQuestion].options.length > 0 ? (
-                            <div className="space-y-3">
-                                {questions[currentQuestion].options.map((option, index) => (
-                                    <label 
+                        <div className="rounded-lg border border-slate-200 bg-white p-4">
+                            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Navigasi Soal
+                            </p>
+                            <div className="grid grid-cols-5 gap-2">
+                                {questions.map((_, index) => (
+                                    <button
                                         key={index}
-                                        className="flex items-start gap-3 p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors"
+                                        onClick={() => goToQuestion(index)}
+                                        disabled={isLockedByViolation || isAutoSaving}
+                                        className={`h-9 w-9 rounded-md text-xs font-semibold transition-colors ${
+                                            index === currentQuestion 
+                                                ? 'bg-indigo-600 text-white' 
+                                                : hasAnswerForQuestion(questions[index])
+                                                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                                  : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                                        }`}
                                     >
-                                        <input
-                                            type="radio"
-                                            name={`question_${questions[currentQuestion].id}`}
-                                            value={index}
-                                            disabled={isLockedByViolation}
-                                            checked={answers[questions[currentQuestion].id]?.selected_options?.includes(index)}
-                                            onChange={(e) => {
-                                                const question = questions[currentQuestion];
-                                                const currentAnswers = answers[questions[currentQuestion].id]?.selected_options || [];
-                                                if (e.target.checked) {
-                                                    handleAnswerChange(
-                                                        questions[currentQuestion].id, 
-                                                        question.question_type === "multiple_choice"
-                                                            ? String(index)
-                                                            : option,
-                                                        [index]
-                                                    );
-                                                } else {
-                                                    handleAnswerChange(
-                                                        questions[currentQuestion].id, 
-                                                        question.question_type === "multiple_choice"
-                                                            ? String(index)
-                                                            : option,
-                                                        currentAnswers.filter(id => id !== index)
-                                                    );
-                                                }
-                                            }}
-                                            className="mt-1"
-                                        />
-                                        <div className="flex-1">
-                                            <span className="font-medium text-slate-900">
-                                                {String.fromCharCode(65 + index)}. {option}
-                                            </span>
-                                        </div>
-                                    </label>
+                                        {index + 1}
+                                    </button>
                                 ))}
                             </div>
-                        ) : (
-                            /* Essay question */
-                            <textarea
-                                rows={4}
-                                placeholder="Tulis jawaban Anda di sini..."
-                                disabled={isLockedByViolation}
-                                value={answers[questions[currentQuestion].id]?.answer || ''}
-                                onChange={(e) => handleAnswerChange(questions[currentQuestion].id, e.target.value)}
-                                className="w-full rounded-lg border border-slate-200 p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
-                        )}
+                        </div>
                     </div>
                 )}
 
                 {/* Navigation */}
                 <div className="flex justify-between items-center">
                     <button
-                        onClick={() => setCurrentQuestion(Math.max(0, currentQuestion - 1))}
-                        disabled={currentQuestion === 0 || isLockedByViolation}
+                        onClick={() => goToQuestion(currentQuestion - 1)}
+                        disabled={currentQuestion === 0 || isLockedByViolation || isAutoSaving}
                         className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                         Sebelumnya
                     </button>
 
-                    <div className="flex gap-2">
-                        {questions.map((_, index) => (
-                            <button
-                                key={index}
-                                onClick={() => setCurrentQuestion(index)}
-                                disabled={isLockedByViolation}
-                                className={`w-8 h-8 rounded-full text-sm font-medium transition-colors ${
-                                    index === currentQuestion 
-                                        ? 'bg-indigo-600 text-white' 
-                                        : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                                }`}
-                            >
-                                {index + 1}
-                            </button>
-                        ))}
-                    </div>
+                    <div />
 
                     <button
-                        onClick={() => setCurrentQuestion(Math.min(questions.length - 1, currentQuestion + 1))}
-                        disabled={currentQuestion === questions.length - 1 || isLockedByViolation}
+                        onClick={() => goToQuestion(currentQuestion + 1)}
+                        disabled={currentQuestion === questions.length - 1 || isLockedByViolation || isAutoSaving}
                         className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                         Selanjutnya
@@ -459,6 +535,11 @@ export default function ExamAttempt() {
 
                 {/* Submit Button */}
                 <div className="mt-8 text-center">
+                    {isAutoSaving ? (
+                        <p className="mb-3 text-xs text-slate-500">
+                            Menyimpan jawaban soal aktif...
+                        </p>
+                    ) : null}
                     {submitError ? (
                         <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
                             {submitError}

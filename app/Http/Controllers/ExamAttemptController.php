@@ -289,19 +289,34 @@ class ExamAttemptController extends Controller
     {
         $user = Auth::user();
 
-        // Validate attempt ownership
-        if ($attempt->student_id !== $user->id || $attempt->exam_id !== $exam->id) {
+        if ($attempt->exam_id !== $exam->id) {
+            abort(403, 'Unauthorized');
+        }
+
+        $exam->loadMissing('classSubject');
+
+        $isOwner = $attempt->student_id === $user->id;
+        $isTeacherReviewer = $user->hasRole('guru')
+            && $user->can('exams grade')
+            && $exam->classSubject
+            && $exam->classSubject->isTaughtBy($user);
+        $isAdminViewer = $user->hasRole('admin') && $user->can('exams view');
+
+        if (! $isOwner && ! $isTeacherReviewer && ! $isAdminViewer) {
             abort(403, 'Unauthorized');
         }
 
         // Load attempt with answers and questions
         $attempt->load([
             'answers.question',
+            'student',
         ]);
 
         return inertia('Exams/Result', [
             'exam' => $exam,
             'attempt' => $attempt,
+            'isStudentView' => $isOwner,
+            'canManualGrade' => $isTeacherReviewer,
         ]);
     }
 

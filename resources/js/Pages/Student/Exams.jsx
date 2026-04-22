@@ -356,12 +356,24 @@ export default function StudentExams() {
                                                         )}
                                                     </td>
                                                     <td className="whitespace-nowrap px-5 py-4 text-right">
-                                                        <Link
-                                                            href={route('exams.show', ex.id)}
-                                                            className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
-                                                        >
-                                                            Lihat
-                                                        </Link>
+                                                        {ex?.id ? (
+                                                            <Link
+                                                                href={route(
+                                                                    "exams.attempt.result",
+                                                                    {
+                                                                        exam: ex.id,
+                                                                        attempt: att.id,
+                                                                    }
+                                                                )}
+                                                                className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
+                                                            >
+                                                                Lihat hasil
+                                                            </Link>
+                                                        ) : (
+                                                            <span className="text-xs text-slate-400">
+                                                                —
+                                                            </span>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             );

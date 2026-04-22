@@ -201,6 +201,24 @@ export default function ExamsAvailable() {
                                                     >
                                                         Lanjutkan
                                                     </Link>
+                                                ) : (
+                                                    (status === "selesai_siswa" ||
+                                                        (status === "selesai" &&
+                                                            latestAttempt?.finished_at)) &&
+                                                    latestAttempt ? (
+                                                    <Link
+                                                        href={route(
+                                                            "exams.attempt.result",
+                                                            {
+                                                                exam: exam.id,
+                                                                attempt:
+                                                                    latestAttempt.id,
+                                                            }
+                                                        )}
+                                                        className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
+                                                    >
+                                                        Lihat hasil
+                                                    </Link>
                                                 ) : status === 'buka' ? (
                                                     <Link
                                                         href={route('exams.show', exam.id)}
@@ -220,7 +238,7 @@ export default function ExamsAvailable() {
                                                               ? 'Sudah Dikerjakan'
                                                               : 'Selesai'}
                                                     </Button>
-                                                )}
+                                                ))}
                                             </td>
                                         </tr>
                                     )})}

@@ -1,6 +1,6 @@
 import { router, useForm } from "@inertiajs/react";
 import { IconSearch } from "@tabler/icons-react";
-import React from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 
 const inputClass =
     "block w-full rounded-xl border border-stone-200 bg-white py-2.5 pl-4 pr-11 text-sm text-stone-800 placeholder:text-stone-400 shadow-sm transition-colors focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-400";
@@ -39,12 +39,15 @@ export default function Search({
         search: filter?.search ?? "",
     });
 
-    const handleSearchData = (e) => {
-        e.preventDefault();
+    const searchQuery = useMemo(() => data.search ?? "", [data.search]);
+    const initialMountRef = useRef(true);
+    const lastSentRef = useRef(filter?.search ?? "");
+
+    const performSearch = (keyword) => {
         if (!url) {
             return;
         }
-        const query = { search: data.search ?? "" };
+        const query = { search: keyword ?? "" };
         if (filter && typeof filter === "object") {
             Object.entries(filter).forEach(([k, v]) => {
                 if (k === "search") {
@@ -55,8 +58,32 @@ export default function Search({
                 }
             });
         }
-        router.get(url, query, { preserveScroll: true });
+        lastSentRef.current = keyword ?? "";
+        router.get(url, query, {
+            preserveScroll: true,
+            replace: true,
+        });
     };
+
+    const handleSearchData = (e) => {
+        e.preventDefault();
+        performSearch(searchQuery);
+    };
+
+    useEffect(() => {
+        if (initialMountRef.current) {
+            initialMountRef.current = false;
+            return;
+        }
+        if (searchQuery === lastSentRef.current) {
+            return;
+        }
+        const timer = setTimeout(() => {
+            performSearch(searchQuery);
+        }, 400);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
         <form onSubmit={handleSearchData} className={className}>

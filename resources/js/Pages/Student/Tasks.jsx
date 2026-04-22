@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import StudentShell from "@/Components/Student/StudentShell";
 import Button from "@/Components/Button";
@@ -51,7 +51,6 @@ const statusConfig = {
 
 export default function StudentTasks() {
     const { tasks, filters = {} } = usePage().props;
-    const [search, setSearch] = useState(filters.search || "");
 
     const rows = tasks.data ?? [];
     const total = tasks.total ?? 0;
@@ -67,11 +66,9 @@ export default function StudentTasks() {
             >
                 <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm sm:p-6">
                     <Search
-                        value={search}
-                        onChange={(value) => setSearch(value)}
+                        url={route("student.tasks")}
                         placeholder="Cari judul atau deskripsi…"
-                        routeName="student.tasks"
-                        filters={filters}
+                        filter={{ search: filters.search ?? "" }}
                     />
                 </div>
 

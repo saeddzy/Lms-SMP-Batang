@@ -294,13 +294,19 @@ export default function ExamAttempt() {
         }
     };
 
-    const handleSubmit = async () => {
+    const handleSubmit = async ({ exitFirst = false } = {}) => {
         if (isSubmitting) return;
-        
+
         setIsSubmitting(true);
         setSubmitError("");
-        
+
         try {
+            // Untuk submit manual (klik tombol), keluar fullscreen lebih awal
+            // agar tetap dianggap user gesture oleh browser.
+            if (exitFirst) {
+                await ensureExitFullscreen();
+            }
+
             // Save all answers first
             for (const [questionId, answerData] of Object.entries(answers)) {
                 await postJson(route('exams.attempt.save-answer', [exam.id, attempt.id]), {
@@ -329,6 +335,8 @@ export default function ExamAttempt() {
             setIsSubmitting(false);
         }
     };
+
+    const handleManualSubmit = () => handleSubmit({ exitFirst: true });
 
     const formatTime = (minutes) => {
         const hours = Math.floor(minutes / 60);
@@ -546,7 +554,7 @@ export default function ExamAttempt() {
                         </div>
                     ) : null}
                     <button
-                        onClick={handleSubmit}
+                        onClick={handleManualSubmit}
                         disabled={isSubmitting || timeLeft === 0 || isLockedByViolation}
                         className="px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
                     >

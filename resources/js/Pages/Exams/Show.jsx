@@ -275,7 +275,11 @@ export default function Show() {
                                         : "—"}
                                 </Table.Td>
                                 <Table.Td>
-                                    {att.score != null ? `${att.score}%` : "—"}
+                                    {att.attempt_status === "menunggu_penilaian"
+                                        ? "Menunggu"
+                                        : att.score != null
+                                          ? `${att.score}%`
+                                          : "—"}
                                 </Table.Td>
                                 <Table.Td>
                                     {att.passed === true

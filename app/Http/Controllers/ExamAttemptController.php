@@ -7,6 +7,7 @@ use App\Models\ExamAttempt;
 use App\Models\ExamAttemptAnswer;
 use App\Models\ExamQuestion;
 use App\Helpers\ExamTimeHelper;
+use App\Support\AttemptScoreCalculator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -261,14 +262,30 @@ class ExamAttemptController extends Controller
         }
 
         DB::transaction(function () use ($attempt, $exam) {
-            // Mark attempt as finished
             $attempt->update([
                 'finished_at' => now(),
-                'attempt_status' => 'finished',
             ]);
 
-            // Calculate score
-            $attempt->calculateScore();
+            $attempt->refresh();
+            $attempt->load('answers.question');
+            $totals = AttemptScoreCalculator::forExamAttempt($attempt);
+            $threshold = (float) ($exam->passing_marks ?? 60);
+            $hasEssay = $exam->questions()->where('question_type', 'essay')->exists();
+            $pendingManualGrading = $hasEssay
+                && $attempt->answers->contains(
+                    fn ($ans) => $ans->question?->question_type === 'essay'
+                        && $ans->points_awarded === null
+                );
+
+            $attempt->update([
+                'attempt_status' => $pendingManualGrading
+                    ? 'submitted'
+                    : 'finished',
+                'score' => $pendingManualGrading ? null : $totals['percent'],
+                'passed' => $pendingManualGrading
+                    ? null
+                    : ($totals['percent'] >= $threshold),
+            ]);
         });
 
         if ($request->expectsJson()) {

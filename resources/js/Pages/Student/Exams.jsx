@@ -330,7 +330,12 @@ export default function StudentExams() {
                                                         )}
                                                     </td>
                                                     <td className="px-5 py-4">
-                                                        {att.score != null ? (
+                                                        {att.attempt_status ===
+                                                        "menunggu_penilaian" ? (
+                                                            <span className="text-sm font-semibold text-amber-700">
+                                                                Menunggu
+                                                            </span>
+                                                        ) : att.score != null ? (
                                                             <span className="text-lg font-bold tabular-nums text-slate-900">
                                                                 {att.score}%
                                                             </span>

@@ -7,6 +7,7 @@ import StudentShell, {
 import StudentStatCard from "@/Components/Student/StudentStatCard";
 import Button from "@/Components/Button";
 import Pagination from "@/Components/Pagination";
+import Search from "@/Components/Search";
 import { Head, Link, usePage } from "@inertiajs/react";
 import {
     IconBrain,
@@ -44,6 +45,7 @@ export default function StudentQuizzes() {
         attempts,
         summary = {},
         availableQuizzes = [],
+        filters = {},
     } = usePage().props;
 
     const rows = attempts?.data ?? [];
@@ -92,6 +94,13 @@ export default function StudentQuizzes() {
                         accent="amber"
                     />
                 </div>
+
+                <Search
+                    url={route("student.quizzes")}
+                    placeholder="Cari judul kuis, mapel, atau kelas..."
+                    filter={{ search: filters.search ?? "" }}
+                    className="mt-4"
+                />
 
                 <section className="mt-8">
                     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -305,7 +314,12 @@ export default function StudentQuizzes() {
                                                         )}
                                                     </td>
                                                     <td className="px-5 py-4">
-                                                        {att.score != null ? (
+                                                        {att.attempt_status ===
+                                                        "menunggu_penilaian" ? (
+                                                            <span className="text-sm font-semibold text-amber-700">
+                                                                Menunggu
+                                                            </span>
+                                                        ) : att.score != null ? (
                                                             <span className="text-lg font-bold tabular-nums text-slate-900">
                                                                 {att.score}%
                                                             </span>

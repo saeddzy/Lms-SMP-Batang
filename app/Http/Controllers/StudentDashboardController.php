@@ -234,7 +234,7 @@ class StudentDashboardController extends Controller
      *
      * @return array<int, array<string, mixed>>
      */
-    private function availableQuizzesForStudent($user): array
+    private function availableQuizzesForStudent($user, ?string $search = null): array
     {
         $quizzes = Quiz::query()
             ->whereHas('schoolClass.enrollments', function ($q) use ($user) {
@@ -298,7 +298,7 @@ class StudentDashboardController extends Controller
 
         $prio = ['buka' => 0, 'belum_mulai' => 1, 'berakhir' => 2, 'jadwal_tidak_lengkap' => 3];
 
-        return $items->sort(function ($a, $b) use ($prio) {
+        $items = $items->sort(function ($a, $b) use ($prio) {
             $da = $prio[$a['window']] ?? 99;
             $db = $prio[$b['window']] ?? 99;
             if ($da !== $db) {
@@ -309,7 +309,29 @@ class StudentDashboardController extends Controller
                 (string) ($a['start_time'] ?? ''),
                 (string) ($b['start_time'] ?? '')
             );
-        })->values()->all();
+        })->values();
+
+        if ($search !== null && trim($search) !== '') {
+            $needle = mb_strtolower(trim($search));
+            $items = $items->filter(function (array $item) use ($needle) {
+                $haystacks = [
+                    (string) ($item['title'] ?? ''),
+                    (string) ($item['description'] ?? ''),
+                    (string) ($item['subject'] ?? ''),
+                    (string) ($item['class'] ?? ''),
+                ];
+
+                foreach ($haystacks as $text) {
+                    if (str_contains(mb_strtolower($text), $needle)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            })->values();
+        }
+
+        return $items->all();
     }
 
     /**
@@ -357,6 +379,19 @@ class StudentDashboardController extends Controller
         $exams = Exam::whereIn('class_id', $enrolledClasses)
             ->where('is_cancelled', false)
             ->where('is_active', true)
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $search = trim((string) $request->input('search'));
+                $query->where(function ($inner) use ($search) {
+                    $inner->where('title', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%")
+                        ->orWhereHas('subject', function ($subjectQuery) use ($search) {
+                            $subjectQuery->where('name', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('schoolClass', function ($classQuery) use ($search) {
+                            $classQuery->where('name', 'like', "%{$search}%");
+                        });
+                });
+            })
             ->with([
                 'subject',
                 'schoolClass',
@@ -367,10 +402,23 @@ class StudentDashboardController extends Controller
                 },
             ])
             ->orderBy('created_at', 'desc') // Order by creation date since scheduled_date might be null
-            ->paginate(10);
+            ->paginate(10)
+            ->withQueryString();
+
+        $exams->setCollection(
+            $exams->getCollection()->map(function ($exam) {
+                $attempts = $exam->attempts ?? collect();
+                $annotatedAttempts = AttemptStatusHelper::annotateExamAttempts(
+                    $attempts->values()
+                );
+                $exam->setRelation('attempts', $annotatedAttempts);
+                return $exam;
+            })
+        );
             
         return Inertia::render('Student/ExamsAvailable', [
             'exams' => $exams,
+            'filters' => $request->only(['search']),
         ]);
     }
 
@@ -739,10 +787,11 @@ class StudentDashboardController extends Controller
     /**
      * Show student's quiz attempts
      */
-    public function quizzes()
+    public function quizzes(Request $request)
     {
         $user = auth()->user();
         $studentId = $user->id;
+        $search = trim((string) $request->input('search', ''));
 
         $summary = [
             'total_attempts' => QuizAttempt::where('student_id', $studentId)->count(),
@@ -754,6 +803,20 @@ class StudentDashboardController extends Controller
         ];
 
         $attempts = QuizAttempt::where('student_id', $studentId)
+            ->when($search !== '', function ($query) use ($search) {
+                $query->whereHas('quiz', function ($quizQuery) use ($search) {
+                    $quizQuery->where(function ($inner) use ($search) {
+                        $inner->where('title', 'like', "%{$search}%")
+                            ->orWhere('description', 'like', "%{$search}%")
+                            ->orWhereHas('subject', function ($subjectQuery) use ($search) {
+                                $subjectQuery->where('name', 'like', "%{$search}%");
+                            })
+                            ->orWhereHas('schoolClass', function ($classQuery) use ($search) {
+                                $classQuery->where('name', 'like', "%{$search}%");
+                            });
+                    });
+                });
+            })
             ->with(['quiz.subject', 'quiz.schoolClass', 'quiz.teacher'])
             ->latest('finished_at')
             ->paginate(15)
@@ -765,15 +828,18 @@ class StudentDashboardController extends Controller
         return Inertia::render('Student/Quizzes', [
             'attempts' => $attempts,
             'summary' => $summary,
-            'availableQuizzes' => $this->availableQuizzesForStudent($user),
-            'filters' => [],
+            'availableQuizzes' => $this->availableQuizzesForStudent(
+                $user,
+                $search
+            ),
+            'filters' => $request->only(['search']),
         ]);
     }
 
     /**
      * Show available exams for student
      */
-    public function exams()
+    public function exams(Request $request)
     {
         $user = auth()->user();
         
@@ -784,6 +850,19 @@ class StudentDashboardController extends Controller
         $exams = Exam::whereIn('class_id', $enrolledClasses)
             ->where('is_cancelled', false)
             ->where('is_active', true)
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $search = trim((string) $request->input('search'));
+                $query->where(function ($inner) use ($search) {
+                    $inner->where('title', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%")
+                        ->orWhereHas('subject', function ($subjectQuery) use ($search) {
+                            $subjectQuery->where('name', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('schoolClass', function ($classQuery) use ($search) {
+                            $classQuery->where('name', 'like', "%{$search}%");
+                        });
+                });
+            })
             ->with([
                 'subject',
                 'schoolClass',
@@ -794,10 +873,23 @@ class StudentDashboardController extends Controller
                 },
             ])
             ->orderBy('created_at', 'desc') // Order by creation date since scheduled_date might be null
-            ->paginate(10);
+            ->paginate(10)
+            ->withQueryString();
+
+        $exams->setCollection(
+            $exams->getCollection()->map(function ($exam) {
+                $attempts = $exam->attempts ?? collect();
+                $annotatedAttempts = AttemptStatusHelper::annotateExamAttempts(
+                    $attempts->values()
+                );
+                $exam->setRelation('attempts', $annotatedAttempts);
+                return $exam;
+            })
+        );
             
         return Inertia::render('Student/ExamsAvailable', [
             'exams' => $exams,
+            'filters' => $request->only(['search']),
         ]);
     }
 

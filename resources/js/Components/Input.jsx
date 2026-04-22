@@ -50,8 +50,18 @@ function DateTimeLocalInput(props) {
     return <Input type="datetime-local" step={60} {...props} />;
 }
 
-function NumberInput(props) {
-    return <Input type="number" {...props} />;
+function NumberInput({ onWheel, ...props }) {
+    return (
+        <Input
+            type="number"
+            onWheel={(e) => {
+                // Cegah perubahan angka tidak sengaja saat scroll halaman.
+                e.currentTarget.blur();
+                onWheel?.(e);
+            }}
+            {...props}
+        />
+    );
 }
 
 Input.Label = Label;

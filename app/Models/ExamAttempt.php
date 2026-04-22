@@ -74,13 +74,25 @@ class ExamAttempt extends Model
         return $this->attempt_status === 'in_progress';
     }
 
-    public function getPassedAttribute(): bool
+    public function getPassedAttribute($value): ?bool
     {
-        if (!$this->exam) {
-            return false;
+        if ($value !== null) {
+            return (bool) $value;
         }
 
-        return $this->score >= $this->exam->passing_marks;
+        if ($this->score === null) {
+            return null;
+        }
+
+        if (!$this->relationLoaded('exam')) {
+            $this->loadMissing('exam');
+        }
+
+        if (!$this->exam) {
+            return null;
+        }
+
+        return (float) $this->score >= (float) $this->exam->passing_marks;
     }
 
     public function getDurationMinutesAttribute(): ?int

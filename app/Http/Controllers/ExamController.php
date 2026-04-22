@@ -762,14 +762,23 @@ class ExamController extends Controller
             }
 
             $max = (float) $ans->question->points;
-            if ((float) $row['points_awarded'] > $max) {
+            $pointsAwarded = (float) $row['points_awarded'];
+            if (abs($max - $pointsAwarded) < 0.011) {
+                $pointsAwarded = $max;
+            }
+            if (abs($pointsAwarded) < 0.011) {
+                $pointsAwarded = 0.0;
+            }
+            $pointsAwarded = round($pointsAwarded, 2);
+
+            if ($pointsAwarded > $max) {
                 throw ValidationException::withMessages([
                     "grades.{$index}.points_awarded" => "Maksimal {$max} poin untuk soal ini.",
                 ]);
             }
 
             $ans->update([
-                'points_awarded' => $row['points_awarded'],
+                'points_awarded' => $pointsAwarded,
                 'teacher_feedback' => $row['teacher_feedback'] ?? null,
                 'graded_at' => now(),
                 'graded_by' => auth()->id(),
@@ -780,6 +789,7 @@ class ExamController extends Controller
         $totals = AttemptScoreCalculator::forExamAttempt($attempt->load('answers.question'));
         $threshold = (float) ($exam->passing_marks ?? 60);
         $attempt->update([
+            'attempt_status' => 'finished',
             'score' => $totals['percent'],
             'passed' => $totals['percent'] >= $threshold,
         ]);

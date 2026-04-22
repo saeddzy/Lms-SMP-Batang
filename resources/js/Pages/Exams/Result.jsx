@@ -11,6 +11,7 @@ export default function ExamResult() {
     const getStatusBadge = (status) => {
         const badges = {
             finished: { color: 'green', text: 'Selesai', icon: IconCheck },
+            submitted: { color: 'blue', text: 'Menunggu Penilaian', icon: IconClock },
             timeout: { color: 'red', text: 'Waktu Habis', icon: IconX },
             in_progress: { color: 'blue', text: 'Sedang Berlangsung', icon: IconClock },
         };
@@ -35,6 +36,9 @@ export default function ExamResult() {
     const hasEssayAnswers = sortedAnswers.some(
         (ans) => ans?.question?.question_type === "essay"
     );
+    const isPendingManual =
+        attempt?.attempt_status === "menunggu_penilaian" ||
+        attempt?.passed == null;
 
     const formatStudentAnswer = (ans) => {
         const raw = typeof ans?.answer === "string" ? ans.answer.trim() : "";
@@ -91,7 +95,11 @@ export default function ExamResult() {
                         <Card.Content>
                             <div className="text-center">
                                 <div className="text-3xl font-bold text-slate-900">
-                                    {attempt.score || 0}%
+                                    {isPendingManual
+                                        ? "Menunggu"
+                                        : attempt.score != null
+                                          ? `${attempt.score}%`
+                                          : "—"}
                                 </div>
                                 <div className="text-sm text-slate-600 mt-1">Nilai Akhir</div>
                             </div>
@@ -189,12 +197,20 @@ export default function ExamResult() {
                                             </p>
                                         </div>
                                         {isEssay ? (
-                                            <p className="mt-2 text-xs text-slate-600">
-                                                Nilai esai:{" "}
-                                                {ans.points_awarded != null
-                                                    ? `${ans.points_awarded} / ${ans.question?.points ?? 0}`
-                                                    : "Belum dinilai"}
-                                            </p>
+                                            <div className="mt-2 space-y-1 text-xs text-slate-600">
+                                                <p>
+                                                    Nilai esai:{" "}
+                                                    {ans.points_awarded != null
+                                                        ? `${ans.points_awarded} / ${ans.question?.points ?? 0}`
+                                                        : "Belum dinilai"}
+                                                </p>
+                                                {ans.teacher_feedback ? (
+                                                    <p className="whitespace-pre-wrap rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-amber-900">
+                                                        Feedback guru:{" "}
+                                                        {ans.teacher_feedback}
+                                                    </p>
+                                                ) : null}
+                                            </div>
                                         ) : (
                                             <p className="mt-2 text-xs text-slate-600">
                                                 Status:{" "}

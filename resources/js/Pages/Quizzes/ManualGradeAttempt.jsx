@@ -103,6 +103,9 @@ export default function ManualGradeAttempt() {
                                             max={max}
                                             step="0.01"
                                             required
+                                            onWheel={(e) =>
+                                                e.currentTarget.blur()
+                                            }
                                             value={g?.points_awarded ?? ""}
                                             onChange={(e) => {
                                                 const next = [

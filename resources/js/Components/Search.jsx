@@ -1,6 +1,6 @@
 import { router, useForm } from "@inertiajs/react";
 import { IconSearch } from "@tabler/icons-react";
-import React, { useEffect, useMemo, useRef } from "react";
+import React from "react";
 
 const inputClass =
     "block w-full rounded-xl border border-stone-200 bg-white py-2.5 pl-4 pr-11 text-sm text-stone-800 placeholder:text-stone-400 shadow-sm transition-colors focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-400";
@@ -39,10 +39,6 @@ export default function Search({
         search: filter?.search ?? "",
     });
 
-    const searchQuery = useMemo(() => data.search ?? "", [data.search]);
-    const initialMountRef = useRef(true);
-    const lastSentRef = useRef(filter?.search ?? "");
-
     const performSearch = (keyword) => {
         if (!url) {
             return;
@@ -58,7 +54,6 @@ export default function Search({
                 }
             });
         }
-        lastSentRef.current = keyword ?? "";
         router.get(url, query, {
             preserveScroll: true,
             replace: true,
@@ -67,23 +62,8 @@ export default function Search({
 
     const handleSearchData = (e) => {
         e.preventDefault();
-        performSearch(searchQuery);
+        performSearch(data.search ?? "");
     };
-
-    useEffect(() => {
-        if (initialMountRef.current) {
-            initialMountRef.current = false;
-            return;
-        }
-        if (searchQuery === lastSentRef.current) {
-            return;
-        }
-        const timer = setTimeout(() => {
-            performSearch(searchQuery);
-        }, 400);
-
-        return () => clearTimeout(timer);
-    }, [searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
         <form onSubmit={handleSearchData} className={className}>
@@ -96,9 +76,13 @@ export default function Search({
                     placeholder={placeholder}
                     aria-label={placeholder ?? "Cari"}
                 />
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-stone-400">
+                <button
+                    type="submit"
+                    className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-stone-400 transition-colors hover:text-stone-600"
+                    aria-label="Cari"
+                >
                     <IconSearch className="h-4 w-4" strokeWidth={1.5} />
-                </div>
+                </button>
             </div>
         </form>
     );

@@ -46,6 +46,12 @@ class ClassController extends Controller
             $query->where('teacher_id', $request->teacher_id);
         }
 
+        // Search by class name
+        if ($request->filled('search')) {
+            $search = trim((string) $request->search);
+            $query->where('name', 'like', "%{$search}%");
+        }
+
         // Siswa: hanya kelas yang diikuti
         if (auth()->user()->hasRole('siswa')) {
             $query->whereHas('enrollments', function ($q) {
@@ -61,6 +67,12 @@ class ClassController extends Controller
             });
         }
 
+        // Urutkan natural: angka kelas dulu, lalu paralel (contoh: 7 A, 7 B, ... 8 A, ... 10 A)
+        $query
+            ->orderByRaw("CAST(SUBSTRING_INDEX(name, ' ', 1) AS UNSIGNED) ASC")
+            ->orderByRaw("TRIM(SUBSTRING(name, LENGTH(SUBSTRING_INDEX(name, ' ', 1)) + 1)) ASC")
+            ->orderBy('name');
+
         $classes = $query->paginate(10)->withQueryString();
 
         $teachers = auth()->user()->hasRole('admin')
@@ -75,7 +87,7 @@ class ClassController extends Controller
             'classes' => $classes,
             'teachers' => $teachers,
             'academicYears' => $academicYears,
-            'filters' => $request->only(['academic_year', 'teacher_id']),
+            'filters' => $request->only(['academic_year', 'teacher_id', 'search']),
         ]);
     }
 

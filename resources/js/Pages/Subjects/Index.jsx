@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import Table from "@/Components/Table";
 import Button from "@/Components/Button";
@@ -8,12 +8,7 @@ import { Head, usePage } from "@inertiajs/react";
 import hasAnyPermission, { hasRole } from "@/Utils/Permissions";
 
 export default function Index() {
-    const { subjects } = usePage().props;
-    const [search, setSearch] = useState('');
-
-    const handleSearch = (query) => {
-        setSearch(query);
-    };
+    const { subjects, filters } = usePage().props;
 
     return (
         <DashboardLayout title="Mata Pelajaran">
@@ -36,9 +31,9 @@ export default function Index() {
 
                 {/* Search */}
                 <Search
+                    url={route("subjects.index")}
                     placeholder="Cari mata pelajaran..."
-                    onSearch={handleSearch}
-                    value={search}
+                    filter={filters}
                 />
 
                 {/* Table */}
@@ -133,9 +128,9 @@ export default function Index() {
                                 <tr>
                                     <Table.Td colSpan={hasAnyPermission(["subjects edit", "subjects delete"]) && !hasRole("guru") ? 7 : 6} className="text-center py-8">
                                         <div className="text-gray-500">
-                                            {search ? 'Tidak ada mata pelajaran yang ditemukan' : 'Belum ada mata pelajaran yang terdaftar'}
+                                            {filters?.search ? 'Tidak ada mata pelajaran yang ditemukan' : 'Belum ada mata pelajaran yang terdaftar'}
                                         </div>
-                                        {hasAnyPermission(["subjects create"]) && !search && (
+                                        {hasAnyPermission(["subjects create"]) && !filters?.search && (
                                             <div className="mt-2">
                                                 <Button
                                                     type={"add"}

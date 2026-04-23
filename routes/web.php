@@ -40,6 +40,20 @@ Route::get('/fitur', function () {
 })->name('features');
 
 Route::get('/dashboard', function () {
+    $user = auth()->user();
+
+    if ($user?->hasRole('admin')) {
+        return redirect()->route('admin.dashboard');
+    }
+
+    if ($user?->hasRole('guru')) {
+        return redirect()->route('teacher.dashboard');
+    }
+
+    if ($user?->hasRole('siswa')) {
+        return redirect()->route('student.dashboard');
+    }
+
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 

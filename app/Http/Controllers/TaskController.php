@@ -76,10 +76,17 @@ class TaskController extends Controller
 
         // Search by title or description
         if ($request->filled('search')) {
-            $search = $request->search;
+            $search = trim((string) $request->search);
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                  ->orWhere('description', 'like', "%{$search}%")
+                  ->orWhereHas('subject', function ($subjectQuery) use ($search) {
+                      $subjectQuery->where('name', 'like', "%{$search}%")
+                          ->orWhere('code', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('schoolClass', function ($classQuery) use ($search) {
+                      $classQuery->where('name', 'like', "%{$search}%");
+                  });
             });
         }
 

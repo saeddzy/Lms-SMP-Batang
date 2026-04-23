@@ -114,6 +114,8 @@ class GradeController extends Controller
         if ($user->hasRole('admin')) {
             return SchoolClass::query()
                 ->where('is_active', true)
+                ->orderByRaw("CAST(SUBSTRING_INDEX(name, ' ', 1) AS UNSIGNED) ASC")
+                ->orderByRaw("TRIM(SUBSTRING(name, LENGTH(SUBSTRING_INDEX(name, ' ', 1)) + 1)) ASC")
                 ->orderBy('name')
                 ->get();
         }
@@ -125,6 +127,8 @@ class GradeController extends Controller
                     $q->where('teacher_id', $user->id)
                         ->orWhereHas('classSubjects', fn ($cs) => $cs->forTeacher($user));
                 })
+                ->orderByRaw("CAST(SUBSTRING_INDEX(name, ' ', 1) AS UNSIGNED) ASC")
+                ->orderByRaw("TRIM(SUBSTRING(name, LENGTH(SUBSTRING_INDEX(name, ' ', 1)) + 1)) ASC")
                 ->orderBy('name')
                 ->get();
         }
@@ -161,8 +165,11 @@ class GradeController extends Controller
 
         $studentsQuery = $class->students();
         if ($request->filled('search')) {
-            $search = (string) $request->search;
-            $studentsQuery->where('name', 'like', '%'.$search.'%');
+            $search = trim((string) $request->search);
+            $studentsQuery->where(function ($q) use ($search) {
+                $q->where('users.name', 'like', '%'.$search.'%')
+                    ->orWhere('users.email', 'like', '%'.$search.'%');
+            });
         }
 
         $students = $studentsQuery->orderBy('name')->get(['users.id', 'users.name', 'users.email']);

@@ -297,6 +297,7 @@ export default function ExamAttempt() {
     const handleSubmit = async ({ exitFirst = false } = {}) => {
         if (isSubmitting) return;
 
+        submitTriggeredRef.current = true;
         setIsSubmitting(true);
         setSubmitError("");
 
@@ -333,6 +334,7 @@ export default function ExamAttempt() {
                     "Gagal mengumpulkan jawaban. Cek koneksi lalu coba lagi."
             );
             setIsSubmitting(false);
+            submitTriggeredRef.current = false;
         }
     };
 

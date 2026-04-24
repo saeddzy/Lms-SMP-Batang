@@ -42,8 +42,9 @@ function StatBlock({ label, hint, value, suffix = "", tone = "slate", icon: Icon
     );
 }
 
-function Panel({ title, children, icon: Icon, tone = "slate" }) {
+function Panel({ title, children, icon: Icon, tone = "dark-blue" }) {
     const toneClass = {
+        "dark-blue": "bg-gradient-to-r from-[#154497] to-[#1460BE]",
         slate: "bg-stone-100/80",
         indigo: "bg-indigo-100/80",
         sky: "bg-sky-100/80",
@@ -52,10 +53,10 @@ function Panel({ title, children, icon: Icon, tone = "slate" }) {
     };
 
     return (
-        <section className="overflow-hidden rounded-2xl border border-stone-300/70 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-            <div className={`border-b border-stone-100 px-6 py-4 ${toneClass[tone] ?? toneClass.slate}`}>
-                <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-stone-900">
-                    {Icon ? <Icon className="h-4 w-4" stroke={1.7} /> : null}
+        <section className="overflow-hidden rounded-2xl border-[rgba(20,96,190,0.25)] bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+            <div className={`border-b border-[rgba(20,96,190,0.3)] px-6 py-4 ${toneClass[tone] ?? toneClass["dark-blue"]}`}>
+                <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-white">
+                    {Icon ? <Icon className="h-4 w-4 text-white" stroke={1.7} /> : null}
                     {title}
                 </h2>
             </div>

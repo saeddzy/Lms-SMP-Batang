@@ -91,7 +91,7 @@ export default function ExamResult() {
 
                 {/* Score Summary */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                    <Card>
+                    <Card darkTheme={false}>
                         <Card.Content>
                             <div className="text-center">
                                 <div className="text-3xl font-bold text-slate-900">
@@ -106,7 +106,7 @@ export default function ExamResult() {
                         </Card.Content>
                     </Card>
 
-                    <Card>
+                    <Card darkTheme={false}>
                         <Card.Content>
                             <div className="text-center">
                                 <div className="text-3xl font-bold text-slate-900">
@@ -117,7 +117,7 @@ export default function ExamResult() {
                         </Card.Content>
                     </Card>
 
-                    <Card>
+                    <Card darkTheme={false}>
                         <Card.Content>
                             <div className="text-center">
                                 <div className="text-3xl font-bold text-slate-900">
@@ -234,7 +234,7 @@ export default function ExamResult() {
 
                 {/* Time Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <Card>
+                    <Card darkTheme={false}>
                         <Card.Content>
                             <div className="flex items-center gap-3">
                                 <IconClock className="w-5 h-5 text-slate-400" />
@@ -248,7 +248,7 @@ export default function ExamResult() {
                         </Card.Content>
                     </Card>
 
-                    <Card>
+                    <Card darkTheme={false}>
                         <Card.Content>
                             <div className="flex items-center gap-3">
                                 <IconClock className="w-5 h-5 text-slate-400" />

@@ -14,9 +14,9 @@ export default function StudentShell({
         <div className={clsx("space-y-8", className)}>
             <div
                 className={clsx(
-                    "relative overflow-hidden rounded-2xl p-8 shadow-xl shadow-indigo-950/10",
-                    "bg-gradient-to-br from-indigo-600 via-violet-600 to-cyan-600",
-                    "ring-1 ring-white/10"
+                    "relative overflow-hidden rounded-2xl p-8 shadow-xl shadow-[rgba(20,96,190,0.3)]",
+                    "bg-gradient-to-br from-[#154497] via-[#1460BE] to-[#1E6FDB]",
+                    "ring-1 ring-[rgba(96,165,250,0.2)]"
                 )}
             >
                 <div
@@ -24,12 +24,12 @@ export default function StudentShell({
                     aria-hidden
                 />
                 <div
-                    className="pointer-events-none absolute -bottom-20 -left-20 h-56 w-56 rounded-full bg-cyan-400/25 blur-2xl"
+                    className="pointer-events-none absolute -bottom-20 -left-20 h-56 w-56 rounded-full bg-[#60A5FA]/25 blur-2xl"
                     aria-hidden
                 />
                 <div className="relative">
                     {eyebrow ? (
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-200">
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#B6D4FF]">
                             {eyebrow}
                         </p>
                     ) : null}
@@ -37,7 +37,7 @@ export default function StudentShell({
                         {title}
                     </h1>
                     {subtitle ? (
-                        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-indigo-100/95">
+                        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#CBD5E1]/95">
                             {subtitle}
                         </p>
                     ) : null}

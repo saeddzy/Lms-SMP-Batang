@@ -113,7 +113,7 @@ export default function Create() {
             <Head title="Buat Kuis Baru" />
 
             <div className="mx-auto max-w-4xl">
-                <Card>
+                <Card darkTheme={false}>
                     <Card.Header>
                         <Card.Title>Buat Kuis Baru</Card.Title>
                         <Card.Description>

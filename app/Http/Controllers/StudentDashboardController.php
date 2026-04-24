@@ -415,9 +415,18 @@ class StudentDashboardController extends Controller
                 return $exam;
             })
         );
-            
+        $summary = [
+            'total_attempts' => ExamAttempt::where('student_id', $user->id)->count(),
+            'passed' => ExamAttempt::where('student_id', $user->id)->where('passed', true)->count(),
+            'avg_score' => round(
+                (float) (ExamAttempt::where('student_id', $user->id)->whereNotNull('score')->avg('score') ?? 0),
+                1
+            ),
+        ];
+
         return Inertia::render('Student/ExamsAvailable', [
             'exams' => $exams,
+            'summary' => $summary,
             'filters' => $request->only(['search']),
         ]);
     }
@@ -487,7 +496,9 @@ class StudentDashboardController extends Controller
             ->count();
 
         // Average grades
-        $averageGrade = FinalGrade::where('student_id', $user->id)->avg('score') ?? 0;
+        $rows = $this->buildUnifiedStudentGradeRows($user);
+        $scores = $rows->pluck('score')->filter(fn ($s) => $s !== null && $s !== '');
+        $averageGrade = $scores->isEmpty() ? 0 : round((float) $scores->avg(), 1);
 
         return [
             'tasks' => [
@@ -886,9 +897,18 @@ class StudentDashboardController extends Controller
                 return $exam;
             })
         );
-            
+        $summary = [
+            'total_attempts' => ExamAttempt::where('student_id', $user->id)->count(),
+            'passed' => ExamAttempt::where('student_id', $user->id)->where('passed', true)->count(),
+            'avg_score' => round(
+                (float) (ExamAttempt::where('student_id', $user->id)->whereNotNull('score')->avg('score') ?? 0),
+                1
+            ),
+        ];
+
         return Inertia::render('Student/ExamsAvailable', [
             'exams' => $exams,
+            'summary' => $summary,
             'filters' => $request->only(['search']),
         ]);
     }

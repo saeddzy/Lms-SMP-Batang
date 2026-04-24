@@ -8,13 +8,15 @@ import Search from "@/Components/Search";
 import { Head, usePage, Link } from "@inertiajs/react";
 import {
     IconTestPipe,
+    IconCircleCheck,
+    IconPercentage,
     IconCalendar,
     IconClock,
     IconSchool,
 } from "@tabler/icons-react";
 
 export default function ExamsAvailable() {
-    const { exams, filters = {} } = usePage().props;
+    const { exams, summary = {}, filters = {} } = usePage().props;
 
     const rows = exams?.data ?? [];
     const total = exams?.total ?? 0;
@@ -27,9 +29,18 @@ export default function ExamsAvailable() {
                     attempt?.attempt_status
                 )
         );
-    const isCompletedExam = (exam) => isCompletedAttempt(getLatestAttempt(exam));
-    const activeExams = rows.filter((exam) => !isCompletedExam(exam));
-    const completedExams = rows.filter((exam) => isCompletedExam(exam));
+
+    const activeExams = rows.filter((exam) => {
+        const attemptsUsed = exam.attempts?.filter(isCompletedAttempt).length || 0;
+        const maxAttempts = exam.max_attempts || 1;
+        const hasUnfinished = exam.attempts?.some((a) => !isCompletedAttempt(a));
+        
+        return attemptsUsed < maxAttempts || hasUnfinished;
+    });
+
+    const completedExams = rows.filter((exam) => 
+        exam.attempts?.some(isCompletedAttempt)
+    );
 
     const examTypeLabel = (type) => {
         const types = {
@@ -71,17 +82,15 @@ export default function ExamsAvailable() {
             return null;
         }
 
-        if (
-            latestAttempt.finished_at ||
-            ["finished", "submitted", "timeout"].includes(
-                latestAttempt.attempt_status
-            )
-        ) {
-            return "selesai_siswa";
-        }
-
-        if (latestAttempt.attempt_status === "in_progress") {
+        if (!isCompletedAttempt(latestAttempt)) {
             return "berlangsung_siswa";
+        }
+        
+        const attemptsUsed = exam.attempts?.filter(isCompletedAttempt).length || 0;
+        const maxAttempts = exam.max_attempts || 1;
+        
+        if (attemptsUsed >= maxAttempts) {
+            return "selesai_siswa";
         }
 
         return null;
@@ -126,6 +135,20 @@ export default function ExamsAvailable() {
                         value={total}
                         hint="Semua kelas"
                         accent="indigo"
+                    />
+                    <StudentStatCard
+                        icon={IconCircleCheck}
+                        label="Lulus"
+                        value={summary.passed ?? 0}
+                        hint="Percobaan memenuhi kelulusan"
+                        accent="emerald"
+                    />
+                    <StudentStatCard
+                        icon={IconPercentage}
+                        label="Rata-rata nilai"
+                        value={`${summary.avg_score ?? 0}%`}
+                        hint="Agregat keseluruhan"
+                        accent="amber"
                     />
                 </div>
 
@@ -402,8 +425,8 @@ export default function ExamsAvailable() {
                     </div>
                 ) : null}
 
-                {exams?.links && (
-                    <div className="border-t border-slate-200 bg-white px-6 py-3">
+                {exams?.last_page > 1 && (
+                    <div className="mt-6 rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm">
                         <Pagination links={exams.links} />
                     </div>
                 )}

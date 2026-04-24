@@ -277,6 +277,9 @@ class ExamAttemptController extends Controller
                         && $ans->points_awarded === null
                 );
 
+            $totalQuestions = $exam->questions()->count();
+            $correctAnswers = $attempt->answers()->where('is_correct', true)->count();
+
             $attempt->update([
                 'attempt_status' => $pendingManualGrading
                     ? 'submitted'
@@ -285,6 +288,8 @@ class ExamAttemptController extends Controller
                 'passed' => $pendingManualGrading
                     ? null
                     : ($totals['percent'] >= $threshold),
+                'total_questions' => $totalQuestions,
+                'total_correct' => $correctAnswers,
             ]);
         });
 
@@ -328,6 +333,12 @@ class ExamAttemptController extends Controller
             'answers.question',
             'student',
         ]);
+
+        if (empty($attempt->total_questions)) {
+            $attempt->total_questions = $exam->questions()->count();
+            $attempt->total_correct = $attempt->answers->where('is_correct', true)->count();
+            $attempt->save();
+        }
 
         return inertia('Exams/Result', [
             'exam' => $exam,

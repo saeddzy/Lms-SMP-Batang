@@ -183,6 +183,10 @@ class ClassController extends Controller
             'teacher',
             'classSubjects.subject.teacher',
             'classSubjects.teacher',
+            'classSubjects.materials',
+            'classSubjects.tasks',
+            'classSubjects.quizzes',
+            'classSubjects.exams',
             'students',
             'enrollments' => function ($q) {
                 $q->where('status', 'active')->with('student');
@@ -215,6 +219,19 @@ class ClassController extends Controller
             $class->setRelation('classSubjects', $filteredSubjects);
             $showTeacherOnlySubjects = true;
         }
+
+        $currentUser = auth()->user();
+        $class->setRelation(
+            'classSubjects',
+            $class->classSubjects->map(function ($classSubject) use ($currentUser) {
+                $classSubject->setAttribute(
+                    'can_manage_learning',
+                    $currentUser->hasRole('admin') || $classSubject->isAssignedSlotTeacher($currentUser)
+                );
+
+                return $classSubject;
+            })->values()
+        );
 
         $gradesAvg = FinalGrade::where('class_id', $class->id)->avg('score');
 
@@ -366,6 +383,18 @@ class ClassController extends Controller
         $studentsToRemove = array_diff($currentStudentIds, $newStudentIds);
 
         foreach ($studentsToAdd as $studentId) {
+            $existingEnrollment = StudentEnrollment::where('class_id', $class->id)
+                ->where('student_id', $studentId)
+                ->first();
+
+            if ($existingEnrollment) {
+                $existingEnrollment->update([
+                    'status' => 'active',
+                    'enrolled_at' => $existingEnrollment->enrolled_at ?? now(),
+                ]);
+                continue;
+            }
+
             StudentEnrollment::create([
                 'student_id' => $studentId,
                 'class_id' => $class->id,

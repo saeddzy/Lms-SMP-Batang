@@ -15,7 +15,6 @@ export default function Create() {
         subject_ids: [],
         student_ids: [],
         academic_year: '',
-        capacity: '',
         description: '',
         is_active: true,
         teacher_id: '',
@@ -121,17 +120,6 @@ export default function Create() {
                             onChange={e => setData('academic_year', e.target.value)}
                             errors={errors.academic_year}
                             placeholder="Contoh: 2024/2025"
-                        />
-                    </div>
-
-                    <div className='mb-4'>
-                        <Input
-                            label={'Kapasitas Siswa'}
-                            type={'number'}
-                            value={data.capacity}
-                            onChange={e => setData('capacity', e.target.value)}
-                            errors={errors.capacity}
-                            placeholder="Contoh: 30"
                         />
                     </div>
 

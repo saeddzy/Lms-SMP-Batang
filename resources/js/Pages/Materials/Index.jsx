@@ -17,22 +17,6 @@ export default function Index() {
     const searchQuery = filters.search ?? "";
     const totalMaterials = materials?.total ?? materials?.data?.length ?? 0;
 
-    const getTypeIcon = (type) => {
-        switch (type) {
-            case "video":
-                return "🎥";
-            case "pdf":
-            case "document":
-                return "📄";
-            case "presentation":
-                return "📊";
-            case "image":
-                return "🖼️";
-            default:
-                return "📁";
-        }
-    };
-
     const getTypeLabel = (type) => {
         switch (type) {
             case "video":
@@ -55,17 +39,18 @@ export default function Index() {
             <Head title="Materi Pembelajaran" />
 
             <div className="space-y-6">
-                <div className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-sm">
-                    <div className="bg-gradient-to-r from-amber-50 via-white to-orange-50 px-6 py-5">
+                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <div className="h-1 w-full bg-gradient-to-r from-[#163d8f] via-[#2453b8] to-[#5b84d9]" />
+                    <div className="px-6 py-5">
                         <h1 className="text-2xl font-bold text-stone-900">
                             Materi pembelajaran
                         </h1>
                         <p className="text-sm text-stone-600">
-                            Kelola materi kelas dalam tampilan ringkas untuk guru.
+                            Daftar materi per kelas dengan tampilan ringkas dan profesional.
                         </p>
                     </div>
                     <div className="grid grid-cols-1 gap-3 border-t border-stone-100 px-6 py-4 sm:grid-cols-3">
-                        <div className="rounded-xl border border-stone-100 bg-stone-50/70 p-3">
+                        <div className="border border-stone-100 bg-stone-50/70 p-3">
                             <p className="text-xs font-semibold uppercase text-stone-500">
                                 Total materi
                             </p>
@@ -73,7 +58,7 @@ export default function Index() {
                                 {totalMaterials}
                             </p>
                         </div>
-                        <div className="rounded-xl border border-stone-100 bg-stone-50/70 p-3">
+                        <div className="border border-stone-100 bg-stone-50/70 p-3">
                             <p className="text-xs font-semibold uppercase text-stone-500">
                                 Fokus halaman
                             </p>
@@ -81,12 +66,12 @@ export default function Index() {
                                 Tipe materi, status aktif, dan pengajar
                             </p>
                         </div>
-                        <div className="rounded-xl border border-stone-100 bg-stone-50/70 p-3">
+                        <div className="border border-stone-100 bg-stone-50/70 p-3">
                             <p className="text-xs font-semibold uppercase text-stone-500">
                                 Tampilan
                             </p>
                             <p className="mt-1 text-sm font-medium text-stone-900">
-                                Card responsif untuk akses cepat
+                                Bersih, modern, dan mudah dipindai
                             </p>
                         </div>
                     </div>
@@ -114,25 +99,17 @@ export default function Index() {
                         {materials.data.map((material) => (
                             <article
                                 key={material.id}
-                                className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm"
+                                className="border border-slate-200 bg-white p-5"
                             >
                                 <div className="flex items-start justify-between gap-3">
-                                    <div className="flex min-w-0 items-start gap-3">
-                                        <span className="text-2xl" aria-hidden>
-                                            {getTypeIcon(
-                                                material.material_type ??
-                                                    material.type
-                                            )}
-                                        </span>
-                                        <div className="min-w-0">
-                                            <h2 className="line-clamp-2 text-base font-semibold text-stone-900">
-                                                {material.title}
-                                            </h2>
-                                            <p className="mt-1 line-clamp-2 text-sm text-stone-600">
-                                                {material.description ||
-                                                    "Tanpa deskripsi"}
-                                            </p>
-                                        </div>
+                                    <div className="min-w-0">
+                                        <h2 className="line-clamp-2 text-base font-semibold text-stone-900">
+                                            {material.title}
+                                        </h2>
+                                        <p className="mt-1 line-clamp-2 text-sm text-stone-600">
+                                            {material.description ||
+                                                "Tanpa deskripsi"}
+                                        </p>
                                     </div>
                                     <span className={badge}>
                                         {getTypeLabel(
@@ -167,7 +144,7 @@ export default function Index() {
                                     </div>
                                 </dl>
 
-                                <div className="mt-4 rounded-lg border border-stone-100 bg-stone-50 px-3 py-2 text-xs text-stone-600">
+                                <div className="mt-4 border border-stone-100 bg-stone-50 px-3 py-2 text-xs text-stone-600">
                                     <p>
                                         Dibuat{" "}
                                         {material.created_at
@@ -234,7 +211,7 @@ export default function Index() {
                         ))}
                     </div>
                 ) : (
-                    <div className="rounded-2xl border border-dashed border-stone-200 bg-stone-50/60 p-10 text-center text-sm text-stone-500">
+                    <div className="border border-dashed border-stone-200 bg-stone-50/60 p-10 text-center text-sm text-stone-500">
                         {searchQuery
                             ? "Tidak ada materi yang cocok dengan pencarian."
                             : "Belum ada materi pembelajaran."}
@@ -242,7 +219,7 @@ export default function Index() {
                 )}
 
                 {materials?.last_page > 1 && (
-                    <div className="rounded-2xl border border-stone-200/90 bg-white p-3">
+                    <div className="border border-stone-200/90 bg-white p-3">
                         <Pagination links={materials.links} />
                     </div>
                 )}

@@ -16,7 +16,6 @@ export default function Edit() {
         subject_ids: schoolClass.subjects ? schoolClass.subjects.map(subject => subject.id) : [],
         student_ids: schoolClass.students ? schoolClass.students.map(student => student.id) : [],
         academic_year: schoolClass.academic_year || '',
-        capacity: schoolClass.capacity || '',
         description: schoolClass.description || '',
         is_active: schoolClass.is_active || false,
     });
@@ -128,18 +127,6 @@ export default function Edit() {
                                         placeholder="Cari dan pilih siswa untuk kelas ini"
                                     />
                                     <Input.Error message={errors.student_ids} />
-                                </div>
-
-                                <div>
-                                    <Input.Label htmlFor="capacity" value="Kapasitas (Opsional)" />
-                                    <Input.Number
-                                        id="capacity"
-                                        value={data.capacity}
-                                        onChange={(e) => setData('capacity', e.target.value)}
-                                        placeholder="Masukkan kapasitas kelas"
-                                        min="1"
-                                    />
-                                    <Input.Error message={errors.capacity} />
                                 </div>
 
                                 <div>

@@ -7,13 +7,6 @@ import hasAnyPermission from "@/Utils/Permissions";
 import { hasRole } from "@/Utils/Permissions";
 import { materialClassName } from "@/Utils/materialClassName";
 
-function typeIcon(material) {
-    const t = material.material_type ?? material.type;
-    if (t === "video") return "🎥";
-    if (t === "pdf") return "📄";
-    return "📁";
-}
-
 function typeLabel(material) {
     if (material.type_label) return material.type_label;
     const t = material.material_type ?? material.type;
@@ -120,153 +113,151 @@ export default function Show() {
     };
 
     const mainCard = (
-            <div className="space-y-6">
-                <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
-                    <div className="border-b border-stone-200 p-6">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                            <div className="flex min-w-0 items-start gap-3">
-                                <span className="text-3xl" aria-hidden>
-                                    {typeIcon(material)}
-                                </span>
-                                <div className="min-w-0">
-                                    <h2 className="text-2xl font-semibold text-stone-900">
-                                        {material.title}
-                                    </h2>
-                                    <p className="mt-1 text-sm text-stone-600">
-                                        {typeLabel(material)}
-                                        {material.subject?.name
-                                            ? ` • ${material.subject.name}`
-                                            : ""}
-                                        {classLabel ? ` • ${classLabel}` : ""}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {fileUrl && (
-                                    <>
-                                        <a
-                                            href={fileUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center justify-center rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-800 shadow-sm hover:bg-stone-50"
-                                        >
-                                            Pratinjau
-                                        </a>
-                                        <a
-                                            href={downloadUrl || fileUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center justify-center rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-800 shadow-sm hover:bg-stone-50"
-                                        >
-                                            {isRemote ? "Buka / unduh tautan" : "Unduh"}
-                                        </a>
-                                    </>
-                                )}
-                                {canManageMaterial && hasAnyPermission(["materials edit"]) && (
-                                    <Button
-                                        type="edit"
-                                        url={route("materials.edit", material.id)}
-                                    />
-                                )}
-                                {canManageMaterial && hasAnyPermission(["materials delete"]) && (
-                                    <Button
-                                        type="delete"
-                                        url={route("materials.destroy", material.id)}
-                                    />
-                                )}
-                            </div>
+        <div className="mx-auto max-w-6xl space-y-4">
+            <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                <div className="h-1 w-full bg-gradient-to-r from-[#163d8f] via-[#2453b8] to-[#5b84d9]" />
+                <div className="border-b border-slate-200 bg-slate-50/70 px-6 py-5">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                Detail Materi
+                            </p>
+                            <h2 className="mt-1 text-2xl font-semibold text-slate-900">
+                                {material.title}
+                            </h2>
+                            <p className="mt-1 text-sm text-slate-600">
+                                {typeLabel(material)}
+                                {material.subject?.name ? ` • ${material.subject.name}` : ""}
+                                {classLabel ? ` • ${classLabel}` : ""}
+                            </p>
                         </div>
 
-                        <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-                            <div>
-                                <span className="text-xs font-medium uppercase tracking-wide text-stone-500">
-                                    Mata pelajaran
-                                </span>
-                                <p className="mt-1 text-sm text-stone-900">
-                                    {material.subject?.name || "—"}
-                                </p>
-                            </div>
-                            <div>
-                                <span className="text-xs font-medium uppercase tracking-wide text-stone-500">
-                                    Kelas
-                                </span>
-                                <p className="mt-1 text-sm text-stone-900">
-                                    {classLabel || "—"}
-                                </p>
-                            </div>
-                            <div>
-                                <span className="text-xs font-medium uppercase tracking-wide text-stone-500">
-                                    Tipe / MIME
-                                </span>
-                                <p className="mt-1">
-                                    <span className="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-medium text-stone-800 ring-1 ring-stone-200/80">
-                                        {mimeLabel(material)}
-                                    </span>
-                                </p>
-                            </div>
-                            <div>
-                                <span className="text-xs font-medium uppercase tracking-wide text-stone-500">
-                                    Status
-                                </span>
-                                <p className="mt-1">
-                                    <span
-                                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${
-                                            material.is_active
-                                                ? "bg-emerald-50 text-emerald-800 ring-emerald-200/80"
-                                                : "bg-amber-50 text-amber-900 ring-amber-200/80"
-                                        }`}
+                        <div className="flex flex-wrap gap-2">
+                            {fileUrl && (
+                                <>
+                                    <a
+                                        href={fileUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                                     >
-                                        {material.is_active ? "Aktif" : "Tidak aktif"}
-                                    </span>
-                                </p>
-                            </div>
-                            <div>
-                                <span className="text-xs font-medium uppercase tracking-wide text-stone-500">
-                                    Diunggah oleh
-                                </span>
-                                <p className="mt-1 text-sm text-stone-900">
-                                    {material.uploader?.name || "—"}
-                                </p>
-                            </div>
-                            <div className="md:col-span-2">
-                                <span className="text-xs font-medium uppercase tracking-wide text-stone-500">
-                                    Deskripsi
-                                </span>
-                                <p className="mt-1 text-sm text-stone-800">
-                                    {material.description?.trim()
-                                        ? material.description
-                                        : "Tidak ada deskripsi"}
-                                </p>
-                            </div>
-                            <div>
-                                <span className="text-xs font-medium uppercase tracking-wide text-stone-500">
-                                    Nama berkas
-                                </span>
-                                <p className="mt-1 text-sm text-stone-900 break-all">
-                                    {material.file_name || "—"}
-                                </p>
-                            </div>
-                            <div>
-                                <span className="text-xs font-medium uppercase tracking-wide text-stone-500">
-                                    Diperbarui
-                                </span>
-                                <p className="mt-1 text-sm text-stone-900">
-                                    {new Date(material.updated_at).toLocaleString(
-                                        "id-ID"
-                                    )}
-                                </p>
-                            </div>
+                                        Pratinjau
+                                    </a>
+                                    <a
+                                        href={downloadUrl || fileUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                                    >
+                                        {isRemote ? "Buka Tautan" : "Unduh"}
+                                    </a>
+                                </>
+                            )}
+                            {canManageMaterial && hasAnyPermission(["materials edit"]) && (
+                                <Button
+                                    type="edit"
+                                    url={route("materials.edit", material.id)}
+                                />
+                            )}
+                            {canManageMaterial && hasAnyPermission(["materials delete"]) && (
+                                <Button
+                                    type="delete"
+                                    url={route("materials.destroy", material.id)}
+                                />
+                            )}
                         </div>
-                    </div>
-
-                    <div className="p-6">
-                        <h3 className="text-sm font-semibold text-stone-900">
-                            Pratinjau materi
-                        </h3>
-                        <div className="mt-3">{renderPreview()}</div>
                     </div>
                 </div>
-            </div>
+
+                <div className="grid grid-cols-1 gap-x-8 gap-y-5 px-6 py-5 md:grid-cols-2 xl:grid-cols-4">
+                    <div>
+                        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                            Mata pelajaran
+                        </span>
+                        <p className="mt-1 text-sm text-slate-900">
+                            {material.subject?.name || "—"}
+                        </p>
+                    </div>
+                    <div>
+                        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                            Kelas
+                        </span>
+                        <p className="mt-1 text-sm text-slate-900">
+                            {classLabel || "—"}
+                        </p>
+                    </div>
+                    <div>
+                        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                            Tipe / MIME
+                        </span>
+                        <p className="mt-1">
+                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 ring-1 ring-slate-200/80">
+                                {mimeLabel(material)}
+                            </span>
+                        </p>
+                    </div>
+                    <div>
+                        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                            Status
+                        </span>
+                        <p className="mt-1">
+                            <span
+                                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${
+                                    material.is_active
+                                        ? "bg-emerald-50 text-emerald-800 ring-emerald-200/80"
+                                        : "bg-amber-50 text-amber-900 ring-amber-200/80"
+                                }`}
+                            >
+                                {material.is_active ? "Aktif" : "Tidak aktif"}
+                            </span>
+                        </p>
+                    </div>
+                    <div>
+                        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                            Diunggah oleh
+                        </span>
+                        <p className="mt-1 text-sm text-slate-900">
+                            {material.uploader?.name || "—"}
+                        </p>
+                    </div>
+                    <div className="md:col-span-2">
+                        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                            Deskripsi
+                        </span>
+                        <p className="mt-1 text-sm text-slate-800">
+                            {material.description?.trim()
+                                ? material.description
+                                : "Tidak ada deskripsi"}
+                        </p>
+                    </div>
+                    <div>
+                        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                            Nama berkas
+                        </span>
+                        <p className="mt-1 break-all text-sm text-slate-900">
+                            {material.file_name || "—"}
+                        </p>
+                    </div>
+                    <div>
+                        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                            Diperbarui
+                        </span>
+                        <p className="mt-1 text-sm text-slate-900">
+                            {new Date(material.updated_at).toLocaleString("id-ID")}
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                <div className="border-b border-slate-200 bg-slate-50/70 px-6 py-4">
+                    <h3 className="text-sm font-semibold text-slate-900">
+                        Pratinjau materi
+                    </h3>
+                </div>
+                <div className="px-6 py-5">{renderPreview()}</div>
+            </section>
+        </div>
     );
 
     return (
@@ -287,7 +278,7 @@ export default function Show() {
                         href={route("materials.index")}
                         className="inline-flex text-sm font-medium text-indigo-600 hover:text-indigo-800"
                     >
-                        ← Kembali ke daftar materi
+                        Kembali ke daftar materi
                     </Link>
                     {mainCard}
                 </StudentShell>

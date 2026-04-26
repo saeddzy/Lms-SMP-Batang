@@ -184,6 +184,7 @@ class QuizController extends Controller
             'classes' => $classes,
             'selectedClassId' => $selectedClassId,
             'selectedSubjectId' => $selectedSubjectId,
+            'classSubjectsMap' => $this->buildClassSubjectsMap($classes),
         ]);
     }
 
@@ -322,7 +323,34 @@ class QuizController extends Controller
             'quiz' => $quizPayload,
             'subjects' => $subjects,
             'classes' => $classes,
+            'classSubjectsMap' => $this->buildClassSubjectsMap($classes),
         ]);
+    }
+
+    private function buildClassSubjectsMap($classes): array
+    {
+        $classIds = collect($classes)->pluck('id')->filter()->values();
+        if ($classIds->isEmpty()) {
+            return [];
+        }
+
+        return ClassSubject::query()
+            ->with('subject:id,name,is_active')
+            ->whereIn('class_id', $classIds)
+            ->where('is_active', true)
+            ->get(['id', 'class_id', 'subject_id'])
+            ->groupBy('class_id')
+            ->map(function ($rows) {
+                return $rows
+                    ->map(fn ($row) => [
+                        'id' => $row->subject_id,
+                        'name' => $row->subject?->name,
+                    ])
+                    ->filter(fn ($subject) => !empty($subject['id']) && !empty($subject['name']))
+                    ->values()
+                    ->all();
+            })
+            ->toArray();
     }
 
     /**
@@ -701,9 +729,40 @@ class QuizController extends Controller
         $this->assertQuizPointsBudget($quiz, (float) $data['points']);
         $order = (int) ($quiz->questions()->max('order') ?? 0) + 1;
         $quiz->questions()->create(array_merge($data, ['order' => $order]));
-        $quiz->update(['total_questions' => $quiz->questions()->count()]);
 
         return back()->with('success', 'Soal berhasil ditambahkan.');
+    }
+
+    /**
+     * Tambah banyak soal kuis sekaligus (wizard berurutan).
+     */
+    public function storeQuestionsBatch(Request $request, Quiz $quiz)
+    {
+        Gate::authorize('update', $quiz);
+
+        $validated = $request->validate([
+            'questions' => ['required', 'array', 'min:1'],
+            'questions.*.question_text' => ['required', 'string'],
+            'questions.*.question_type' => ['required', 'in:multiple_choice,true_false,short_answer,essay'],
+            'questions.*.options' => ['nullable', 'array'],
+            'questions.*.options.*' => ['nullable', 'string'],
+            'questions.*.correct_answer' => ['nullable', 'string', 'max:10000'],
+            'questions.*.points' => ['nullable', 'numeric', 'min:0', 'max:1000'],
+            'questions.*.explanation' => ['nullable', 'string'],
+        ]);
+
+        $nextOrder = (int) ($quiz->questions()->max('order') ?? 0) + 1;
+
+        foreach ($validated['questions'] as $row) {
+            $itemRequest = new Request($row);
+            $data = $this->prepareQuizQuestionData($itemRequest);
+            $this->assertQuizPointsBudget($quiz, (float) $data['points']);
+            $quiz->questions()->create(array_merge($data, ['order' => $nextOrder]));
+            $nextOrder++;
+            $quiz->refresh();
+        }
+
+        return back()->with('success', 'Semua soal berhasil disimpan.');
     }
 
     /**
@@ -723,7 +782,6 @@ class QuizController extends Controller
             $data['order'] = (int) $request->input('order');
         }
         $question->update($data);
-        $quiz->update(['total_questions' => $quiz->questions()->count()]);
 
         return back()->with('success', 'Soal berhasil diperbarui.');
     }
@@ -740,7 +798,6 @@ class QuizController extends Controller
         }
 
         $question->delete();
-        $quiz->update(['total_questions' => $quiz->questions()->count()]);
 
         return back()->with('success', 'Soal berhasil dihapus.');
     }

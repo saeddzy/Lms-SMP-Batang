@@ -2,7 +2,7 @@ import clsx from "clsx";
 
 const lightBlueAccents = {
     primary: "border-sky-300/80 bg-sky-100/80",
-    secondary: "border-cyan-300/80 bg-cyan-100/80", 
+    secondary: "border-cyan-300/80 bg-cyan-100/80",
     accent: "border-blue-300/80 bg-blue-100/80",
     ocean: "border-indigo-300/80 bg-indigo-100/80",
     sky: "border-teal-300/80 bg-teal-100/80",

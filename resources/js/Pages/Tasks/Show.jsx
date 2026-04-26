@@ -72,7 +72,7 @@ export default function Show() {
 
     const MetaGrid = () => (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
+            <div className="rounded-md border border-slate-200 bg-slate-50/80 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Mata pelajaran
                 </p>
@@ -80,7 +80,7 @@ export default function Show() {
                     {task.subject?.name ?? "—"}
                 </p>
             </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
+            <div className="rounded-md border border-slate-200 bg-slate-50/80 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Kelas
                 </p>
@@ -88,13 +88,13 @@ export default function Show() {
                     {sc?.name ?? "—"}
                 </p>
             </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
+            <div className="rounded-md border border-slate-200 bg-slate-50/80 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Guru
                 </p>
                 <p className="mt-1 font-medium text-slate-900">{teacherName}</p>
             </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
+            <div className="rounded-md border border-slate-200 bg-slate-50/80 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Nilai maks.
                 </p>
@@ -102,7 +102,7 @@ export default function Show() {
                     {task.max_score ?? "—"} poin
                 </p>
             </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 sm:col-span-2">
+            <div className="rounded-md border border-slate-200 bg-slate-50/80 p-4 sm:col-span-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Deadline
                 </p>
@@ -117,7 +117,7 @@ export default function Show() {
                     </span>
                 ) : null}
             </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
+            <div className="rounded-md border border-slate-200 bg-slate-50/80 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Status tugas
                 </p>
@@ -136,7 +136,7 @@ export default function Show() {
 
     const body = (
         <>
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm">
+            <div className="rounded-lg border border-slate-200 bg-white p-6">
                 <h3 className="text-sm font-semibold text-slate-900">
                     Deskripsi
                 </h3>
@@ -146,7 +146,7 @@ export default function Show() {
                         : "Tidak ada deskripsi."}
                 </p>
                 {task.instructions?.trim() ? (
-                    <div className="mt-6 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+                    <div className="mt-6 rounded-md border border-indigo-100 bg-indigo-50/50 p-4">
                         <h4 className="text-sm font-semibold text-indigo-950">
                             Instruksi
                         </h4>
@@ -158,7 +158,7 @@ export default function Show() {
             </div>
 
             {isStudent && (
-                <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm">
+                <div className="rounded-lg border border-slate-200 bg-white p-6">
                     <h3 className="text-lg font-semibold text-slate-900">
                         Pengumpulan saya
                     </h3>
@@ -173,7 +173,7 @@ export default function Show() {
                                 </strong>
                             </p>
                             {mySubmission.content ? (
-                                <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                                <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
                                     <p className="text-xs font-semibold uppercase text-slate-500">
                                         Teks
                                     </p>
@@ -205,7 +205,7 @@ export default function Show() {
                                 </a>
                             ) : null}
                             {mySubmission.score != null ? (
-                                <div className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-900 px-4 py-3 text-white">
+                                <div className="flex flex-wrap items-center gap-3 rounded-md bg-slate-900 px-4 py-3 text-white">
                                     <span className="text-sm opacity-90">
                                         Nilai
                                     </span>
@@ -222,7 +222,7 @@ export default function Show() {
                                 </p>
                             )}
                             {mySubmission.feedback ? (
-                                <div className="rounded-xl border border-amber-100 bg-amber-50/80 p-4 text-amber-950">
+                                <div className="rounded-md border border-amber-100 bg-amber-50/80 p-4 text-amber-950">
                                     <p className="text-xs font-semibold uppercase">
                                         Feedback guru
                                     </p>
@@ -240,7 +240,7 @@ export default function Show() {
                     <div className="mt-6 flex flex-wrap gap-3">
                         <Link
                             href={route("student.tasks")}
-                            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                            className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
                         >
                             <IconArrowLeft
                                 className="h-4 w-4"
@@ -256,7 +256,7 @@ export default function Show() {
                                         route("tasks.submit-page", task.id)
                                     )
                                 }
-                                className="inline-flex items-center rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20"
+                                className="inline-flex items-center rounded-md bg-[#163d8f] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f2e6f]"
                             >
                                 {mySubmission ? "Ubah pengumpulan" : "Kumpulkan tugas"}
                             </button>
@@ -309,7 +309,7 @@ export default function Show() {
                         {hasAnyPermission(["tasks grade"]) && (
                             <Link
                                 href={route("teacher.grade-task", task.id)}
-                                className="inline-flex rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
+                                className="inline-flex rounded-md bg-[#163d8f] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f2e6f]"
                             >
                                 Buka halaman penilaian
                             </Link>
@@ -403,11 +403,15 @@ export default function Show() {
                 </StudentShell>
             ) : (
                 <div className="space-y-6">
-                    <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm">
-                        <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-6 py-5">
+                    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                        <div className="h-1 w-full bg-gradient-to-r from-[#163d8f] via-[#2453b8] to-[#5b84d9]" />
+                        <div className="border-b border-slate-200 bg-slate-50/70 px-6 py-5">
                             <div className="flex flex-wrap items-start justify-between gap-4">
                                 <div>
-                                    <h1 className="text-2xl font-bold text-slate-900">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                        Detail tugas
+                                    </p>
+                                    <h1 className="mt-1 text-2xl font-semibold text-slate-900">
                                         {task.title}
                                     </h1>
                                     <p className="mt-1 text-sm text-slate-600">
@@ -417,28 +421,24 @@ export default function Show() {
                                 </div>
                                 <div className="flex w-full flex-col gap-4 sm:w-auto sm:min-w-[280px]">
                                     <div className="flex flex-wrap gap-2">
+                                        <Link
+                                            href={route("tasks.index")}
+                                            className="inline-flex items-center rounded-md bg-[#163d8f] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0f2e6f]"
+                                        >
+                                            Kembali
+                                        </Link>
                                         {canManageTask &&
-                                            hasAnyPermission([
-                                                "tasks edit",
-                                            ]) && (
+                                            hasAnyPermission(["tasks edit"]) && (
                                                 <Button
                                                     type="edit"
-                                                    url={route(
-                                                        "tasks.edit",
-                                                        task.id
-                                                    )}
+                                                    url={route("tasks.edit", task.id)}
                                                 />
                                             )}
                                         {canManageTask &&
-                                            hasAnyPermission([
-                                                "tasks delete",
-                                            ]) && (
+                                            hasAnyPermission(["tasks delete"]) && (
                                                 <Button
                                                     type="delete"
-                                                    url={route(
-                                                        "tasks.destroy",
-                                                        task.id
-                                                    )}
+                                                    url={route("tasks.destroy", task.id)}
                                                 />
                                             )}
                                     </div>

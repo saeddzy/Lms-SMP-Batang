@@ -13,9 +13,6 @@ import {
     IconCircleCheck,
     IconClock,
     IconPercentage,
-    IconCalendarTime,
-    IconSettings,
-    IconListCheck,
 } from "@tabler/icons-react";
 import QuestionBank from "@/Components/Lms/QuestionBank";
 
@@ -108,78 +105,60 @@ export default function Show() {
         router.post(route("quizzes.start-attempt", quiz.id));
     };
 
+    const metaItems = [
+        { label: "Mapel", value: quiz.subject?.name ?? "—" },
+        { label: "Kelas", value: sc?.name ?? "—" },
+        {
+            label: "Waktu pengerjaan",
+            value: quiz.time_limit ? `${quiz.time_limit} menit` : "—",
+        },
+        {
+            label: "Soal / lulus",
+            value: `${quiz.questions?.length ?? quiz.total_questions ?? 0} soal · lulus ≥ ${quiz.passing_score ?? "—"}%`,
+        },
+        {
+            label: "Periode pengerjaan",
+            value: `${quiz.start_time ? formatStudentDateTime(quiz.start_time) : "—"} — ${
+                quiz.end_time ? formatStudentDateTime(quiz.end_time) : "—"
+            }`,
+        },
+        { label: "Percobaan maks.", value: quiz.max_attempts ?? "—" },
+        { label: "Acak soal", value: quiz.is_randomized ? "Ya" : "Tidak" },
+        { label: "Status kuis", value: quiz.is_active ? "Aktif" : "Nonaktif" },
+    ];
+
     const metaBlock = (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
-                <p className="text-xs font-semibold uppercase text-slate-500">
-                    Mapel
-                </p>
-                <p className="mt-1 font-medium text-slate-900">
-                    {quiz.subject?.name ?? "—"}
+        <div className="rounded-md border border-slate-200 bg-white">
+            <div className="border-b border-slate-200 px-4 py-2.5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Informasi Kuis
                 </p>
             </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
-                <p className="text-xs font-semibold uppercase text-slate-500">
-                    Kelas
-                </p>
-                <p className="mt-1 font-medium text-slate-900">
-                    {sc?.name ?? "—"}
-                </p>
-            </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
-                <p className="text-xs font-semibold uppercase text-slate-500">
-                    Waktu pengerjaan
-                </p>
-                <p className="mt-1 font-medium text-slate-900">
-                    {quiz.time_limit ? `${quiz.time_limit} menit` : "—"}
-                </p>
-            </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
-                <p className="text-xs font-semibold uppercase text-slate-500">
-                    Soal / lulus
-                </p>
-                <p className="mt-1 font-medium text-slate-900">
-                    {quiz.questions?.length ?? quiz.total_questions ?? 0} soal ·
-                    lulus ≥ {quiz.passing_score ?? "—"}%
-                </p>
-            </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 sm:col-span-2">
-                <p className="text-xs font-semibold uppercase text-slate-500">
-                    Jendela kuis
-                </p>
-                <p className="mt-1 text-sm text-slate-800">
-                    {quiz.start_time
-                        ? formatStudentDateTime(quiz.start_time)
-                        : "—"}{" "}
-                    —{" "}
-                    {quiz.end_time
-                        ? formatStudentDateTime(quiz.end_time)
-                        : "—"}
-                </p>
-            </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
-                <p className="text-xs font-semibold uppercase text-slate-500">
-                    Percobaan maks.
-                </p>
-                <p className="mt-1 font-medium text-slate-900">
-                    {quiz.max_attempts ?? "—"}
-                </p>
-            </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
-                <p className="text-xs font-semibold uppercase text-slate-500">
-                    Acak soal
-                </p>
-                <p className="mt-1 font-medium text-slate-900">
-                    {quiz.is_randomized ? "Ya" : "Tidak"}
-                </p>
-            </div>
+            <dl className="grid grid-cols-1 divide-y divide-slate-100 md:grid-cols-2 md:divide-y-0 md:divide-x">
+                {metaItems.map((item) => (
+                    <div
+                        key={item.label}
+                        className="grid grid-cols-1 gap-1 px-4 py-2.5 sm:grid-cols-[130px,1fr] sm:items-start"
+                    >
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            {item.label}
+                        </dt>
+                        <dd className="text-sm font-medium leading-snug text-slate-900">{item.value}</dd>
+                    </div>
+                ))}
+            </dl>
         </div>
     );
 
     const attemptsTable = (
-        <Table.Card title={`Percobaan (${attempts.length})`}>
-            <Table>
-                <Table.Thead>
+        <section id="percobaan-kuis">
+            <Table.Card
+                title={`Percobaan (${attempts.length})`}
+                className="rounded-md border-slate-200 shadow-none"
+            >
+                <div className="max-h-[380px] overflow-auto">
+                    <Table>
+                        <Table.Thead className="sticky top-0 z-10 bg-slate-50/95">
                     <tr>
                         <Table.Th>#</Table.Th>
                         {!isStudent && <Table.Th>Siswa</Table.Th>}
@@ -192,41 +171,41 @@ export default function Show() {
                             <Table.Th>Aksi</Table.Th>
                         )}
                     </tr>
-                </Table.Thead>
-                <Table.Tbody>
+                    </Table.Thead>
+                    <Table.Tbody>
                     {attempts.length > 0 ? (
                         attempts.map((att, i) => {
                             const st = attemptProgressBadge(att);
                             return (
                                 <tr key={att.id}>
-                                    <Table.Td>{i + 1}</Table.Td>
+                                    <Table.Td className="px-4 py-2.5">{i + 1}</Table.Td>
                                     {!isStudent && (
-                                        <Table.Td>
+                                        <Table.Td className="px-4 py-2.5">
                                             {att.student?.name ?? "—"}
                                         </Table.Td>
                                     )}
-                                    <Table.Td>
+                                    <Table.Td className="px-4 py-2.5">
                                         <span
                                             className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${st.className}`}
                                         >
                                             {st.text}
                                         </span>
                                     </Table.Td>
-                                    <Table.Td className="text-sm">
+                                    <Table.Td className="px-4 py-2.5 text-sm">
                                         {att.started_at
                                             ? formatStudentDateTime(
                                                   att.started_at
                                               )
                                             : "—"}
                                     </Table.Td>
-                                    <Table.Td className="text-sm">
+                                    <Table.Td className="px-4 py-2.5 text-sm">
                                         {att.finished_at
                                             ? formatStudentDateTime(
                                                   att.finished_at
                                               )
                                             : "—"}
                                     </Table.Td>
-                                    <Table.Td>
+                                    <Table.Td className="px-4 py-2.5">
                                         {att.attempt_status ===
                                         "menunggu_penilaian"
                                             ? "Menunggu"
@@ -234,7 +213,7 @@ export default function Show() {
                                               ? `${att.score}%`
                                               : "—"}
                                     </Table.Td>
-                                    <Table.Td>
+                                    <Table.Td className="px-4 py-2.5">
                                         {att.passed === true ? (
                                             <span className="text-emerald-700">
                                                 Ya
@@ -251,7 +230,7 @@ export default function Show() {
                                         hasAnyPermission([
                                             "quizzes grade",
                                         ]) && (
-                                            <Table.Td>
+                                            <Table.Td className="px-4 py-2.5">
                                                 {att.finished_at ? (
                                                     <div className="flex flex-wrap gap-2">
                                                         <Button
@@ -307,14 +286,16 @@ export default function Show() {
                             </Table.Td>
                         </tr>
                     )}
-                </Table.Tbody>
-            </Table>
-        </Table.Card>
+                        </Table.Tbody>
+                    </Table>
+                </div>
+            </Table.Card>
+        </section>
     );
 
     const statsRow =
         !isStudent && hasAnyPermission(["quizzes view_results"]) ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <StudentStatCard
                     icon={IconUsers}
                     label="Siswa kelas"
@@ -350,44 +331,11 @@ export default function Show() {
             </div>
         ) : null;
 
-    const teacherActionPanel =
-        !isStudent ? (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-4">
-                    <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase text-indigo-700">
-                        <IconSettings size={15} />
-                        Pengaturan
-                    </p>
-                    <p className="mt-1 text-sm text-indigo-950">
-                        Edit jadwal, durasi, passing score, dan konfigurasi kuis.
-                    </p>
-                </div>
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
-                    <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase text-emerald-700">
-                        <IconListCheck size={15} />
-                        Penilaian
-                    </p>
-                    <p className="mt-1 text-sm text-emerald-950">
-                        Pantau hasil percobaan dan lakukan penilaian esai bila perlu.
-                    </p>
-                </div>
-                <div className="rounded-xl border border-sky-100 bg-sky-50/70 p-4">
-                    <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase text-sky-700">
-                        <IconCalendarTime size={15} />
-                        Jadwal aktif
-                    </p>
-                    <p className="mt-1 text-sm text-sky-950">
-                        Pastikan jendela mulai-selesai sesuai waktu kelas berlangsung.
-                    </p>
-                </div>
-            </div>
-        ) : null;
-
     const inner = (
         <>
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm">
+            <section id="ringkasan-kuis" className="rounded-md border border-slate-200 bg-white p-4 md:p-5">
                 <div
-                    className={`rounded-xl border p-4 text-sm ${
+                    className={`rounded-md border p-4 text-sm ${
                         window === "buka"
                             ? "border-emerald-200 bg-emerald-50/80 text-emerald-950"
                             : window === "belum_mulai"
@@ -443,9 +391,9 @@ export default function Show() {
                             </p>
                         )}
                 </div>
-                {metaBlock}
+                <div className="mt-4">{metaBlock}</div>
                 {quiz.description ? (
-                    <div className="mt-6">
+                    <div className="mt-5 border-t border-slate-100 pt-5">
                         <h3 className="text-sm font-semibold text-slate-900">
                             Deskripsi
                         </h3>
@@ -455,7 +403,7 @@ export default function Show() {
                     </div>
                 ) : null}
                 {quiz.instructions ? (
-                    <div className="mt-6 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+                    <div className="mt-5 rounded-md border border-indigo-100 bg-indigo-50/50 p-4">
                         <h3 className="text-sm font-semibold text-indigo-950">
                             Instruksi
                         </h3>
@@ -464,11 +412,9 @@ export default function Show() {
                         </p>
                     </div>
                 ) : null}
-            </div>
+            </section>
 
             {statsRow}
-
-            {teacherActionPanel}
 
             {isStudent && quiz.is_active && (
                 <div className="flex flex-wrap gap-3">
@@ -476,7 +422,7 @@ export default function Show() {
                         <button
                             type="button"
                             onClick={startOrContinue}
-                            className="inline-flex items-center rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25"
+                            className="inline-flex items-center rounded-md bg-[#163d8f] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f2e6f]"
                         >
                             {unfinished
                                 ? "Lanjutkan pengerjaan"
@@ -486,52 +432,25 @@ export default function Show() {
                     <button
                         type="button"
                         onClick={() => router.visit(route("student.quizzes"))}
-                        className="inline-flex rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                        className="inline-flex rounded-md border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
                     >
                         Kembali ke daftar kuis
                     </button>
                 </div>
             )}
 
-            {!isStudent && (
-                <div className="space-y-4">
-                    <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm">
-                        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Aksi guru
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                            {canManageQuiz &&
-                                hasAnyPermission(["quizzes edit"]) && (
-                                    <Button
-                                        type="edit"
-                                        url={route("quizzes.edit", quiz.id)}
-                                    />
-                                )}
-                            {canManageQuiz &&
-                                hasAnyPermission(["quizzes delete"]) && (
-                                    <Button
-                                        type="delete"
-                                        url={route(
-                                            "quizzes.destroy",
-                                            quiz.id
-                                        )}
-                                    />
-                                )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {attemptsTable}
 
             {!isStudent && (
-                <QuestionBank
-                    mode="quiz"
-                    entityId={quiz.id}
-                    questions={quiz.questions ?? []}
-                    canManage={canManageQuiz && hasAnyPermission(["quizzes edit"])}
-                    entityLabel="kuis"
-                />
+                <section id="kelola-soal" className="scroll-mt-24">
+                    <QuestionBank
+                        mode="quiz"
+                        entityId={quiz.id}
+                        questions={quiz.questions ?? []}
+                        canManage={canManageQuiz && hasAnyPermission(["quizzes edit"])}
+                        entityLabel="kuis"
+                    />
+                </section>
             )}
         </>
     );
@@ -546,7 +465,7 @@ export default function Show() {
                     title={quiz.title}
                     subtitle={`${quiz.subject?.name ?? "Mapel"} · ${sc?.name ?? "Kelas"}`}
                 >
-                    <div className="flex items-start gap-3 rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm">
+                    <div className="flex items-start gap-3 rounded-md border border-indigo-100 bg-white p-4">
                         <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
                             <IconBrain className="h-7 w-7" stroke={1.25} />
                         </span>
@@ -562,42 +481,72 @@ export default function Show() {
                     {inner}
                 </StudentShell>
             ) : (
-                <div className="space-y-6">
-                    <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm">
-                        <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-6 py-5">
-                            <h1 className="text-2xl font-bold text-slate-900">
-                                {quiz.title}
-                            </h1>
-                            <p className="mt-1 text-sm text-slate-600">
-                                {sc?.name ?? "—"} ·{" "}
-                                {quiz.subject?.name ?? "—"}
-                            </p>
+                <div className="mx-auto max-w-6xl space-y-4">
+                    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                        <div className="h-1 w-full bg-gradient-to-r from-[#163d8f] via-[#2453b8] to-[#5b84d9]" />
+                        <div className="px-5 py-4">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                        Detail kuis
+                                    </p>
+                                    <h1 className="mt-1 text-xl font-semibold text-slate-900">
+                                        {quiz.title}
+                                    </h1>
+                                    <p className="mt-1 text-sm text-slate-600">
+                                        {sc?.name ?? "—"} ·{" "}
+                                        {quiz.subject?.name ?? "—"}
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Link
+                                        href={route("quizzes.index")}
+                                        className="inline-flex items-center rounded-md bg-[#163d8f] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0f2e6f]"
+                                    >
+                                        Kembali ke daftar kuis
+                                    </Link>
+                                    {canManageQuiz &&
+                                        hasAnyPermission(["quizzes edit"]) && (
+                                            <Button
+                                                type="edit"
+                                                url={route("quizzes.edit", quiz.id)}
+                                            />
+                                        )}
+                                    {canManageQuiz &&
+                                        hasAnyPermission(["quizzes delete"]) && (
+                                            <Button
+                                                type="delete"
+                                                url={route(
+                                                    "quizzes.destroy",
+                                                    quiz.id
+                                                )}
+                                            />
+                                        )}
+                                </div>
+                            </div>
                         </div>
-                        <div className="grid grid-cols-1 gap-3 px-6 py-4 sm:grid-cols-3">
-                            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
-                                <p className="text-xs font-semibold uppercase text-slate-500">
-                                    Total soal
-                                </p>
-                                <p className="mt-1 text-lg font-bold text-slate-900">
-                                    {quiz.questions?.length ?? quiz.total_questions ?? 0}
-                                </p>
-                            </div>
-                            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
-                                <p className="text-xs font-semibold uppercase text-slate-500">
-                                    Attempt selesai
-                                </p>
-                                <p className="mt-1 text-lg font-bold text-slate-900">
-                                    {attempts.filter((a) => a.finished_at).length}
-                                </p>
-                            </div>
-                            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
-                                <p className="text-xs font-semibold uppercase text-slate-500">
-                                    Rata-rata saat ini
-                                </p>
-                                <p className="mt-1 text-lg font-bold text-indigo-700">
-                                    {avgScore != null ? `${avgScore}%` : "—"}
-                                </p>
-                            </div>
+                        <div className="border-t border-slate-200 bg-slate-50/60 px-5 py-2.5" />
+                    </div>
+                    <div className="rounded-md border border-slate-200 bg-white px-4 py-2.5">
+                        <div className="flex flex-wrap gap-2">
+                            <a
+                                href="#ringkasan-kuis"
+                                className="rounded-md bg-[#163d8f] px-3 py-1.5 text-xs font-semibold text-white"
+                            >
+                                Ringkasan
+                            </a>
+                            <a
+                                href="#percobaan-kuis"
+                                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                                Percobaan
+                            </a>
+                            <a
+                                href="#kelola-soal"
+                                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                                Kelola Soal
+                            </a>
                         </div>
                     </div>
                     {inner}

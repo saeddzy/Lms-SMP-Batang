@@ -94,6 +94,7 @@ Route::middleware('auth')->group(function () {
 
     // Quizzes
     Route::post('quizzes/{quiz}/questions', [QuizController::class, 'storeQuestion'])->name('quizzes.questions.store');
+    Route::post('quizzes/{quiz}/questions/batch', [QuizController::class, 'storeQuestionsBatch'])->name('quizzes.questions.store-batch');
     Route::put('quizzes/{quiz}/questions/{question}', [QuizController::class, 'updateQuestion'])->name('quizzes.questions.update');
     Route::delete('quizzes/{quiz}/questions/{question}', [QuizController::class, 'destroyQuestion'])->name('quizzes.questions.destroy');
     Route::get('quizzes/{quiz}/attempts/{attempt}/manual-grade', [QuizController::class, 'manualGradeAttempt'])->name('quizzes.manual-grade');

@@ -173,6 +173,7 @@ class TaskController extends Controller
             'classes' => $classes,
             'selectedClassId' => $selectedClassId,
             'selectedSubjectId' => $selectedSubjectId,
+            'classSubjectsMap' => $this->buildClassSubjectsMap($classes),
         ]);
     }
 
@@ -309,6 +310,7 @@ class TaskController extends Controller
             'task' => $taskPayload,
             'subjects' => $subjects,
             'classes' => $classes,
+            'classSubjectsMap' => $this->buildClassSubjectsMap($classes),
         ]);
     }
 
@@ -536,5 +538,31 @@ class TaskController extends Controller
         $status = $task->is_active ? 'diaktifkan' : 'dinonaktifkan';
 
         return back()->with('success', "Tugas berhasil {$status}.");
+    }
+
+    private function buildClassSubjectsMap($classes): array
+    {
+        $classIds = collect($classes)->pluck('id')->filter()->values();
+        if ($classIds->isEmpty()) {
+            return [];
+        }
+
+        return ClassSubject::query()
+            ->with('subject:id,name,is_active')
+            ->whereIn('class_id', $classIds)
+            ->where('is_active', true)
+            ->get(['id', 'class_id', 'subject_id'])
+            ->groupBy('class_id')
+            ->map(function ($rows) {
+                return $rows
+                    ->map(fn ($row) => [
+                        'id' => $row->subject_id,
+                        'name' => $row->subject?->name,
+                    ])
+                    ->filter(fn ($subject) => !empty($subject['id']) && !empty($subject['name']))
+                    ->values()
+                    ->all();
+            })
+            ->toArray();
     }
 }

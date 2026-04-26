@@ -18,7 +18,9 @@ class Quiz extends Model
         'instructions',
         'time_limit', // in minutes
         'total_questions',
+        'max_attempts',
         'max_score',
+        'passing_score',
         'start_time',
         'end_time',
         'class_id',
@@ -32,7 +34,9 @@ class Quiz extends Model
     protected $casts = [
         'time_limit' => 'integer',
         'total_questions' => 'integer',
+        'max_attempts' => 'integer',
         'max_score' => 'decimal:2',
+        'passing_score' => 'decimal:2',
         'start_time' => 'datetime',
         'end_time' => 'datetime',
         'is_active' => 'boolean',

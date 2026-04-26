@@ -115,7 +115,10 @@ class Material extends Model
         // Route relatif: iframe <video>/pratinjau memakai host yang sama dengan halaman (cookie sesi tetap terkirim).
         // URL absolut dari APP_URL yang salah sering memicu 403 karena permintaan tanpa autentikasi.
         if ($this->exists && $this->getKey()) {
-            return route('materials.file', ['material' => $this->getKey()], false);
+            return route('materials.file', [
+                'material' => $this->getKey(),
+                'v' => $this->updated_at?->timestamp ?? time(),
+            ], false);
         }
 
         return Storage::disk('public')->url($this->file_path);
@@ -158,7 +161,23 @@ class Material extends Model
             return 'Video';
         }
         if ($this->material_type === 'pdf') {
-            return 'PDF';
+            $name = strtolower((string) $this->file_name);
+            $mime = strtolower((string) $this->mime_type);
+
+            if ($mime === 'application/pdf' || str_ends_with($name, '.pdf')) {
+                return 'PDF';
+            }
+            if (str_contains($mime, 'presentation') || str_ends_with($name, '.ppt') || str_ends_with($name, '.pptx')) {
+                return 'PPT';
+            }
+            if (str_contains($mime, 'word') || str_ends_with($name, '.doc') || str_ends_with($name, '.docx')) {
+                return 'DOC';
+            }
+            if (str_contains($mime, 'excel') || str_contains($mime, 'spreadsheetml') || str_ends_with($name, '.xls') || str_ends_with($name, '.xlsx') || str_ends_with($name, '.csv')) {
+                return 'XLS';
+            }
+
+            return 'Dokumen';
         }
         if ($this->mime_type) {
             return strtoupper(explode('/', $this->mime_type)[1] ?? $this->mime_type);

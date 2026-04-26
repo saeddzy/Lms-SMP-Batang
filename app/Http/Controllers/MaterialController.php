@@ -176,6 +176,7 @@ class MaterialController extends Controller
             'classes' => $classes,
             'selectedClassId' => $selectedClassId,
             'selectedSubjectId' => $selectedSubjectId,
+            'maxUploadBytes' => $this->getEffectiveUploadLimitBytes(),
         ]);
     }
 
@@ -186,16 +187,23 @@ class MaterialController extends Controller
     {
         Gate::authorize('materials create');
 
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'material_type' => 'required|in:pdf,video',
-            'subject_id' => 'required|exists:subjects,id',
-            'class_id' => 'required|exists:school_classes,id',
-            'file' => 'nullable|file|mimes:pdf,mp4,avi,mov,wmv|max:524288', // 512MB max
-            'video_url' => 'nullable|url|max:500',
-            'is_active' => 'boolean',
-        ]);
+        $validated = $request->validate(
+            [
+                'title' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'material_type' => 'required|in:pdf,video',
+                'subject_id' => 'required|exists:subjects,id',
+                'class_id' => 'required|exists:school_classes,id',
+                'file' => 'nullable|file|mimes:pdf,doc,docx,ppt,pptx,xls,xlsx,csv,mp4,avi,mov,wmv|max:524288', // 512MB max
+                'video_url' => 'nullable|url|max:500',
+                'is_active' => 'boolean',
+            ],
+            [
+                'file.uploaded' => 'Upload file gagal. Kemungkinan ukuran file melebihi batas server (upload_max_filesize/post_max_size).',
+                'file.max' => 'Ukuran file terlalu besar untuk kebijakan aplikasi.',
+                'file.mimes' => 'Format file tidak didukung. Gunakan PDF, PPT/PPTX, DOC/DOCX, XLS/XLSX, CSV, atau video yang valid.',
+            ]
+        );
 
         // Find the class_subject based on class_id and subject_id
         $classSubject = ClassSubject::where('class_id', $validated['class_id'])
@@ -207,7 +215,7 @@ class MaterialController extends Controller
         }
 
         if ($validated['material_type'] === 'pdf' && !$request->hasFile('file')) {
-            return back()->withErrors(['file' => 'File PDF wajib diunggah.']);
+            return back()->withErrors(['file' => 'File dokumen wajib diunggah (PDF/PPT/DOC/XLS).']);
         }
 
         if ($validated['material_type'] === 'video' && !$request->hasFile('file') && empty($validated['video_url'])) {
@@ -301,6 +309,7 @@ class MaterialController extends Controller
             'material' => $materialPayload,
             'subjects' => $subjects,
             'classes' => $classes,
+            'maxUploadBytes' => $this->getEffectiveUploadLimitBytes(),
         ]);
     }
 
@@ -311,16 +320,23 @@ class MaterialController extends Controller
     {
         Gate::authorize('update', $material);
 
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'material_type' => 'required|in:pdf,video',
-            'subject_id' => 'required|exists:subjects,id',
-            'class_id' => 'required|exists:school_classes,id',
-            'file' => 'nullable|file|mimes:pdf,mp4,avi,mov,wmv|max:524288',
-            'video_url' => 'nullable|url|max:500',
-            'is_active' => 'boolean',
-        ]);
+        $validated = $request->validate(
+            [
+                'title' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'material_type' => 'required|in:pdf,video',
+                'subject_id' => 'required|exists:subjects,id',
+                'class_id' => 'required|exists:school_classes,id',
+                'file' => 'nullable|file|mimes:pdf,doc,docx,ppt,pptx,xls,xlsx,csv,mp4,avi,mov,wmv|max:524288',
+                'video_url' => 'nullable|url|max:500',
+                'is_active' => 'boolean',
+            ],
+            [
+                'file.uploaded' => 'Upload file gagal. Kemungkinan ukuran file melebihi batas server (upload_max_filesize/post_max_size).',
+                'file.max' => 'Ukuran file terlalu besar untuk kebijakan aplikasi.',
+                'file.mimes' => 'Format file tidak didukung. Gunakan PDF, PPT/PPTX, DOC/DOCX, XLS/XLSX, CSV, atau video yang valid.',
+            ]
+        );
 
         $classSubject = ClassSubject::where('class_id', $validated['class_id'])
             ->where('subject_id', $validated['subject_id'])
@@ -333,7 +349,7 @@ class MaterialController extends Controller
         $this->authorizeClassSubjectSlotTeacher($classSubject);
 
         if ($validated['material_type'] === 'pdf' && !$request->hasFile('file') && !$material->file_path) {
-            return back()->withErrors(['file' => 'File PDF wajib diunggah.']);
+            return back()->withErrors(['file' => 'File dokumen wajib diunggah (PDF/PPT/DOC/XLS).']);
         }
 
         $wasLocal = $material->file_path
@@ -423,5 +439,45 @@ class MaterialController extends Controller
 
         return redirect()->route('materials.edit', $newMaterial)
             ->with('success', 'Materi berhasil diduplikat. Silakan edit judul dan konten.');
+    }
+
+    private function getEffectiveUploadLimitBytes(): int
+    {
+        $uploadMax = $this->parseIniSizeToBytes((string) ini_get('upload_max_filesize'));
+        $postMax = $this->parseIniSizeToBytes((string) ini_get('post_max_size'));
+
+        if ($uploadMax <= 0 && $postMax <= 0) {
+            return 0;
+        }
+        if ($uploadMax <= 0) {
+            return $postMax;
+        }
+        if ($postMax <= 0) {
+            return $uploadMax;
+        }
+
+        return min($uploadMax, $postMax);
+    }
+
+    private function parseIniSizeToBytes(string $value): int
+    {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return 0;
+        }
+
+        if (is_numeric($trimmed)) {
+            return (int) $trimmed;
+        }
+
+        $unit = strtolower(substr($trimmed, -1));
+        $number = (float) substr($trimmed, 0, -1);
+
+        return match ($unit) {
+            'g' => (int) ($number * 1024 * 1024 * 1024),
+            'm' => (int) ($number * 1024 * 1024),
+            'k' => (int) ($number * 1024),
+            default => (int) $trimmed,
+        };
     }
 }

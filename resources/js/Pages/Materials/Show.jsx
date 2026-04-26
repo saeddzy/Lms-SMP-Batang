@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import StudentShell from "@/Components/Student/StudentShell";
 import Button from "@/Components/Button";
@@ -6,12 +6,14 @@ import { Head, Link, usePage } from "@inertiajs/react";
 import hasAnyPermission from "@/Utils/Permissions";
 import { hasRole } from "@/Utils/Permissions";
 import { materialClassName } from "@/Utils/materialClassName";
+import mammoth from "mammoth";
+import * as XLSX from "xlsx";
 
 function typeLabel(material) {
     if (material.type_label) return material.type_label;
     const t = material.material_type ?? material.type;
     if (t === "video") return "Video";
-    if (t === "pdf") return "PDF";
+    if (t === "pdf") return "Dokumen";
     return t ?? "—";
 }
 
@@ -20,6 +22,25 @@ function mimeLabel(material) {
         return material.mime_type;
     }
     return typeLabel(material);
+}
+
+function fileExtension(material) {
+    const fromName = String(material.file_name || "")
+        .toLowerCase()
+        .split(".")
+        .pop();
+
+    if (fromName && fromName !== String(material.file_name || "").toLowerCase()) {
+        return fromName;
+    }
+
+    const mime = String(material.mime_type || "").toLowerCase();
+    if (mime.includes("word")) return "docx";
+    if (mime.includes("presentation")) return "pptx";
+    if (mime.includes("excel") || mime.includes("spreadsheetml")) return "xlsx";
+    if (mime === "text/csv") return "csv";
+    if (mime === "application/pdf") return "pdf";
+    return "";
 }
 
 /** URL unduh untuk file lokal (route Laravel); tautan eksternal tidak ditambah query. */
@@ -38,8 +59,146 @@ export default function Show() {
     const youtubeEmbed = material.youtube_embed_url;
     const isRemote = material.is_remote_url;
     const isVideoType = (material.material_type ?? material.type) === "video";
-    const isPdfType = (material.material_type ?? material.type) === "pdf";
+    const isDocumentType = (material.material_type ?? material.type) === "pdf";
+    const isPdfMime =
+        String(material.mime_type || "").toLowerCase() === "application/pdf" ||
+        String(material.file_name || "").toLowerCase().endsWith(".pdf");
+    const ext = fileExtension(material);
+    const isOfficeLike = ["doc", "docx", "ppt", "pptx", "xls", "xlsx", "csv"].includes(ext);
+    const canUseRemoteViewer = Boolean(fileUrl && isRemote);
+    const officeViewerUrl = canUseRemoteViewer
+        ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`
+        : null;
+    const googleViewerUrl = canUseRemoteViewer
+        ? `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(fileUrl)}`
+        : null;
     const classLabel = materialClassName(material);
+    const [docxPreview, setDocxPreview] = useState("");
+    const [docxPreviewLoading, setDocxPreviewLoading] = useState(false);
+    const [docxPreviewError, setDocxPreviewError] = useState("");
+    const [sheetPreview, setSheetPreview] = useState([]);
+    const [sheetPreviewLoading, setSheetPreviewLoading] = useState(false);
+    const [sheetPreviewError, setSheetPreviewError] = useState("");
+
+    const isLocalDocx = isDocumentType && !isRemote && (ext === "docx" || ext === "doc");
+    const isLocalSheet = isDocumentType && !isRemote && ["xls", "xlsx", "csv"].includes(ext);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadDocxPreview = async () => {
+            if (!isLocalDocx || !fileUrl) {
+                setDocxPreview("");
+                setDocxPreviewError("");
+                setDocxPreviewLoading(false);
+                return;
+            }
+
+            try {
+                setDocxPreviewLoading(true);
+                setDocxPreviewError("");
+
+                const response = await fetch(fileUrl, {
+                    method: "GET",
+                    credentials: "include",
+                    cache: "no-store",
+                });
+
+                if (!response.ok) {
+                    throw new Error("Gagal mengambil file dokumen.");
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+                const result = await mammoth.convertToHtml({ arrayBuffer });
+
+                if (cancelled) return;
+                setDocxPreview(result.value || "<p>Tidak ada konten yang bisa ditampilkan.</p>");
+            } catch (error) {
+                if (cancelled) return;
+                setDocxPreview("");
+                setDocxPreviewError(
+                    "Pratinjau DOCX belum bisa ditampilkan. Gunakan tombol Unduh/Pratinjau untuk membuka file."
+                );
+            } finally {
+                if (!cancelled) {
+                    setDocxPreviewLoading(false);
+                }
+            }
+        };
+
+        loadDocxPreview();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isLocalDocx, fileUrl]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadSheetPreview = async () => {
+            if (!isLocalSheet || !fileUrl) {
+                setSheetPreview([]);
+                setSheetPreviewError("");
+                setSheetPreviewLoading(false);
+                return;
+            }
+
+            try {
+                setSheetPreviewLoading(true);
+                setSheetPreviewError("");
+
+                const response = await fetch(fileUrl, {
+                    method: "GET",
+                    credentials: "include",
+                    cache: "no-store",
+                });
+
+                if (!response.ok) {
+                    throw new Error("Gagal mengambil file spreadsheet.");
+                }
+
+                let rows = [];
+                if (ext === "csv") {
+                    const text = await response.text();
+                    rows = text
+                        .split(/\r?\n/)
+                        .filter((line) => line.trim() !== "")
+                        .slice(0, 101)
+                        .map((line) => line.split(",").slice(0, 20));
+                } else {
+                    const arrayBuffer = await response.arrayBuffer();
+                    const workbook = XLSX.read(arrayBuffer, { type: "array" });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const firstSheet = workbook.Sheets[firstSheetName];
+                    rows = XLSX.utils.sheet_to_json(firstSheet, {
+                        header: 1,
+                        defval: "",
+                        blankrows: false,
+                    }).slice(0, 101).map((row) => row.slice(0, 20));
+                }
+
+                if (cancelled) return;
+                setSheetPreview(rows);
+            } catch (error) {
+                if (cancelled) return;
+                setSheetPreview([]);
+                setSheetPreviewError(
+                    "Pratinjau spreadsheet belum bisa ditampilkan. Gunakan tombol Unduh/Pratinjau untuk membuka file."
+                );
+            } finally {
+                if (!cancelled) {
+                    setSheetPreviewLoading(false);
+                }
+            }
+        };
+
+        loadSheetPreview();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isLocalSheet, fileUrl, ext]);
 
     const renderPreview = () => {
         if (!material.file_path || !fileUrl) {
@@ -50,7 +209,7 @@ export default function Show() {
             );
         }
 
-        if (isPdfType) {
+        if (isDocumentType && isPdfMime) {
             return (
                 <div className="mt-2 rounded-lg border border-stone-200 bg-stone-50 overflow-hidden">
                     <iframe
@@ -58,6 +217,103 @@ export default function Show() {
                         src={fileUrl}
                         className="h-[min(70vh,720px)] w-full"
                     />
+                </div>
+            );
+        }
+
+        if (isDocumentType && !isPdfMime) {
+            if (isLocalDocx) {
+                return (
+                    <div className="mt-2 rounded-lg border border-stone-200 bg-white">
+                        <div className="border-b border-stone-200 bg-stone-50 px-4 py-2 text-xs font-medium text-stone-600">
+                            Pratinjau dokumen Word
+                        </div>
+                        <div className="max-h-[70vh] overflow-auto p-5">
+                            {docxPreviewLoading ? (
+                                <p className="text-sm text-slate-500">Memuat pratinjau dokumen...</p>
+                            ) : docxPreviewError ? (
+                                <p className="text-sm text-slate-600">{docxPreviewError}</p>
+                            ) : (
+                                <div
+                                    className="prose prose-sm max-w-none text-slate-800"
+                                    dangerouslySetInnerHTML={{ __html: docxPreview }}
+                                />
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+
+            if (isLocalSheet) {
+                return (
+                    <div className="mt-2 rounded-lg border border-stone-200 bg-white">
+                        <div className="border-b border-stone-200 bg-stone-50 px-4 py-2 text-xs font-medium text-stone-600">
+                            Pratinjau spreadsheet (maks. 100 baris pertama)
+                        </div>
+                        <div className="max-h-[70vh] overflow-auto p-4">
+                            {sheetPreviewLoading ? (
+                                <p className="text-sm text-slate-500">Memuat pratinjau spreadsheet...</p>
+                            ) : sheetPreviewError ? (
+                                <p className="text-sm text-slate-600">{sheetPreviewError}</p>
+                            ) : sheetPreview.length === 0 ? (
+                                <p className="text-sm text-slate-600">Tidak ada data yang bisa ditampilkan.</p>
+                            ) : (
+                                <table className="min-w-full border-collapse text-sm">
+                                    <tbody>
+                                        {sheetPreview.map((row, rowIdx) => (
+                                            <tr key={`r-${rowIdx}`} className="border-b border-slate-100">
+                                                {row.map((cell, colIdx) => (
+                                                    <td
+                                                        key={`c-${rowIdx}-${colIdx}`}
+                                                        className={`px-3 py-2 align-top ${
+                                                            rowIdx === 0
+                                                                ? "bg-slate-50 font-semibold text-slate-800"
+                                                                : "text-slate-700"
+                                                        }`}
+                                                    >
+                                                        {String(cell ?? "")}
+                                                    </td>
+                                                ))}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+
+            if (isOfficeLike && canUseRemoteViewer) {
+                return (
+                    <div className="space-y-3">
+                        <div className="rounded-lg border border-stone-200 bg-stone-50 overflow-hidden">
+                            <iframe
+                                title={`${material.title} preview`}
+                                src={officeViewerUrl}
+                                className="h-[min(70vh,720px)] w-full"
+                            />
+                        </div>
+                        <p className="text-xs text-slate-500">
+                            Jika pratinjau kosong, buka fallback viewer Google.
+                            {" "}
+                            <a
+                                href={googleViewerUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium text-[#163d8f] hover:underline"
+                            >
+                                Buka fallback
+                            </a>
+                        </p>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="mt-2 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                    <p>Pratinjau langsung untuk format ini belum tersedia pada file lokal/protected route.</p>
+                    <p>Gunakan tombol <strong>Unduh</strong> atau <strong>Pratinjau</strong> untuk membuka file.</p>
                 </div>
             );
         }
@@ -133,6 +389,12 @@ export default function Show() {
                         </div>
 
                         <div className="flex flex-wrap gap-2">
+                            <Link
+                                href={route("materials.index")}
+                                className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                            >
+                                Kembali
+                            </Link>
                             {fileUrl && (
                                 <>
                                     <a

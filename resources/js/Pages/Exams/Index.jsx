@@ -16,7 +16,14 @@ export default function Index() {
     const { exams, filters = {}, auth = {} } = usePage().props;
     const canMutate = auth.canMutateTeachingContent ?? false;
     const searchQuery = filters.search ?? "";
-    const totalExam = exams?.total ?? exams?.data?.length ?? 0;
+    const examItems = exams?.data ?? [];
+    const totalExam = exams?.total ?? examItems?.length ?? 0;
+    const scheduledExam = examItems.filter((e) => e.status === "scheduled").length;
+    const inProgressExam = examItems.filter((e) => e.status === "in_progress").length;
+    const totalParticipants = examItems.reduce(
+        (sum, e) => sum + (e.participants_count ?? 0),
+        0
+    );
 
     const getStatusColor = (status) => {
         switch (status) {
@@ -89,65 +96,77 @@ export default function Index() {
             <Head title="Ujian" />
 
             <div className="space-y-6">
-                <div className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-sm">
-                    <div className="bg-gradient-to-r from-violet-50 via-white to-indigo-50 px-6 py-5">
-                        <h1 className="text-2xl font-bold text-stone-900">
+                <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <div className="h-1 w-full bg-gradient-to-r from-[#163d8f] via-[#2453b8] to-[#5b84d9]" />
+                    <div className="border-b border-slate-200 bg-slate-50/70 px-6 py-5">
+                        <h1 className="text-2xl font-semibold text-slate-900">
                             Ujian
                         </h1>
-                        <p className="text-sm text-stone-600">
+                        <p className="mt-1 text-sm text-slate-600">
                             Kelola jadwal ujian, peserta, dan progres pengerjaan siswa.
                         </p>
                     </div>
-                    <div className="grid grid-cols-1 gap-3 border-t border-stone-100 px-6 py-4 sm:grid-cols-3">
-                        <div className="rounded-xl border border-stone-100 bg-stone-50/70 p-3">
-                            <p className="text-xs font-semibold uppercase text-stone-500">
+                    <div className="grid grid-cols-2 gap-4 px-6 py-5 md:grid-cols-4">
+                        <div className="rounded-md border border-slate-200 bg-white px-4 py-3">
+                            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
                                 Total ujian
                             </p>
-                            <p className="mt-1 text-xl font-bold text-stone-900">
+                            <p className="mt-1 text-xl font-semibold text-slate-900">
                                 {totalExam}
                             </p>
                         </div>
-                        <div className="rounded-xl border border-stone-100 bg-stone-50/70 p-3">
-                            <p className="text-xs font-semibold uppercase text-stone-500">
-                                Fokus halaman
+                        <div className="rounded-md border border-sky-200 bg-sky-50/50 px-4 py-3">
+                            <p className="text-xs font-medium uppercase tracking-wide text-sky-700">
+                                Terjadwal
                             </p>
-                            <p className="mt-1 text-sm font-medium text-stone-900">
-                                Status jadwal, durasi, dan jumlah peserta
+                            <p className="mt-1 text-xl font-semibold text-sky-800">
+                                {scheduledExam}
                             </p>
                         </div>
-                        <div className="rounded-xl border border-stone-100 bg-stone-50/70 p-3">
-                            <p className="text-xs font-semibold uppercase text-stone-500">
-                                Tampilan
+                        <div className="rounded-md border border-amber-200 bg-amber-50/50 px-4 py-3">
+                            <p className="text-xs font-medium uppercase tracking-wide text-amber-700">
+                                Berlangsung
                             </p>
-                            <p className="mt-1 text-sm font-medium text-stone-900">
-                                Card ringkas untuk monitoring cepat
+                            <p className="mt-1 text-xl font-semibold text-amber-800">
+                                {inProgressExam}
+                            </p>
+                        </div>
+                        <div className="rounded-md border border-slate-200 bg-white px-4 py-3">
+                            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                                Total peserta
+                            </p>
+                            <p className="mt-1 text-xl font-semibold text-slate-900">
+                                {totalParticipants}
                             </p>
                         </div>
                     </div>
-                </div>
+                </section>
 
                 <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
                     <div className="text-sm text-stone-600">
                         Gunakan pencarian untuk menemukan ujian lebih cepat.
                     </div>
                     {canMutate && hasAnyPermission(["exams create"]) && (
-                        <Button type="add" url={route("exams.create")} />
+                        <Button
+                            type="add"
+                            url={route("exams.create")}
+                            className="border-[#163d8f] bg-[#163d8f] hover:bg-[#0f2e6f]"
+                        />
                     )}
                 </div>
 
-                <Search
-                    url={route("exams.index")}
-                    placeholder="Cari judul / deskripsi ujian..."
-                    filter={{ search: searchQuery }}
-                />
+                <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <Search
+                        url={route("exams.index")}
+                        placeholder="Cari judul / deskripsi ujian..."
+                        filter={{ search: searchQuery }}
+                    />
+                </div>
 
                 {exams?.data?.length > 0 ? (
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
                         {exams.data.map((exam) => (
-                            <article
-                                key={exam.id}
-                                className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm"
-                            >
+                            <article key={exam.id} className="rounded-lg border border-slate-200 bg-white p-5">
                                 <div className="flex items-start justify-between gap-3">
                                     <h2 className="line-clamp-2 text-base font-semibold text-stone-900">
                                         {exam.title}
@@ -217,7 +236,7 @@ export default function Index() {
                                     </div>
                                 </dl>
 
-                                <div className="mt-4 rounded-lg border border-stone-100 bg-stone-50 px-3 py-2 text-xs text-stone-600">
+                                <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                                     <p className="inline-flex items-center gap-1">
                                         <IconCalendarTime size={14} />
                                         Jadwal:{" "}
@@ -252,12 +271,12 @@ export default function Index() {
                                         </div>
                                     )}
 
-                                <div className="mt-4 flex items-center gap-2 border-t border-stone-100 pt-4">
+                                <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-4">
                                     <Link
                                         href={route("exams.show", exam.id)}
-                                        className="inline-flex rounded-lg bg-stone-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-stone-800"
+                                        className="inline-flex rounded-md bg-[#163d8f] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#0f2e6f]"
                                     >
-                                        Buka
+                                        Buka Detail
                                     </Link>
                                     {hasAnyPermission(["exams edit"]) && (
                                         <Button
@@ -276,13 +295,13 @@ export default function Index() {
                         ))}
                     </div>
                 ) : (
-                    <div className="rounded-2xl border border-dashed border-stone-200 bg-stone-50/60 p-10 text-center text-sm text-stone-500">
+                    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/60 p-10 text-center text-sm text-slate-500">
                         Belum ada ujian yang cocok dengan filter saat ini.
                     </div>
                 )}
 
                 {exams?.last_page > 1 && (
-                    <div className="rounded-2xl border border-stone-200/90 bg-white p-3">
+                    <div className="rounded-lg border border-slate-200 bg-white p-3">
                         <Pagination links={exams.links} />
                     </div>
                 )}

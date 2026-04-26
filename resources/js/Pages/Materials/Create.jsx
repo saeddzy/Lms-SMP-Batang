@@ -6,7 +6,13 @@ import Select2 from "@/Components/Select2";
 import { Head, useForm, usePage } from "@inertiajs/react";
 
 export default function Create() {
-    const { subjects = [], classes = [], selectedClassId = null, selectedSubjectId = null } = usePage().props;
+    const {
+        subjects = [],
+        classes = [],
+        selectedClassId = null,
+        selectedSubjectId = null,
+        maxUploadBytes = 0,
+    } = usePage().props;
 
     const { data, setData, post, processing, errors, progress } = useForm({
         title: '',
@@ -20,15 +26,26 @@ export default function Create() {
     });
 
     const [filePreview, setFilePreview] = useState(null);
+    const [localFileError, setLocalFileError] = useState("");
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        post(route('materials.store'));
+        post(route('materials.store'), { forceFormData: true });
     };
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (file) {
+            if (maxUploadBytes > 0 && file.size > maxUploadBytes) {
+                const limitMb = (maxUploadBytes / (1024 * 1024)).toFixed(1);
+                setLocalFileError(`Ukuran file melebihi batas server (${limitMb} MB). Kompres PDF atau kecilkan file dulu.`);
+                setData('file', null);
+                setFilePreview(null);
+                e.target.value = "";
+                return;
+            }
+
+            setLocalFileError("");
             setData('file', file);
             setFilePreview(file.name);
         }
@@ -45,7 +62,7 @@ export default function Create() {
     }));
 
     const materialTypeOptions = [
-        { value: 'pdf', label: 'File PDF' },
+        { value: 'pdf', label: 'Dokumen (PDF/PPT/DOC/XLS)' },
         { value: 'video', label: 'Video' },
     ];
 
@@ -130,7 +147,16 @@ export default function Create() {
                                         id="material_type"
                                         options={materialTypeOptions}
                                         value={materialTypeOptions.find(t => t.value === data.material_type)}
-                                        onChange={(selected) => setData('material_type', selected ? selected.value : 'pdf')}
+                                        onChange={(selected) => {
+                                            const nextType = selected ? selected.value : 'pdf';
+                                            setData('material_type', nextType);
+                                            setData('file', null);
+                                            setFilePreview(null);
+                                            setLocalFileError("");
+                                            if (nextType === 'pdf') {
+                                                setData('video_url', '');
+                                            }
+                                        }}
                                         placeholder="Pilih tipe materi"
                                     />
                                     <Input.Error message={errors.material_type} />
@@ -140,16 +166,21 @@ export default function Create() {
                             <div className="rounded-md border border-slate-200 bg-slate-50/50 p-4">
                                 {data.material_type === 'pdf' && (
                                     <div className="space-y-2">
-                                        <Input.Label htmlFor="file" value="Upload File PDF" />
+                                        <Input.Label htmlFor="file" value="Upload Dokumen" />
                                         <input
                                             id="file"
                                             type="file"
                                             onChange={handleFileChange}
                                             className="block w-full rounded-md border border-slate-300 bg-white text-sm text-slate-600 file:mr-4 file:border-0 file:bg-[#163d8f] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[#0f2e6f]"
-                                            accept=".pdf"
+                                            accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv"
                                             required
                                         />
                                         {filePreview && <p className="text-sm text-slate-600">File terpilih: {filePreview}</p>}
+                                        {maxUploadBytes > 0 && (
+                                            <p className="text-xs text-slate-500">
+                                                Maksimal ukuran file: {(maxUploadBytes / (1024 * 1024)).toFixed(1)} MB (PDF/PPT/DOC/XLS/CSV)
+                                            </p>
+                                        )}
                                     </div>
                                 )}
 
@@ -165,6 +196,11 @@ export default function Create() {
                                                 accept=".mp4,.avi,.mov,.wmv"
                                             />
                                             {filePreview && <p className="mt-2 text-sm text-slate-600">File terpilih: {filePreview}</p>}
+                                            {maxUploadBytes > 0 && (
+                                                <p className="text-xs text-slate-500">
+                                                    Maksimal ukuran file: {(maxUploadBytes / (1024 * 1024)).toFixed(1)} MB
+                                                </p>
+                                            )}
                                         </div>
                                         <div className="text-center text-xs font-medium uppercase tracking-wide text-slate-400">atau</div>
                                         <div>
@@ -179,6 +215,7 @@ export default function Create() {
                                         </div>
                                     </div>
                                 )}
+                                {localFileError && <p className="text-sm text-red-600">{localFileError}</p>}
                                 <Input.Error message={errors.file} />
                             </div>
 
@@ -220,10 +257,15 @@ export default function Create() {
                                 <div className="h-2 overflow-hidden rounded-full bg-blue-100">
                                     <div
                                         className="h-2 rounded-full bg-[#163d8f] transition-all duration-300"
-                                        style={{ width: `${progress}%` }}
+                                        style={{
+                                            width: `${typeof progress === "number" ? progress : progress.percentage ?? 0}%`,
+                                        }}
                                     />
                                 </div>
-                                <p className="mt-2 text-sm text-slate-600">Progres upload: {progress}%</p>
+                                <p className="mt-2 text-sm text-slate-600">
+                                    Progres upload:{" "}
+                                    {typeof progress === "number" ? progress : progress.percentage ?? 0}%
+                                </p>
                             </div>
                         )}
 

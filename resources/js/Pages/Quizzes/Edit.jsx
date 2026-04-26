@@ -2,7 +2,6 @@ import React from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import Input from "@/Components/Input";
 import Button from "@/Components/Button";
-import Card from "@/Components/Card";
 import Select2 from "@/Components/Select2";
 import { Head, useForm, usePage } from "@inertiajs/react";
 import {
@@ -17,7 +16,7 @@ function pickId(v) {
 }
 
 export default function Edit() {
-    const { quiz, classes, subjects } = usePage().props;
+    const { quiz, classes, subjects, classSubjectsMap = {} } = usePage().props;
 
     const { data, setData, put, processing, errors, transform } = useForm({
         title: quiz.title || "",
@@ -77,10 +76,21 @@ export default function Edit() {
         label: cls.name,
     }));
 
-    const subjectOptions = subjects.map((subject) => ({
+    const allSubjectOptions = subjects.map((subject) => ({
         value: subject.id,
         label: subject.name,
     }));
+
+    const selectedClassIdValue = data.class_id;
+    const allowedSubjectIdsForClass = selectedClassIdValue
+        ? (classSubjectsMap?.[selectedClassIdValue] ?? []).map((s) => s.id)
+        : [];
+    const subjectOptions = selectedClassIdValue
+        ? allSubjectOptions.filter((subject) =>
+              allowedSubjectIdsForClass.includes(subject.value)
+          )
+        : [];
+    const isSubjectDisabled = !selectedClassIdValue;
 
     const selectedClass = data.class_id
         ? classOptions.find((c) => c.value === data.class_id) ?? null
@@ -89,47 +99,80 @@ export default function Edit() {
         ? subjectOptions.find((s) => s.value === data.subject_id) ?? null
         : null;
 
+    React.useEffect(() => {
+        if (!selectedClassIdValue) {
+            if (data.subject_id) {
+                setData("subject_id", "");
+            }
+            return;
+        }
+        if (
+            data.subject_id &&
+            !allowedSubjectIdsForClass.includes(data.subject_id)
+        ) {
+            setData("subject_id", "");
+        }
+    }, [
+        selectedClassIdValue,
+        data.subject_id,
+        allowedSubjectIdsForClass,
+        setData,
+    ]);
+
     const typeOptions = [
-        { value: 'multiple_choice', label: 'Pilihan Ganda' },
-        { value: 'true_false', label: 'Benar/Salah' },
-        { value: 'essay', label: 'Esai' },
-        { value: 'mixed', label: 'Campuran' },
+        { value: "multiple_choice", label: "Pilihan Ganda" },
+        { value: "true_false", label: "Benar/Salah" },
+        { value: "essay", label: "Esai" },
+        { value: "mixed", label: "Campuran" },
     ];
 
     const statusOptions = [
-        { value: 'draft', label: 'Draft (Simpan sebagai draf)' },
-        { value: 'published', label: 'Publikasikan (Langsung tersedia)' },
-        { value: 'closed', label: 'Tutup (Tidak menerima attempt lagi)' },
+        { value: "draft", label: "Draft (Simpan sebagai draf)" },
+        { value: "published", label: "Publikasikan (Langsung tersedia)" },
+        { value: "closed", label: "Tutup (Tidak menerima attempt lagi)" },
     ];
 
     return (
         <DashboardLayout title="Edit Kuis">
             <Head title="Edit Kuis" />
 
-            <div className="max-w-4xl mx-auto">
-                <Card>
-                    <Card.Header>
-                        <Card.Title>Edit Kuis: {quiz.title}</Card.Title>
-                        <Card.Description>
-                            Perbarui informasi kuis sesuai kebutuhan
-                        </Card.Description>
-                    </Card.Header>
+            <div className="mx-auto max-w-5xl">
+                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <div className="h-1 w-full bg-gradient-to-r from-[#163d8f] via-[#2453b8] to-[#5b84d9]" />
+                    <div className="border-b border-slate-200 bg-slate-50/70 px-6 py-5">
+                        <h2 className="text-xl font-semibold text-slate-900">
+                            Edit Kuis: {quiz.title}
+                        </h2>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Perbarui informasi kuis sesuai kebutuhan.
+                        </p>
+                    </div>
 
-                    <form onSubmit={handleSubmit}>
-                        <Card.Content>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <form onSubmit={handleSubmit} className="space-y-6 p-6">
+                        <section className="space-y-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Informasi Utama
+                            </p>
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                 <div className="md:col-span-2">
                                     <Input.Label htmlFor="title" value="Judul Kuis" />
                                     <Input.Text
                                         id="title"
                                         value={data.title}
-                                        onChange={(e) => setData('title', e.target.value)}
+                                        onChange={(e) => setData("title", e.target.value)}
                                         placeholder="Masukkan judul kuis"
                                         required
                                     />
                                     <Input.Error message={errors.title} />
                                 </div>
+                            </div>
+                        </section>
 
+                        <section className="space-y-4 border-t border-slate-100 pt-6">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Kelas dan Jadwal
+                            </p>
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                 <div>
                                     <Input.Label htmlFor="class_id" value="Kelas" />
                                     <Select2
@@ -140,6 +183,7 @@ export default function Edit() {
                                         }
                                         options={classOptions}
                                         placeholder="Pilih kelas"
+                                        isSearchable={true}
                                         required
                                     />
                                     <Input.Error message={errors.class_id} />
@@ -154,12 +198,59 @@ export default function Edit() {
                                             setData("subject_id", selected ? selected.value : "")
                                         }
                                         options={subjectOptions}
-                                        placeholder="Pilih mata pelajaran"
+                                        placeholder={
+                                            isSubjectDisabled
+                                                ? "Pilih kelas dulu"
+                                                : "Pilih mata pelajaran"
+                                        }
+                                        isSearchable={true}
+                                        isDisabled={isSubjectDisabled}
+                                        noOptionsMessage={() =>
+                                            "Tidak ada mapel aktif untuk kelas ini"
+                                        }
                                         required
                                     />
                                     <Input.Error message={errors.subject_id} />
                                 </div>
 
+                                <div className="md:col-span-2">
+                                    <Input.Label
+                                        htmlFor="start_datetime"
+                                        value="Mulai pengerjaan (tanggal & jam)"
+                                    />
+                                    <Input.DateTimeLocal
+                                        id="start_datetime"
+                                        value={data.start_datetime}
+                                        onChange={(e) => setData("start_datetime", e.target.value)}
+                                        required
+                                    />
+                                    <p className="mt-1 text-xs text-stone-500">
+                                        Ditampilkan dalam jam lokal perangkat Anda.
+                                    </p>
+                                    <Input.Error message={errors.start_time} />
+                                </div>
+
+                                <div className="md:col-span-2">
+                                    <Input.Label
+                                        htmlFor="end_datetime"
+                                        value="Selesai pengerjaan (tanggal & jam)"
+                                    />
+                                    <Input.DateTimeLocal
+                                        id="end_datetime"
+                                        value={data.end_datetime}
+                                        onChange={(e) => setData("end_datetime", e.target.value)}
+                                        required
+                                    />
+                                    <Input.Error message={errors.end_time} />
+                                </div>
+                            </div>
+                        </section>
+
+                        <section className="space-y-4 border-t border-slate-100 pt-6">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Struktur Penilaian
+                            </p>
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                 <div>
                                     <Input.Label htmlFor="type" value="Tipe Kuis" />
                                     <Select2
@@ -194,7 +285,7 @@ export default function Edit() {
                                     <Input.Number
                                         id="total_questions"
                                         value={data.total_questions}
-                                        onChange={(e) => setData('total_questions', e.target.value)}
+                                        onChange={(e) => setData("total_questions", e.target.value)}
                                         placeholder="20"
                                         min="1"
                                     />
@@ -206,7 +297,7 @@ export default function Edit() {
                                     <Input.Number
                                         id="passing_score"
                                         value={data.passing_score}
-                                        onChange={(e) => setData('passing_score', e.target.value)}
+                                        onChange={(e) => setData("passing_score", e.target.value)}
                                         placeholder="70"
                                         min="0"
                                         max="100"
@@ -219,76 +310,44 @@ export default function Edit() {
                                     <Input.Number
                                         id="max_attempts"
                                         value={data.max_attempts}
-                                        onChange={(e) => setData('max_attempts', e.target.value)}
+                                        onChange={(e) => setData("max_attempts", e.target.value)}
                                         placeholder="3"
                                         min="1"
                                     />
                                     <Input.Error message={errors.max_attempts} />
                                 </div>
+                            </div>
+                        </section>
 
-                                <div className="md:col-span-2">
-                                    <Input.Label
-                                        htmlFor="start_datetime"
-                                        value="Mulai pengerjaan (tanggal & jam)"
-                                    />
-                                    <Input.DateTimeLocal
-                                        id="start_datetime"
-                                        value={data.start_datetime}
-                                        onChange={(e) =>
-                                            setData(
-                                                "start_datetime",
-                                                e.target.value
-                                            )
-                                        }
-                                        required
-                                    />
-                                    <p className="mt-1 text-xs text-stone-500">
-                                        Ditampilkan dalam jam lokal perangkat
-                                        Anda.
-                                    </p>
-                                    <Input.Error message={errors.start_time} />
-                                </div>
-
-                                <div className="md:col-span-2">
-                                    <Input.Label
-                                        htmlFor="end_datetime"
-                                        value="Selesai pengerjaan (tanggal & jam)"
-                                    />
-                                    <Input.DateTimeLocal
-                                        id="end_datetime"
-                                        value={data.end_datetime}
-                                        onChange={(e) =>
-                                            setData(
-                                                "end_datetime",
-                                                e.target.value
-                                            )
-                                        }
-                                        required
-                                    />
-                                    <Input.Error message={errors.end_time} />
-                                </div>
-
+                        <section className="space-y-4 border-t border-slate-100 pt-6">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Konten dan Publikasi
+                            </p>
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                 <div className="md:col-span-2">
                                     <Input.Label htmlFor="description" value="Deskripsi Kuis" />
                                     <textarea
                                         id="description"
                                         value={data.description}
-                                        onChange={(e) => setData('description', e.target.value)}
+                                        onChange={(e) => setData("description", e.target.value)}
                                         rows={3}
-                                        className="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-[#163d8f] focus:ring-[#163d8f]"
                                         placeholder="Jelaskan tentang kuis ini"
                                     />
                                     <Input.Error message={errors.description} />
                                 </div>
 
                                 <div className="md:col-span-2">
-                                    <Input.Label htmlFor="instructions" value="Instruksi untuk Siswa (Opsional)" />
+                                    <Input.Label
+                                        htmlFor="instructions"
+                                        value="Instruksi untuk Siswa (Opsional)"
+                                    />
                                     <textarea
                                         id="instructions"
                                         value={data.instructions}
-                                        onChange={(e) => setData('instructions', e.target.value)}
+                                        onChange={(e) => setData("instructions", e.target.value)}
                                         rows={4}
-                                        className="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-[#163d8f] focus:ring-[#163d8f]"
                                         placeholder="Instruksi khusus untuk mengerjakan kuis"
                                     />
                                     <Input.Error message={errors.instructions} />
@@ -297,35 +356,41 @@ export default function Edit() {
                                 <div className="md:col-span-2">
                                     <Input.Label value="Pengaturan Kuis" />
                                     <div className="mt-2 space-y-3">
-                                        <div className="flex items-center space-x-4">
+                                        <div className="flex flex-wrap items-center gap-4">
                                             <label className="inline-flex items-center">
                                                 <input
                                                     type="checkbox"
                                                     checked={data.shuffle_questions}
-                                                    onChange={(e) => setData('shuffle_questions', e.target.checked)}
-                                                    className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                                                    onChange={(e) => setData("shuffle_questions", e.target.checked)}
+                                                    className="rounded border-slate-300 text-[#163d8f] shadow-sm focus:ring-[#163d8f]"
                                                 />
-                                                <span className="ml-2 text-sm text-gray-600">Acak urutan soal</span>
+                                                <span className="ml-2 text-sm text-gray-600">
+                                                    Acak urutan soal
+                                                </span>
                                             </label>
 
                                             <label className="inline-flex items-center">
                                                 <input
                                                     type="checkbox"
                                                     checked={data.shuffle_answers}
-                                                    onChange={(e) => setData('shuffle_answers', e.target.checked)}
-                                                    className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                                                    onChange={(e) => setData("shuffle_answers", e.target.checked)}
+                                                    className="rounded border-slate-300 text-[#163d8f] shadow-sm focus:ring-[#163d8f]"
                                                 />
-                                                <span className="ml-2 text-sm text-gray-600">Acak urutan jawaban</span>
+                                                <span className="ml-2 text-sm text-gray-600">
+                                                    Acak urutan jawaban
+                                                </span>
                                             </label>
 
                                             <label className="inline-flex items-center">
                                                 <input
                                                     type="checkbox"
                                                     checked={data.show_results}
-                                                    onChange={(e) => setData('show_results', e.target.checked)}
-                                                    className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                                                    onChange={(e) => setData("show_results", e.target.checked)}
+                                                    className="rounded border-slate-300 text-[#163d8f] shadow-sm focus:ring-[#163d8f]"
                                                 />
-                                                <span className="ml-2 text-sm text-gray-600">Tampilkan hasil setelah selesai</span>
+                                                <span className="ml-2 text-sm text-gray-600">
+                                                    Tampilkan hasil setelah selesai
+                                                </span>
                                             </label>
                                         </div>
                                     </div>
@@ -335,45 +400,41 @@ export default function Edit() {
                                     <Input.Label htmlFor="status" value="Status Publikasi" />
                                     <Select2
                                         id="status"
-                                        value={statusOptions.find(
-                                            (s) => s.value === data.status
-                                        )}
+                                        value={statusOptions.find((s) => s.value === data.status)}
                                         onChange={(selected) =>
-                                            setData(
-                                                "status",
-                                                selected ? selected.value : "draft"
-                                            )
+                                            setData("status", selected ? selected.value : "draft")
                                         }
                                         options={statusOptions}
                                         placeholder="Pilih status"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        {data.status === 'draft' && 'Kuis akan disimpan sebagai draf dan belum dapat diakses siswa'}
-                                        {data.status === 'published' && 'Kuis akan dipublikasikan dan dapat diakses siswa'}
-                                        {data.status === 'closed' && 'Kuis akan ditutup dan tidak menerima attempt baru'}
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        {data.status === "draft" &&
+                                            "Kuis akan disimpan sebagai draf dan belum dapat diakses siswa"}
+                                        {data.status === "published" &&
+                                            "Kuis akan dipublikasikan dan dapat diakses siswa"}
+                                        {data.status === "closed" &&
+                                            "Kuis akan ditutup dan tidak menerima attempt baru"}
                                     </p>
                                     <Input.Error message={errors.status} />
                                 </div>
                             </div>
-                        </Card.Content>
+                        </section>
 
-                        <Card.Footer>
-                            <div className="flex justify-end gap-3">
-                                <Button
-                                    type="cancel"
-                                    url={route('quizzes.show', quiz.id)}
-                                />
-                                <Button
-                                    type="submit"
-                                    processing={processing}
-                                    disabled={processing}
-                                >
-                                    Simpan Perubahan
-                                </Button>
-                            </div>
-                        </Card.Footer>
+                        <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
+                            <Button
+                                type="cancel"
+                                url={route("quizzes.show", quiz.id)}
+                            />
+                            <Button
+                                type="submit"
+                                processing={processing}
+                                disabled={processing}
+                            >
+                                Simpan Perubahan
+                            </Button>
+                        </div>
                     </form>
-                </Card>
+                </div>
             </div>
         </DashboardLayout>
     );

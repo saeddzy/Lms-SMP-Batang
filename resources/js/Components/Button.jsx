@@ -64,7 +64,7 @@ export default function Button({
                     href={url}
                     className={clsx(
                         btnClass,
-                        "bg-stone-900 px-4 py-2.5 text-white shadow-sm hover:bg-stone-800",
+                        "bg-[#163d8f] px-4 py-2.5 text-white shadow-sm hover:bg-[#0f2e6f]",
                         className
                     )}
                 >
@@ -89,7 +89,7 @@ export default function Button({
                     type="submit"
                     className={clsx(
                         btnClass,
-                        "bg-stone-900 px-4 py-2.5 text-white shadow-sm hover:bg-stone-800",
+                        "bg-[#163d8f] px-4 py-2.5 text-white shadow-sm hover:bg-[#0f2e6f]",
                         className
                     )}
                 >

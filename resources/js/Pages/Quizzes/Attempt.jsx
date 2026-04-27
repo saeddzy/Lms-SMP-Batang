@@ -182,11 +182,14 @@ export default function QuizAttempt({ quiz, attempt, timeRemaining }) {
                     )}
                 </div>
 
-                <Card>
-                    <Card.Header>
-                        <Card.Title>{quiz.title}</Card.Title>
+                <Card darkTheme={false}>
+                    <Card.Header darkTheme={false}>
+                        <Card.Title darkTheme={false}>{quiz.title}</Card.Title>
                         {quiz.instructions && (
-                            <Card.Description className="whitespace-pre-wrap">
+                            <Card.Description
+                                darkTheme={false}
+                                className="whitespace-pre-wrap"
+                            >
                                 {quiz.instructions}
                             </Card.Description>
                         )}
@@ -204,7 +207,7 @@ export default function QuizAttempt({ quiz, attempt, timeRemaining }) {
                             </div>
                             <div className="h-2 w-full rounded-full bg-stone-200">
                                 <div
-                                    className="h-2 rounded-full bg-indigo-600 transition-all"
+                                    className="h-2 rounded-full bg-stone-700 transition-all"
                                     style={{ width: `${progressPercent}%` }}
                                 />
                             </div>
@@ -279,7 +282,7 @@ export default function QuizAttempt({ quiz, attempt, timeRemaining }) {
 
                                     {current.question_type === "short_answer" && (
                                         <textarea
-                                            className="mt-3 block w-full rounded-md border border-stone-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                            className="mt-3 block w-full rounded-md border border-stone-300 shadow-sm focus:border-stone-500 focus:ring-stone-500"
                                             rows={4}
                                             value={answers[current.id]?.answer ?? ""}
                                             onChange={(e) =>
@@ -296,7 +299,7 @@ export default function QuizAttempt({ quiz, attempt, timeRemaining }) {
                                                 mengirim jawaban.
                                             </p>
                                             <textarea
-                                                className="block w-full rounded-md border border-stone-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                                className="block w-full rounded-md border border-stone-300 shadow-sm focus:border-stone-500 focus:ring-stone-500"
                                                 rows={8}
                                                 value={answers[current.id]?.answer ?? ""}
                                                 onChange={(e) =>
@@ -320,7 +323,7 @@ export default function QuizAttempt({ quiz, attempt, timeRemaining }) {
                                             const active = idx === currentQuestion;
                                             const answered = isAnswered(q);
                                             const className = active
-                                                ? "bg-indigo-600 text-white"
+                                                ? "bg-stone-800 text-white"
                                                 : answered
                                                   ? "bg-emerald-600 text-white"
                                                   : "bg-slate-200 text-slate-700";

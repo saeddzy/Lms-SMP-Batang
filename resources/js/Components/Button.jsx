@@ -114,13 +114,24 @@ export default function Button({
                 <Link
                     href={url}
                     className={clsx(
-                        btnClass,
-                        "h-9 w-9 border border-stone-200 bg-white p-0 text-stone-600 hover:bg-stone-50 hover:text-stone-900 sm:h-10 sm:w-10",
+                        text || label || children
+                            ? "inline-flex items-center justify-center gap-2 rounded-md border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:bg-stone-50 hover:text-stone-900"
+                            : clsx(
+                                  btnClass,
+                                  "h-9 w-9 border border-stone-200 bg-white p-0 text-stone-600 hover:bg-stone-50 hover:text-stone-900 sm:h-10 sm:w-10"
+                              ),
                         className
                     )}
-                    title="Ubah"
+                    title={text || label || children || "Ubah"}
                 >
-                    <IconPencil className={baseIcon} strokeWidth={1.5} />
+                    {text || label || children ? (
+                        <>
+                            <IconPencil className={baseIcon} strokeWidth={1.5} />
+                            <span>{text || label || children}</span>
+                        </>
+                    ) : (
+                        <IconPencil className={baseIcon} strokeWidth={1.5} />
+                    )}
                 </Link>
             )}
             {type === "view" && (

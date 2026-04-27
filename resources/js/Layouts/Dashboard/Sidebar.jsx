@@ -83,14 +83,12 @@ export default function Sidebar({
 
     /** Menu siswa: berdasarkan peran, bukan permission generik yang bentrok dengan guru. */
     if (isStudent) {
-        if (hasAnyPermission(["dashboard student"])) {
-            navItems.push({
-                href: route("student.dashboard"),
-                label: "Dashboard Siswa",
-                icon: IconLayoutDashboard,
-                active: route().current("student.dashboard"),
-            });
-        }
+        navItems.push({
+            href: route("student.dashboard"),
+            label: "Dashboard Siswa",
+            icon: IconLayoutDashboard,
+            active: route().current("student.dashboard"),
+        });
         if (hasAnyPermission(["student classes"])) {
             navItems.push({
                 href: route("student.classes"),

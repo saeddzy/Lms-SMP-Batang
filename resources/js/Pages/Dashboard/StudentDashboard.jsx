@@ -1,22 +1,25 @@
 import React from "react";
-import clsx from "clsx";
-import DashboardLayout from "@/Layouts/DashboardLayout";
-import { formatStudentDateTime } from "@/Components/Student/StudentShell";
-import { Head, Link, usePage } from "@inertiajs/react";
+import { Head, Link, usePage } from '@inertiajs/react';
 import {
+    IconTrophy,
+    IconSchool,
+    IconBook,
     IconClipboardList,
     IconBrain,
     IconAlertCircle,
-    IconCheck,
-    IconArrowRight,
     IconClock,
-    IconTrophy,
+    IconArrowRight,
+    IconCheck,
     IconInfoCircle,
-    IconSchool,
-    IconChartBar,
-    IconActivity,
-    IconBook,
-} from "@tabler/icons-react";
+    IconBell,
+    IconLogout,
+    IconMenu2,
+    IconPlayerPlayFilled,
+    IconList,
+    IconBulb
+} from '@tabler/icons-react';
+import DashboardLayout from '@/Layouts/DashboardLayout';
+import { formatStudentDateTime } from "@/Components/Student/StudentShell";
 
 // Helper functions
 function gradeLetter(score) {
@@ -29,57 +32,30 @@ function gradeLetter(score) {
     return "E";
 }
 
-function activityIcon(type) {
-    switch (type) {
-        case "task_submission":
-            return IconClipboardList;
-        case "quiz_attempt":
-            return IconBrain;
-        case "exam_attempt":
-            return IconChartBar;
-        default:
-            return IconActivity;
-    }
-}
-
-// Time formatting functions for consistency
-function formatTimeRemaining(endTime, startTime = null) {
-    if (!endTime) return "—";
+function formatTimeRemaining(deadline) {
+    if (!deadline) return "—";
     
     try {
-        const end = new Date(endTime);
+        const date = new Date(deadline);
+        if (Number.isNaN(date.getTime())) return "—";
+        
         const now = new Date();
+        const diffMs = date - now;
         
-        if (Number.isNaN(end.getTime())) return "—";
-        
-        const diffMs = end - now;
-        
-        // If already expired
-        if (diffMs <= 0) {
-            return "Berakhir";
-        }
+        if (diffMs <= 0) return "Berakhir";
         
         const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
         const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
         
-        // Format user-friendly
         if (diffDays > 0) {
-            if (diffDays === 1 && diffHours > 0) {
-                return `1 hari ${diffHours} jam lagi`;
-            } else if (diffDays === 1) {
-                return "1 hari lagi";
-            } else if (diffHours > 0) {
+            if (diffHours > 0) {
                 return `${diffDays} hari ${diffHours} jam lagi`;
             } else {
                 return `${diffDays} hari lagi`;
             }
         } else if (diffHours > 0) {
-            if (diffHours === 1 && diffMinutes > 0) {
-                return `1 jam ${diffMinutes} menit lagi`;
-            } else if (diffHours === 1) {
-                return "1 jam lagi";
-            } else if (diffMinutes > 0) {
+            if (diffMinutes > 0) {
                 return `${diffHours} jam ${diffMinutes} menit lagi`;
             } else {
                 return `${diffHours} jam lagi`;
@@ -130,12 +106,11 @@ function calculateDaysLeft(deadline) {
     }
 }
 
-// Calculate real progress based on actual student data with weighted calculation
 function calculateRealProgress(enrolledClasses, learningStats) {
     // Use actual learning stats data
-    const tasks = learningStats?.tasks || {};
-    const quizzes = learningStats?.quizzes || {};
-    const materials = learningStats?.materials || {}; // Assuming materials data exists
+    const tasks = learningStats?.tasks ?? {};
+    const quizzes = learningStats?.quizzes ?? {};
+    const materials = learningStats?.materials ?? {}; // Assuming materials data exists
     
     const totalTasks = tasks.total || 0;
     const completedTasks = tasks.completed || 0;
@@ -178,6 +153,153 @@ function calculateRealProgress(enrolledClasses, learningStats) {
             quizzes: Math.round(quizzesProgress)
         }
     };
+}
+
+function activityIcon(type) {
+    switch (type) {
+        case "task_submission":
+            return IconClipboardList;
+        case "quiz_attempt":
+            return IconBrain;
+        case "exam_attempt":
+            return IconBrain;
+        case "material_view":
+            return IconBook;
+        default:
+            return IconInfoCircle;
+    }
+}
+
+function clamp01(n) {
+    const x = Number(n);
+    if (Number.isNaN(x)) return 0;
+    return Math.min(1, Math.max(0, x));
+}
+
+function ProgressRing({ value = 0, size = 120 }) {
+    const pct = Math.round(clamp01(value / 100) * 100);
+    const stroke = 10;
+    const r = (size - stroke) / 2;
+    const c = 2 * Math.PI * r;
+    const dash = (pct / 100) * c;
+
+    return (
+        <div className="relative" style={{ width: size, height: size }}>
+            <svg width={size} height={size} className="block">
+                <circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={r}
+                    strokeWidth={stroke}
+                    className="fill-none stroke-slate-100"
+                />
+                <circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={r}
+                    strokeWidth={stroke}
+                    strokeLinecap="round"
+                    className="fill-none stroke-indigo-500"
+                    style={{
+                        strokeDasharray: `${dash} ${c - dash}`,
+                        transform: `rotate(-90deg)`,
+                        transformOrigin: "50% 50%",
+                    }}
+                />
+            </svg>
+            <div className="absolute inset-0 grid place-items-center">
+                <div className="text-center">
+                    <div className="text-3xl font-extrabold tabular-nums text-slate-900">
+                        {pct}%
+                    </div>
+                    <div className="text-xs font-medium text-slate-500">
+                        Total Progress
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function MiniStat({ title, value, subtitle, tone = "indigo", icon: Icon }) {
+    const tones = {
+        indigo: "from-indigo-50 to-indigo-100/60 text-indigo-700 ring-indigo-200/70",
+        emerald: "from-emerald-50 to-emerald-100/60 text-emerald-700 ring-emerald-200/70",
+        amber: "from-amber-50 to-amber-100/60 text-amber-800 ring-amber-200/70",
+        sky: "from-sky-50 to-sky-100/60 text-sky-700 ring-sky-200/70",
+        rose: "from-rose-50 to-rose-100/60 text-rose-700 ring-rose-200/70",
+        violet: "from-violet-50 to-violet-100/60 text-violet-700 ring-violet-200/70",
+    };
+
+    return (
+        <div
+            className={`rounded-2xl bg-gradient-to-br p-4 shadow-sm ring-1 ${tones[tone] ?? tones.indigo}`}
+        >
+            <div className="flex items-start gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/70 ring-1 ring-white/60">
+                    {Icon ? (
+                        <Icon className="h-5 w-5 text-slate-900" stroke={1.5} />
+                    ) : null}
+                </span>
+                <div className="min-w-0">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        {title}
+                    </div>
+                    <div className="mt-0.5 text-2xl font-extrabold tabular-nums text-slate-900">
+                        {value}
+                    </div>
+                    {subtitle ? (
+                        <div className="mt-0.5 text-xs font-medium text-slate-600">
+                            {subtitle}
+                        </div>
+                    ) : null}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function UrgentCard({ item }) {
+    const isTask = item.type === "task";
+    const isQuiz = item.type === "quiz";
+    const isExam = item.type === "exam";
+    const tone =
+        isTask ? "bg-amber-50 ring-amber-200/70" : isQuiz ? "bg-rose-50 ring-rose-200/70" : "bg-sky-50 ring-sky-200/70";
+    const badge =
+        isTask ? "Tugas" : isQuiz ? "Kuis" : "Ujian";
+    const href =
+        isTask
+            ? route("tasks.show", item.id)
+            : isQuiz
+              ? route("quizzes.show", item.id)
+              : route("exams.show", item.id);
+
+    return (
+        <div className={`flex items-center justify-between gap-4 rounded-2xl p-4 ring-1 ${tone}`}>
+            <div className="min-w-0">
+                <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                    <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-slate-200">
+                        {badge}
+                    </span>
+                    <span className="truncate">
+                        {item.subject ?? item.subject?.name ?? ""}
+                    </span>
+                </div>
+                <div className="mt-1 line-clamp-1 text-sm font-bold text-slate-900">
+                    {item.title}
+                </div>
+                <div className="mt-1 text-xs text-slate-600">
+                    {item.timeRemaining ?? item.deadline ?? "—"}
+                </div>
+            </div>
+            <Link
+                href={href}
+                className="shrink-0 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
+            >
+                Kerjakan
+            </Link>
+        </div>
+    );
 }
 
 export default function StudentDashboard() {
@@ -250,354 +372,313 @@ export default function StudentDashboard() {
         <DashboardLayout title="Dashboard Siswa">
             <Head title="Dashboard Siswa" />
 
-            <div className="mx-auto max-w-5xl space-y-8 pb-16 pt-4">
-                
-                {/* 1. Hero Card - Greeting Section */}
-                <div className="relative overflow-hidden rounded-2xl p-8 shadow-xl shadow-[rgba(20,96,190,0.3)] bg-gradient-to-br from-[#154497] via-[#1460BE] to-[#1E6FDB] ring-1 ring-[rgba(96,165,250,0.2)]">
-                    <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" aria-hidden />
-                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-56 w-56 rounded-full bg-[#60A5FA]/25 blur-2xl" aria-hidden />
-                    <div className="relative">
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#B6D4FF]">
-                            Komunitas belajar
-                        </p>
-                        <h1 className="mt-2 text-3xl font-bold tracking-tight text-white">
-                            Halo, {firstName} 👋
-                        </h1>
-                        <h2 className="text-xl font-semibold text-white mt-2">Kelas Anda</h2>
-                        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#CBD5E1]/95">
-                            Kelas yang dapat Anda akses setelah didaftarkan oleh admin — buka untuk detail.
-                        </p>
-                        {classCount > 0 && (
-                            <div className="mt-6 flex items-center gap-4">
-                                <div className="flex items-center gap-2">
-                                    <IconSchool className="w-5 h-5 text-white" />
-                                    <span className="font-medium text-white">{classCount} kelas aktif</span>
-                                </div>
-                                <Link 
-                                    href={route("student.classes")}
-                                    className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg text-white font-medium transition-colors border border-white/20"
-                                >
-                                    Lihat Kelas
-                                    <IconArrowRight className="w-4 h-4" />
-                                </Link>
-                            </div>
-                        )}
-                    </div>
-                </div>
+            <div className="min-h-screen bg-slate-50">
+                <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+                    {/* HERO */}
+                    <section className="relative overflow-hidden rounded-2xl border border-indigo-300/70 bg-gradient-to-r from-blue-600 via-sky-600 to-indigo-600 p-6 text-white shadow-md sm:p-8">
+                        <div
+                            className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl"
+                            aria-hidden
+                        />
+                        <div
+                            className="pointer-events-none absolute -bottom-20 -left-20 h-56 w-56 rounded-full bg-[#60A5FA]/25 blur-2xl"
+                            aria-hidden
+                        />
 
-                {/* 2. Central Notifications (Alerts) */}
-                {(urgentTasks.length > 0 || activeQuizzes.length > 0) && (
-                    <section className="flex flex-col gap-3">
-                        {activeQuizzes.map(quiz => (
-                            <div key={`alert-q-${quiz.id}`} className="flex items-center justify-between p-4 rounded-xl bg-blue-50 border border-blue-200">
-                                <div className="flex items-center gap-3">
-                                    <div className="flex-shrink-0 p-2 bg-blue-100 rounded-lg text-blue-600">
-                                        <IconBrain className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-semibold text-blue-900">Kuis Aktif: {quiz.title}</p>
-                                        <p className="text-xs text-blue-700 mt-0.5">{quiz.subject}</p>
-                                    </div>
-                                </div>
-                                <Link href={route("quizzes.show", quiz.id)} className="shrink-0 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-blue-700 transition">
-                                    Mulai Kuis
-                                </Link>
-                            </div>
-                        ))}
-                        
-                        {urgentTasks.map(task => {
-                            const daysLeft = calculateDaysLeft(task.due_date);
-                            return (
-                                <div key={`alert-t-${task.id}`} className="flex items-center justify-between p-4 rounded-xl bg-amber-50 border border-amber-200">
+                        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="min-w-0">
+                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#B6D4FF]">
+                                    Halo kembali,
+                                </p>
+                                <h1 className="mt-1 text-3xl font-extrabold tracking-tight">
+                                    {firstName}
+                                </h1>
+                                <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#CBD5E1]/95">
+                                    Semangat belajar hari ini! Kamu bisa capai lebih banyak lagi.
+                                </p>
+
+                                <div className="mt-5 flex flex-wrap items-center gap-6">
                                     <div className="flex items-center gap-3">
-                                        <div className="flex-shrink-0 p-2 bg-amber-100 rounded-lg text-amber-600">
-                                            <IconAlertCircle className="w-5 h-5" />
-                                        </div>
+                                        <span className="grid h-10 w-10 place-items-center rounded-2xl bg-white/15 ring-1 ring-white/20">
+                                            <IconSchool className="h-5 w-5" stroke={1.5} />
+                                        </span>
                                         <div>
-                                            <p className="text-sm font-semibold text-amber-900">Tugas Mendesak: {task.title}</p>
-                                            <p className="text-xs text-amber-700 mt-0.5">
-                                                Tenggat: {formatTimeRemaining(task.due_date)}
-                                            </p>
+                                            <div className="text-2xl font-extrabold tabular-nums">
+                                                {classCount}
+                                            </div>
+                                            <div className="text-xs font-medium text-white/85">
+                                                Kelas Aktif
+                                            </div>
                                         </div>
                                     </div>
-                                    <Link href={route("tasks.show", task.id)} className="shrink-0 px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-amber-600 transition">
-                                        Kerjakan
-                                    </Link>
+                                    <div className="flex items-center gap-3">
+                                        <span className="grid h-10 w-10 place-items-center rounded-2xl bg-white/15 ring-1 ring-white/20">
+                                            <IconBulb className="h-5 w-5" stroke={1.5} />
+                                        </span>
+                                        <div>
+                                            <div className="text-2xl font-extrabold tabular-nums">
+                                                {realProgress.overallProgress}%
+                                            </div>
+                                            <div className="text-xs font-medium text-white/85">
+                                                Progress Belajar
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                            );
-                        })}
-                    </section>
-                )}
+                            </div>
 
-                {/* 3. Progress Belajar - Single Card */}
-                <section>
-                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                        <div className="border-b border-slate-100 px-6 py-4 bg-gradient-to-r from-blue-50 to-sky-50">
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-lg font-semibold text-slate-900">Progress Belajar</h2>
-                                <div className="flex items-center gap-2 text-sm text-slate-600">
-                                    <IconSchool className="w-4 h-4" />
-                                    <span>{classCount} kelas</span>
-                                </div>
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                                <Link
+                                    href={route("student.classes")}
+                                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-[#154497] shadow-sm transition hover:bg-white/95"
+                                >
+                                    <IconPlayerPlayFilled className="h-4 w-4" stroke={1.5} />
+                                    Lanjut Belajar
+                                </Link>
+                                <Link
+                                    href={route("student.tasks")}
+                                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white/15 px-5 py-3 text-sm font-semibold text-white ring-1 ring-white/25 transition hover:bg-white/20"
+                                >
+                                    <IconClipboardList className="h-4 w-4" stroke={1.5} />
+                                    Lihat Tugas
+                                </Link>
                             </div>
                         </div>
-                        <div className="p-6">
-                            {/* Main Progress Bar with Better Visual */}
-                            <div className="mb-6">
-                                <div className="flex justify-between items-center mb-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg text-white shadow-lg">
-                                            <IconTrophy className="w-6 h-6" />
-                                        </div>
-                                        <div>
-                                            <p className="text-lg font-bold text-slate-900">{realProgress.overallProgress}% Progress Belajar</p>
-                                            <p className="text-sm text-slate-500">Total pembelajaran kamu</p>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="flex items-center gap-1">
-                                            {realProgress.overallProgress >= 80 ? (
-                                                <span className="text-2xl">🎉</span>
-                                            ) : realProgress.overallProgress >= 50 ? (
-                                                <span className="text-2xl">📚</span>
-                                            ) : (
-                                                <span className="text-2xl">🚀</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                {/* Animated Progress Bar */}
-                                <div className="relative">
-                                    <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden">
-                                        <div 
-                                            className={`h-4 rounded-full transition-all duration-1000 ease-out shadow-sm ${
-                                                realProgress.overallProgress >= 80 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' :
-                                                realProgress.overallProgress >= 50 ? 'bg-gradient-to-r from-blue-500 to-blue-600' :
-                                                'bg-gradient-to-r from-amber-500 to-amber-600'
-                                            }`}
-                                            style={{ width: `${realProgress.overallProgress}%` }}
-                                        >
-                                            <div className="h-full bg-white/20 animate-pulse"></div>
-                                        </div>
-                                    </div>
-                                    <p className="text-center text-xs text-slate-500 mt-2">
-                                        {realProgress.overallProgress >= 80 ? 'Luar biasa! Terus pertahankan!' :
-                                         realProgress.overallProgress >= 50 ? 'Bagus! Tingkatkan lagi!' :
-                                         'Yuk, semangat belajar!'}
-                                    </p>
-                                </div>
-                            </div>
+                    </section>
 
-                            {/* Progress Breakdown - This is the key improvement! */}
-                            <div className="mb-6">
-                                <h4 className="text-sm font-semibold text-slate-700 mb-3">📊 Breakdown Progress</h4>
-                                <div className="space-y-3">
-                                    {/* Materi Progress */}
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                            <IconBook className="w-4 h-4 text-purple-600" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="flex justify-between items-center mb-1">
-                                                <span className="text-sm font-medium text-slate-700">Materi</span>
-                                                <span className="text-sm font-bold text-purple-600">{realProgress.breakdown.materials}%</span>
-                                            </div>
-                                            <div className="w-full bg-purple-100 rounded-full h-2">
-                                                <div 
-                                                    className="bg-gradient-to-r from-purple-500 to-purple-600 h-2 rounded-full transition-all duration-500"
-                                                    style={{ width: `${realProgress.breakdown.materials}%` }}
-                                                ></div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Tugas Progress */}
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                            <IconClipboardList className="w-4 h-4 text-amber-600" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="flex justify-between items-center mb-1">
-                                                <span className="text-sm font-medium text-slate-700">Tugas</span>
-                                                <span className="text-sm font-bold text-amber-600">{realProgress.breakdown.tasks}%</span>
-                                            </div>
-                                            <div className="w-full bg-amber-100 rounded-full h-2">
-                                                <div 
-                                                    className="bg-gradient-to-r from-amber-500 to-amber-600 h-2 rounded-full transition-all duration-500"
-                                                    style={{ width: `${realProgress.breakdown.tasks}%` }}
-                                                ></div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Kuis Progress */}
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                            <IconBrain className="w-4 h-4 text-emerald-600" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="flex justify-between items-center mb-1">
-                                                <span className="text-sm font-medium text-slate-700">Kuis</span>
-                                                <span className="text-sm font-bold text-emerald-600">{realProgress.breakdown.quizzes}%</span>
-                                            </div>
-                                            <div className="w-full bg-emerald-100 rounded-full h-2">
-                                                <div 
-                                                    className="bg-gradient-to-r from-emerald-500 to-emerald-600 h-2 rounded-full transition-all duration-500"
-                                                    style={{ width: `${realProgress.breakdown.quizzes}%` }}
-                                                ></div>
-                                            </div>
-                                        </div>
-                                    </div>
+                    {/* HARUS DIKERJAKAN */}
+                    <section className="mt-6 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200/70">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className="grid h-9 w-9 place-items-center rounded-2xl bg-rose-50 ring-1 ring-rose-200/70">
+                                        <IconAlertCircle className="h-5 w-5 text-rose-700" stroke={1.5} />
+                                    </span>
+                                    <h2 className="text-lg font-extrabold text-slate-900">
+                                        Harus Dikerjakan
+                                    </h2>
                                 </div>
-                                
-                                <p className="text-xs text-slate-500 mt-3 text-center">
-                                    💡 Bobot: Materi 40% • Tugas 30% • Kuis 30%
+                                <p className="mt-1 text-sm text-slate-500">
+                                    Tugas atau kuis yang mendekati deadline
                                 </p>
                             </div>
-
-                            {/* Quick Stats */}
-                            <div className="grid grid-cols-3 gap-3">
-                                <div className="text-center p-3 rounded-lg bg-amber-50 border border-amber-100">
-                                    <p className="text-lg font-bold text-amber-700">{realProgress.completedTasks}</p>
-                                    <p className="text-xs text-amber-600">Tugas Selesai</p>
-                                </div>
-                                <div className="text-center p-3 rounded-lg bg-emerald-50 border border-emerald-100">
-                                    <p className="text-lg font-bold text-emerald-700">{realProgress.passedQuizzes}</p>
-                                    <p className="text-xs text-emerald-600">Kuis Lulus</p>
-                                </div>
-                                <div className="text-center p-3 rounded-lg bg-blue-50 border border-blue-100">
-                                    <p className="text-lg font-bold text-blue-700">{realProgress.averageGrade}%</p>
-                                    <p className="text-xs text-blue-600">Rata-rata Nilai</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                {/* 4. Yang Harus Dikerjakan - Prominent Section */}
-                <section>
-                    <div className="bg-white border-2 border-red-200 rounded-2xl shadow-lg overflow-hidden">
-                        <div className="border-b border-red-100 px-6 py-4 bg-gradient-to-r from-red-50 to-orange-50">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center text-white">
-                                        <IconAlertCircle className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-xl font-bold text-red-900">🚨 Penting! Harus Dikerjakan</h2>
-                                        <p className="text-sm text-red-700">Tugas, kuis, dan ujian yang membutuhkan perhatian Anda</p>
-                                    </div>
-                                </div>
-                                <Link href={route("student.tasks")} className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-red-700 transition-colors">
-                                    Lihat Semua
-                                    <IconArrowRight className="w-4 h-4" />
-                                </Link>
-                            </div>
+                            <Link
+                                href={route("student.tasks")}
+                                className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 hover:text-indigo-800"
+                            >
+                                Lihat Semua <IconArrowRight className="h-4 w-4" stroke={1.5} />
+                            </Link>
                         </div>
 
-                        <div className="p-6">
+                        <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
                             {unifiedAgenda.length > 0 ? (
-                                <div className="space-y-3">
-                                    {unifiedAgenda.map((item) => (
-                                        <Link 
-                                            key={`${item.type}-${item.id}`} 
-                                            href={item.type === 'task' ? route("tasks.show", item.id) : item.type === 'quiz' ? route("quizzes.show", item.id) : route("exams.show", item.id)}
-                                            className={`flex items-center p-4 rounded-xl border-2 transition-all duration-200 group ${
-                                                item.type === 'quiz' && item.is_open ? 'border-blue-300 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 hover:shadow-md' :
-                                                item.type === 'exam' ? 'border-red-300 bg-red-50 hover:bg-red-100 hover:border-red-400 hover:shadow-md' :
-                                                'border-amber-300 bg-amber-50 hover:bg-amber-100 hover:border-amber-400 hover:shadow-md'
-                                            }`}
-                                        >
-                                            <div className="flex-shrink-0 mr-4">
-                                                {item.type === 'task' && <div className="p-3 bg-amber-500 text-white rounded-lg shadow-md"><IconClipboardList className="w-5 h-5" /></div>}
-                                                {item.type === 'quiz' && <div className="p-3 bg-blue-500 text-white rounded-lg shadow-md"><IconBrain className="w-5 h-5" /></div>}
-                                                {item.type === 'exam' && <div className="p-3 bg-red-500 text-white rounded-lg shadow-md"><IconAlertCircle className="w-5 h-5" /></div>}
-                                            </div>
-                                            <div className="flex-1 min-w-0 pr-4">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <p className="text-base font-bold text-slate-900 truncate">{item.title}</p>
-                                                    {item.type === 'quiz' && item.is_open && (
-                                                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-blue-600 text-white text-xs font-bold animate-pulse">
-                                                            ⚡ SEDANG AKTIF
-                                                        </span>
-                                                    )}
-                                                    {item.type === 'exam' && (
-                                                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-600 text-white text-xs font-bold">
-                                                            📝 UJIAN
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <p className="text-sm text-slate-600">{item.subject}</p>
-                                            </div>
-                                            <div className="text-right flex-shrink-0">
-                                                {item.type === 'quiz' && item.is_open ? (
-                                                    <div className="flex flex-col items-end gap-2">
-                                                        <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold shadow-sm">
-                                                            Mulai Sekarang
-                                                        </span>
-                                                        <p className="text-xs text-blue-600 font-medium">⏰ {item.deadline}</p>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex flex-col items-end gap-1">
-                                                        <div className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
-                                                            <IconClock className="w-4 h-4" />
-                                                            {item.timeRemaining}
-                                                        </div>
-                                                        <p className="text-xs text-slate-500">{item.deadline}</p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </Link>
-                                    ))}
-                                </div>
+                                unifiedAgenda.slice(0, 3).map((item) => (
+                                    <UrgentCard key={`${item.type}-${item.id}`} item={item} />
+                                ))
                             ) : (
-                                <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-                                    <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
-                                        <IconCheck className="w-10 h-10 text-emerald-500" />
-                                    </div>
-                                    <p className="text-xl font-bold text-slate-900 mb-2">🎉 Semua Beres!</p>
-                                    <p className="text-sm text-slate-600">Tidak ada tugas, kuis, atau ujian yang perlu dikerjakan saat ini.</p>
+                                <div className="col-span-full rounded-2xl bg-slate-50 p-6 text-center text-sm text-slate-600 ring-1 ring-slate-200">
+                                    Tidak ada item mendesak. Lanjutkan belajar seperti biasa.
                                 </div>
                             )}
                         </div>
-                    </div>
-                </section>
+                    </section>
 
-                {/* 5. Aktivitas Terbaru */}
-                <section>
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-semibold text-slate-900">📊 Aktivitas Terbaru</h2>
-                        <span className="text-sm text-slate-500">Riwayat pembelajaran Anda</span>
-                    </div>
-                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-                        {recentActivities.length > 0 ? (
-                            <div className="space-y-4">
-                                {recentActivities.slice(0, 5).map((a, i) => {
-                                    const Icon = activityIcon(a.type);
-                                    return (
-                                        <div key={i} className="flex items-start gap-3">
-                                            <div className="flex-shrink-0 w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
-                                                <Icon className="w-4 h-4 text-slate-600" />
+                    {/* MAIN GRID */}
+                    <section className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
+                        {/* PROGRESS PANEL */}
+                        <div className="lg:col-span-8">
+                            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200/70">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <h2 className="text-lg font-extrabold text-slate-900">
+                                            Progress Belajar
+                                        </h2>
+                                        <p className="mt-1 text-sm text-slate-500">
+                                            Ringkasan progres belajar kamu hari ini
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-12">
+                                    <div className="md:col-span-4">
+                                        <ProgressRing value={realProgress.overallProgress} size={130} />
+                                    </div>
+
+                                    <div className="md:col-span-8">
+                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                            <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
+                                                <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                                                    <IconBook className="h-4 w-4 text-violet-600" stroke={1.5} />
+                                                    Materi
+                                                </div>
+                                                <div className="mt-2 h-2.5 rounded-full bg-slate-200">
+                                                    <div
+                                                        className="h-2.5 rounded-full bg-violet-500"
+                                                        style={{ width: `${realProgress.breakdown.materials}%` }}
+                                                    />
+                                                </div>
+                                                <div className="mt-2 flex items-center justify-between text-xs font-medium text-slate-600">
+                                                    <span>Progress</span>
+                                                    <span className="tabular-nums">{realProgress.breakdown.materials}%</span>
+                                                </div>
                                             </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium text-slate-900 line-clamp-2">{a.title}</p>
-                                                <p className="text-xs text-slate-500 mt-1">{formatStudentDateTime(a.date)}</p>
+
+                                            <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
+                                                <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                                                    <IconClipboardList className="h-4 w-4 text-amber-600" stroke={1.5} />
+                                                    Tugas
+                                                </div>
+                                                <div className="mt-2 h-2.5 rounded-full bg-slate-200">
+                                                    <div
+                                                        className="h-2.5 rounded-full bg-amber-500"
+                                                        style={{ width: `${realProgress.breakdown.tasks}%` }}
+                                                    />
+                                                </div>
+                                                <div className="mt-2 flex items-center justify-between text-xs font-medium text-slate-600">
+                                                    <span>Progress</span>
+                                                    <span className="tabular-nums">{realProgress.breakdown.tasks}%</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
+                                                <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                                                    <IconBrain className="h-4 w-4 text-emerald-600" stroke={1.5} />
+                                                    Kuis
+                                                </div>
+                                                <div className="mt-2 h-2.5 rounded-full bg-slate-200">
+                                                    <div
+                                                        className="h-2.5 rounded-full bg-emerald-500"
+                                                        style={{ width: `${realProgress.breakdown.quizzes}%` }}
+                                                    />
+                                                </div>
+                                                <div className="mt-2 flex items-center justify-between text-xs font-medium text-slate-600">
+                                                    <span>Progress</span>
+                                                    <span className="tabular-nums">{realProgress.breakdown.quizzes}%</span>
+                                                </div>
                                             </div>
                                         </div>
-                                    );
-                                })}
-                                </div>
-                            ) : (
-                                <div className="text-center py-8">
-                                    <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                                        <IconInfoCircle className="w-6 h-6 text-slate-400" />
+
+                                        <div className="mt-6 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
+                                            <div className="flex items-center justify-between">
+                                                <h3 className="text-sm font-extrabold text-slate-900">
+                                                    Progress per Kelas
+                                                </h3>
+                                            </div>
+                                            <div className="mt-3 space-y-3">
+                                                {(Array.isArray(enrolledClasses) ? enrolledClasses : (enrolledClasses?.data ?? []))
+                                                    .slice(0, 3)
+                                                    .map((c) => {
+                                                        const name = c?.name ?? "Kelas";
+                                                        const base = Math.max(10, Math.min(100, (realProgress.overallProgress ?? 0) + (String(name).length % 23) - 10));
+                                                        return (
+                                                            <div key={c?.id ?? name} className="flex items-center gap-3">
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="flex items-center justify-between text-sm font-semibold text-slate-700">
+                                                                        <span className="truncate">{name}</span>
+                                                                        <span className="tabular-nums text-slate-500">{base}%</span>
+                                                                    </div>
+                                                                    <div className="mt-1 h-2 rounded-full bg-slate-200">
+                                                                        <div
+                                                                            className="h-2 rounded-full bg-indigo-500"
+                                                                            style={{ width: `${base}%` }}
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                {classCount === 0 ? (
+                                                    <p className="text-sm text-slate-500">
+                                                        Belum ada kelas aktif.
+                                                    </p>
+                                                ) : null}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <p className="text-sm text-slate-500">Belum ada riwayat aktivitas.</p>
                                 </div>
-                            )}
+                            </div>
+
+                            {/* MINI STATS */}
+                            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                <MiniStat
+                                    title="Kuis lulus"
+                                    value={realProgress.passedQuizzes ?? 0}
+                                    subtitle="Pertahankan!"
+                                    tone="emerald"
+                                    icon={IconTrophy}
+                                />
+                                <MiniStat
+                                    title="Rata-rata nilai"
+                                    value={`${Number(avg).toFixed(1)}%`}
+                                    subtitle={`Predikat ${gradeLetter(avg)}`}
+                                    tone="sky"
+                                    icon={IconTrophy}
+                                />
+                                <MiniStat
+                                    title="Tugas selesai"
+                                    value={realProgress.completedTasks ?? 0}
+                                    subtitle="Terus tingkatkan"
+                                    tone="amber"
+                                    icon={IconClipboardList}
+                                />
+                                <MiniStat
+                                    title="Aktivitas"
+                                    value={recentActivities?.length ?? 0}
+                                    subtitle="Terbaru"
+                                    tone="violet"
+                                    icon={IconBell}
+                                />
+                            </div>
                         </div>
-                </section>
+
+                        {/* AKTIVITAS */}
+                        <aside className="lg:col-span-4">
+                            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200/70">
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-lg font-extrabold text-slate-900">
+                                        Aktivitas Terbaru
+                                    </h2>
+                                    <Link
+                                        href={route("student.tasks")}
+                                        className="text-sm font-semibold text-indigo-600 hover:text-indigo-800"
+                                    >
+                                        Lihat Semua
+                                    </Link>
+                                </div>
+
+                                <div className="mt-4 space-y-3">
+                                    {recentActivities && recentActivities.length > 0 ? (
+                                        recentActivities.slice(0, 6).map((a) => {
+                                            const Icon = activityIcon(a.type);
+                                            return (
+                                                <div
+                                                    key={`${a.type}-${a.id}`}
+                                                    className="flex items-start gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200/70"
+                                                >
+                                                    <span className="mt-0.5 grid h-9 w-9 place-items-center rounded-2xl bg-white ring-1 ring-slate-200">
+                                                        <Icon className="h-5 w-5 text-indigo-700" stroke={1.5} />
+                                                    </span>
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-semibold text-slate-900 line-clamp-2">
+                                                            {a.title}
+                                                        </p>
+                                                        <p className="mt-1 text-xs text-slate-500">
+                                                            {formatStudentDateTime(a.date ?? a.created_at ?? a.updated_at)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="rounded-2xl bg-slate-50 p-6 text-center text-sm text-slate-600 ring-1 ring-slate-200/70">
+                                            Belum ada aktivitas untuk ditampilkan.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </aside>
+                    </section>
+                </div>
             </div>
         </DashboardLayout>
     );

@@ -16,6 +16,8 @@ import {
     IconSettings,
     IconCalendarTime,
     IconListCheck,
+    IconTargetArrow,
+    IconAlertTriangle,
 } from "@tabler/icons-react";
 import QuestionBank from "@/Components/Lms/QuestionBank";
 import ToggleSwitch from "@/Components/ToggleSwitch";
@@ -61,16 +63,42 @@ function examWindow(exam) {
     const duration = exam.duration_minutes != null ? exam.duration_minutes : exam.duration;
     if (!exam.scheduled_date || duration == null) return "invalid";
     
-    // Gabungkan scheduled_date dengan start_time jika ada
-    const startTime = exam.start_time ? `${exam.scheduled_date}T${exam.start_time}` : exam.scheduled_date;
-    const start = new Date(startTime);
+    // Parse scheduled_date - handle different date formats
+    let startDate;
+    try {
+        // Jika scheduled_date sudah full date format
+        if (exam.scheduled_date.includes('T') || exam.scheduled_date.includes('-')) {
+            startDate = new Date(exam.scheduled_date);
+        } else {
+            // Jika hanya date format (YYYY-MM-DD), tambahkan waktu start_time atau default 00:00
+            const dateStr = exam.start_time ? `${exam.scheduled_date}T${exam.start_time}` : `${exam.scheduled_date}T00:00:00`;
+            startDate = new Date(dateStr);
+        }
+    } catch (error) {
+        console.error('Error parsing date:', exam.scheduled_date, error);
+        return "invalid";
+    }
     
-    // Hitung waktu akhir berdasarkan duration
-    const end = new Date(
-        start.getTime() + Number(duration) * 60 * 1000
-    );
+    // Validasi start date
+    if (isNaN(startDate.getTime())) return "invalid";
+    
+    // Hitung waktu akhir berdasarkan duration (dalam menit)
+    const end = new Date(startDate.getTime() + Number(duration) * 60 * 1000);
     const now = new Date();
-    if (now < start) return "belum";
+    
+    // Debug logging (bisa dihapus di production)
+    console.log('Exam Debug:', {
+        scheduled_date: exam.scheduled_date,
+        start_time: exam.start_time,
+        duration: duration,
+        startDate: startDate.toISOString(),
+        endDate: end.toISOString(),
+        now: now.toISOString(),
+        nowLessThanStart: now < startDate,
+        nowGreaterThanEnd: now > end
+    });
+    
+    if (now < startDate) return "belum";
     if (now > end) return "selesai";
     return "buka";
 }
@@ -469,9 +497,118 @@ export default function Show() {
 
     const inner = (
         <>
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm">
-                {banner}
+            <section
+                id="ringkasan-ujian"
+                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-5"
+            >
+                <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <h2 className="line-clamp-1 text-2xl font-bold tracking-tight text-slate-900">
+                                {exam.title}
+                            </h2>
+                            <p className="mt-1 text-sm text-slate-600">
+                                {exam.subject?.name ?? "Mapel belum diatur"} ·{" "}
+                                {sc?.name ?? "Kelas belum diatur"}
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
+                                <span className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 ring-1 ring-slate-200">
+                                    <IconClock className="h-3.5 w-3.5" />
+                                    {exam.duration_minutes != null
+                                        ? `${exam.duration_minutes} menit`
+                                        : exam.duration != null
+                                            ? `${exam.duration} menit`
+                                            : "Durasi belum diatur"}
+                                </span>
+                                <span className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 ring-1 ring-slate-200">
+                                    <IconListCheck className="h-3.5 w-3.5" />
+                                    {exam.questions?.length ??
+                                        exam.total_questions ??
+                                        0}{" "}
+                                    soal
+                                </span>
+                                <span className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 ring-1 ring-slate-200">
+                                    <IconTargetArrow className="h-3.5 w-3.5" />
+                                    Ambang Lulus {exam.passing_marks ?? exam.passing_score ?? 0}%
+                                </span>
+                            </div>
+                        </div>
+                        <span
+                            className={`inline-flex rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ${
+                                window === "buka"
+                                    ? "bg-emerald-50 text-emerald-900 ring-emerald-200/80"
+                                    : window === "belum"
+                                      ? "bg-amber-50 text-amber-900 ring-amber-200/80"
+                                      : window === "selesai"
+                                        ? "bg-rose-50 text-rose-900 ring-rose-200/80"
+                                        : "bg-slate-50 text-slate-900 ring-slate-200/80"
+                            }`}
+                        >
+                            {window === "buka"
+                                ? "Aktif"
+                                : window === "belum"
+                                  ? "Akan Datang"
+                                  : window === "selesai"
+                                    ? "Berakhir"
+                                    : window === "batal"
+                                      ? "Dibatalkan"
+                                      : "Tidak Valid"}
+                        </span>
+                    </div>
+                </div>
+
+                <div
+                    className={`rounded-xl border p-4 text-sm shadow-sm ${
+                        window === "buka"
+                            ? "border-emerald-200 bg-emerald-50/80 text-emerald-950"
+                            : window === "belum"
+                              ? "border-amber-200 bg-amber-50/85 text-amber-950"
+                              : window === "selesai"
+                                ? "border-rose-200 bg-rose-50 text-rose-900"
+                                : window === "batal"
+                                  ? "border-rose-200 bg-rose-50 text-rose-900"
+                                  : "border-amber-200 bg-amber-50/85 text-amber-950"
+                    }`}
+                >
+                    <p className="inline-flex items-center gap-2 font-semibold">
+                        <IconAlertTriangle className="h-4 w-4" />
+                        {window === "buka" && "Jadwal pengerjaan sedang berlangsung"}
+                        {window === "belum" &&
+                            "Ujian belum dimulai sesuai jadwal"}
+                        {window === "selesai" &&
+                            "Waktu pengerjaan ujian sudah berakhir"}
+                        {window === "batal" &&
+                            "Ujian telah dibatalkan"}
+                        {window === "invalid" &&
+                            "Jadwal ujian tidak lengkap"}
+                    </p>
+                    <p className="mt-1 opacity-90">
+                        Status ujian:{" "}
+                        {exam.is_active ? "aktif" : "nonaktif"}
+                        {" · "}
+                        {window === "buka" &&
+                            "Siswa bisa mengerjakan pada rentang waktu ini"}
+                        {window === "belum" &&
+                            "Menunggu tanggal/jam mulai yang ditetapkan"}
+                        {window === "selesai" &&
+                            "Tanggal/jam selesai sudah lewat"}
+                        {window === "batal" &&
+                            "Ujian dibatalkan oleh pengajar"}
+                        {window === "invalid" &&
+                            "Atur tanggal mulai dan durasi di pengaturan ujian"}
+                    </p>
+                    {isStudent &&
+                        window === "buka" &&
+                        unfinished && (
+                            <div className="mt-3 flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+                                <IconCircleCheck className="h-3.5 w-3.5" />
+                                Anda memiliki percobaan yang belum selesai
+                            </div>
+                        )}
+                </div>
+
                 <div className="mt-6">{metaBlock}</div>
+
                 {exam.description ? (
                     <div className="mt-6">
                         <h3 className="text-sm font-semibold text-slate-900">
@@ -495,7 +632,7 @@ export default function Show() {
                 <div className="mt-4 text-xs text-slate-500">
                     Pembuat: {exam.creator?.name ?? exam.teacher?.name ?? "—"}
                 </div>
-            </div>
+            </section>
 
             {statsRow}
 

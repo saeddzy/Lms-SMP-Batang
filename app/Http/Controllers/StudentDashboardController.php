@@ -218,8 +218,8 @@ class StudentDashboardController extends Controller
                 return [
                     'id' => $quiz->id,
                     'title' => $quiz->title,
-                    'subject' => $quiz->subject?->name ?? '—',
-                    'class' => $quiz->schoolClass?->name ?? '—',
+                    'subject' => $quiz->subject?->name ?? 'ΓÇö',
+                    'class' => $quiz->schoolClass?->name ?? 'ΓÇö',
                     'start_time' => $quiz->start_time,
                     'end_time' => $quiz->end_time,
                     'duration_minutes' => $quiz->time_limit,
@@ -230,7 +230,7 @@ class StudentDashboardController extends Controller
     }
 
     /**
-     * Kuis aktif di kelas siswa — untuk halaman "Kuis Saya" (bukan hanya riwayat percobaan).
+     * Kuis aktif di kelas siswa ΓÇö untuk halaman "Kuis Saya" (bukan hanya riwayat percobaan).
      *
      * @return array<int, array<string, mixed>>
      */
@@ -278,8 +278,8 @@ class StudentDashboardController extends Controller
                 'id' => $quiz->id,
                 'title' => $quiz->title,
                 'description' => $quiz->description,
-                'subject' => $quiz->subject?->name ?? '—',
-                'class' => $quiz->schoolClass?->name ?? '—',
+                'subject' => $quiz->subject?->name ?? 'ΓÇö',
+                'class' => $quiz->schoolClass?->name ?? 'ΓÇö',
                 'start_time' => $quiz->start_time,
                 'end_time' => $quiz->end_time,
                 'time_limit' => $quiz->time_limit,
@@ -914,7 +914,7 @@ class StudentDashboardController extends Controller
     }
 
     /**
-     * Riwayat kelas (setelah naik kelas / pindah — tidak bisa akses lagi ke kelas lama).
+     * Riwayat kelas (setelah naik kelas / pindah ΓÇö tidak bisa akses lagi ke kelas lama).
      * Sertakan nilai (FinalGrade) per kelas agar siswa melihat rekap di kelas tersebut.
      */
     public function enrollmentHistory()
@@ -948,7 +948,7 @@ class StudentDashboardController extends Controller
                     'id' => 'task-'.$x->id,
                     'type' => 'Tugas',
                     'title' => $x->task?->title ?? 'Tugas',
-                    'subject' => $x->task?->subject?->name ?? '—',
+                    'subject' => $x->task?->subject?->name ?? 'ΓÇö',
                     'score' => $x->score,
                     'assessed_at' => $x->graded_at ?? $x->submitted_at,
                 ]);
@@ -964,7 +964,7 @@ class StudentDashboardController extends Controller
                     'id' => 'quiz-'.$x->id,
                     'type' => 'Kuis',
                     'title' => $x->quiz?->title ?? 'Kuis',
-                    'subject' => $x->quiz?->subject?->name ?? '—',
+                    'subject' => $x->quiz?->subject?->name ?? 'ΓÇö',
                     'score' => $x->score,
                     'assessed_at' => $x->finished_at,
                 ]);
@@ -980,7 +980,7 @@ class StudentDashboardController extends Controller
                     'id' => 'exam-'.$x->id,
                     'type' => 'Ujian',
                     'title' => $x->exam?->title ?? 'Ujian',
-                    'subject' => $x->exam?->subject?->name ?? '—',
+                    'subject' => $x->exam?->subject?->name ?? 'ΓÇö',
                     'score' => $x->score,
                     'assessed_at' => $x->finished_at,
                 ]);

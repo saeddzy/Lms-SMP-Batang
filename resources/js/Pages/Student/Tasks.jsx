@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useMemo } from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import StudentShell from "@/Components/Student/StudentShell";
+import StudentStatCard from "@/Components/Student/StudentStatCard";
 import Button from "@/Components/Button";
 import Search from "@/Components/Search";
 import Pagination from "@/Components/Pagination";
@@ -10,6 +11,9 @@ import {
     IconClockHour4,
     IconCheck,
     IconAlertTriangle,
+    IconPlayerPlayFilled,
+    IconClock,
+    IconCircleCheck,
 } from "@tabler/icons-react";
 
 function submissionStatus(task, submission) {
@@ -55,6 +59,26 @@ export default function StudentTasks() {
     const rows = tasks.data ?? [];
     const total = tasks.total ?? 0;
 
+    // Calculate statistics
+    const stats = useMemo(() => {
+        const pending = rows.filter(task => {
+            const submission = task.submissions?.[0] ?? null;
+            return submissionStatus(task, submission) === 'pending';
+        }).length;
+
+        const submitted = rows.filter(task => {
+            const submission = task.submissions?.[0] ?? null;
+            return submissionStatus(task, submission) === 'submitted';
+        }).length;
+
+        const graded = rows.filter(task => {
+            const submission = task.submissions?.[0] ?? null;
+            return submissionStatus(task, submission) === 'graded';
+        }).length;
+
+        return { pending, submitted, graded };
+    }, [rows]);
+
     return (
         <DashboardLayout title="Tugas Saya">
             <Head title="Tugas Saya" />
@@ -64,13 +88,43 @@ export default function StudentTasks() {
                 title="Tugas saya"
                 subtitle="Daftar tugas di kelas Anda — kumpulkan teks dan lampiran sebelum deadline."
             >
-                <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm sm:p-6">
-                    <Search
-                        url={route("student.tasks")}
-                        placeholder="Cari judul atau deskripsi…"
-                        filter={{ search: filters.search ?? "" }}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <StudentStatCard
+                        icon={IconPlayerPlayFilled}
+                        label="Perlu dikerjakan"
+                        value={stats.pending}
+                        hint="Tugas yang belum dikumpulkan"
+                        accent="indigo"
+                    />
+                    <StudentStatCard
+                        icon={IconClock}
+                        label="Menunggu nilai"
+                        value={stats.submitted}
+                        hint="Tugas yang sedang dinilai"
+                        accent="amber"
+                    />
+                    <StudentStatCard
+                        icon={IconCircleCheck}
+                        label="Selesai"
+                        value={stats.graded}
+                        hint="Tugas yang sudah dinilai"
+                        accent="emerald"
                     />
                 </div>
+
+                <section className="mt-4 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm">
+                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto_auto]">
+                        <div className="relative">
+                            <IconClipboardList className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <Search
+                                url={route("student.tasks")}
+                                placeholder="Cari judul tugas, mapel, atau kelas..."
+                                filter={{ search: filters.search ?? "" }}
+                                className="[&_.search-input]:rounded-full [&_.search-input]:pl-9"
+                            />
+                        </div>
+                    </div>
+                </section>
 
                 {rows.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 py-16 text-center">
@@ -86,7 +140,7 @@ export default function StudentTasks() {
                         </p>
                     </div>
                 ) : (
-                    <ul className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                    <div className="space-y-4">
                         {rows.map((task) => {
                             const submission = task.submissions?.[0] ?? null;
                             const st = submissionStatus(task, submission);
@@ -96,90 +150,79 @@ export default function StudentTasks() {
                                 ? new Date(task.due_date)
                                 : null;
                             return (
-                                <li
+                                <article
                                     key={task.id}
-                                    className="group flex flex-col rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm transition hover:border-indigo-200/80 hover:shadow-md"
+                                    className="group rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:border-indigo-200/80 hover:shadow-md md:p-5"
                                 >
-                                    <div className="flex flex-1 flex-col gap-3">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
-                                                    {task.subject?.name ??
-                                                        "Mapel"}
-                                                    {task.school_class?.name
-                                                        ? ` · ${task.school_class.name}`
-                                                        : ""}
-                                                </p>
-                                                <h3 className="mt-1 text-lg font-semibold leading-snug text-slate-900 group-hover:text-indigo-800">
-                                                    {task.title}
-                                                </h3>
-                                                {task.description ? (
-                                                    <p className="mt-2 line-clamp-2 text-sm text-slate-600">
-                                                        {task.description}
-                                                    </p>
-                                                ) : null}
+                                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                                                <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 font-medium text-indigo-700">
+                                                    <IconClipboardList className="h-3.5 w-3.5" />
+                                                    {task.subject?.name ?? "Mapel"}
+                                                </span>
+                                                {task.school_class?.name && (
+                                                    <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 font-medium text-slate-600">
+                                                        {task.school_class.name}
+                                                    </span>
+                                                )}
+                                                {due && (
+                                                    <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 font-medium text-slate-600">
+                                                        <IconClockHour4 className="h-3.5 w-3.5" />
+                                                        {due.toLocaleDateString("id-ID", {
+                                                            day: "numeric",
+                                                            month: "short",
+                                                            year: "numeric"
+                                                        })}
+                                                    </span>
+                                                )}
                                             </div>
-                                            <span
-                                                className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${cfg.className}`}
-                                            >
-                                                <Icon
-                                                    className="h-3.5 w-3.5"
-                                                    stroke={1.5}
-                                                />
-                                                {cfg.label}
-                                            </span>
+                                            <h3 className="mt-2 text-lg font-semibold text-slate-900 group-hover:text-indigo-800">
+                                                {task.title}
+                                            </h3>
+                                            {task.description ? (
+                                                <p className="mt-2 line-clamp-2 text-sm text-slate-600">
+                                                    {task.description}
+                                                </p>
+                                            ) : null}
                                         </div>
-
-                                        <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-                                            <div className="text-sm text-slate-600">
-                                                {due ? (
-                                                    <>
-                                                        <span className="font-medium text-slate-800">
-                                                            Deadline:{" "}
-                                                        </span>
-                                                        {due.toLocaleString(
-                                                            "id-ID",
-                                                            {
-                                                                dateStyle:
-                                                                    "medium",
-                                                                timeStyle:
-                                                                    "short",
-                                                            }
-                                                        )}
-                                                    </>
-                                                ) : (
-                                                    <span className="text-slate-400">
-                                                        Tanpa deadline
+                                        <div className="flex flex-col items-end gap-3 md:min-w-0">
+                                            <div className="flex flex-col items-end gap-2">
+                                                <span
+                                                    className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${cfg.className}`}
+                                                >
+                                                    <Icon
+                                                        className="h-3.5 w-3.5"
+                                                        stroke={1.5}
+                                                    />
+                                                    {cfg.label}
+                                                </span>
+                                                {submission?.score != null && (
+                                                    <span className="rounded-lg bg-slate-900 px-3 py-1 text-sm font-bold tabular-nums text-white">
+                                                        {submission.score}
                                                     </span>
                                                 )}
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                {submission?.score != null ? (
-                                                    <span className="rounded-lg bg-slate-900 px-3 py-1 text-sm font-bold tabular-nums text-white">
-                                                        {submission.score}
-                                                    </span>
-                                                ) : null}
                                                 <Button
                                                     type="view"
-                                                    url={route(
-                                                        "tasks.show",
-                                                        task.id
-                                                    )}
+                                                    url={route("tasks.show", task.id)}
+                                                    text="Lihat Detail"
+                                                    size="sm"
                                                 />
                                                 <Button
                                                     type="edit"
-                                                    url={route(
-                                                        "tasks.submit-page",
-                                                        task.id
-                                                    )}
+                                                    url={route("tasks.submit-page", task.id)}
+                                                    text="Kumpulkan"
+                                                    size="sm"
                                                 />
                                             </div>
                                         </div>
                                     </div>
-                                </li>
+                                </article>
                             );
                         })}
-                    </ul>
+                    </div>
                 )}
 
                 {tasks.last_page > 1 && (

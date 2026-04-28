@@ -124,9 +124,9 @@ function calculateRealProgress(enrolledClasses, learningStats) {
     const completedMaterials = materials.completed || 0;
 
     // Calculate individual progress percentages
-    const tasksProgress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
-    const quizzesProgress = totalQuizzes > 0 ? (completedQuizzes / totalQuizzes) * 100 : 0;
-    const materialsProgress = totalMaterials > 0 ? (completedMaterials / totalMaterials) * 100 : 50; // Default 50% if no data
+    const tasksProgress = totalTasks > 0 ? Math.min(100, (completedTasks / totalTasks) * 100) : 0;
+    const quizzesProgress = totalQuizzes > 0 ? Math.min(100, (completedQuizzes / totalQuizzes) * 100) : 0;
+    const materialsProgress = totalMaterials > 0 ? Math.min(100, (completedMaterials / totalMaterials) * 100) : 0; // Default 0% when no material data
 
     // Weighted calculation: 40% materi, 30% tugas, 30% kuis
     const weightedProgress = 
@@ -163,6 +163,8 @@ function activityIcon(type) {
             return IconBrain;
         case "exam_attempt":
             return IconBrain;
+        case "material_available":
+            return IconBook;
         case "material_view":
             return IconBook;
         default:
@@ -375,7 +377,7 @@ export default function StudentDashboard() {
             <div className="min-h-screen bg-slate-50">
                 <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
                     {/* HERO */}
-                    <section className="relative overflow-hidden rounded-2xl border border-indigo-300/70 bg-gradient-to-r from-blue-600 via-sky-600 to-indigo-600 p-6 text-white shadow-md sm:p-8">
+                    <section className="relative overflow-hidden rounded-2xl border border-blue-700/80 bg-gradient-to-br from-[#154497] via-[#1460BE] to-[#1E6FDB] p-6 text-white shadow-md sm:p-8">
                         <div
                             className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl"
                             aria-hidden

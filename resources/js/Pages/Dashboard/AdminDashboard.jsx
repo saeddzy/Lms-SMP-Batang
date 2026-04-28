@@ -12,10 +12,10 @@ import {
 
 function StatCard({ label, value, hint, icon: Icon, tone = "indigo" }) {
     const tones = {
-        indigo: "border-indigo-300/80 bg-indigo-100/80",
-        sky: "border-sky-300/80 bg-sky-100/80",
-        emerald: "border-emerald-300/80 bg-emerald-100/80",
-        amber: "border-amber-300/80 bg-amber-100/80",
+        indigo: "border-blue-300/80 bg-blue-100/90",
+        sky: "border-sky-300/80 bg-sky-100/90",
+        emerald: "border-blue-300/80 bg-blue-100/90",
+        amber: "border-indigo-300/80 bg-indigo-100/90",
     };
 
     return (
@@ -40,10 +40,10 @@ function StatCard({ label, value, hint, icon: Icon, tone = "indigo" }) {
 
 function Panel({ title, children, icon: Icon }) {
     return (
-        <section className="overflow-hidden rounded-2xl border border-stone-300/70 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-            <div className="border-b border-stone-100 bg-stone-100/80 px-6 py-4">
-                <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-stone-900">
-                    {Icon ? <Icon className="h-4 w-4" stroke={1.6} /> : null}
+        <section className="overflow-hidden rounded-2xl border border-blue-100/80 bg-blue-50/70 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+            <div className="border-b border-blue-100 bg-blue-100/80 px-6 py-4">
+                <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    {Icon ? <Icon className="h-4 w-4 text-blue-700" stroke={1.6} /> : null}
                     {title}
                 </h2>
             </div>
@@ -84,25 +84,25 @@ export default function AdminDashboard() {
             <Head title="Dashboard Admin" />
 
             <div className="space-y-8">
-                <div className="overflow-hidden rounded-3xl border border-indigo-300/80 bg-gradient-to-r from-indigo-200 via-sky-100 to-cyan-200 px-8 py-10 shadow-md">
-                    <p className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-800 ring-1 ring-indigo-300/80">
+                <div className="overflow-hidden rounded-3xl border border-blue-700/80 bg-gradient-to-br from-[#154497] via-[#1460BE] to-[#1E6FDB] px-8 py-10 shadow-md">
+                    <p className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white ring-1 ring-white/20 backdrop-blur-sm">
                         {todayLabel}
                     </p>
-                    <h1 className="mt-3 text-2xl font-semibold tracking-tight text-stone-900">
+                    <h1 className="mt-3 text-2xl font-semibold tracking-tight text-white">
                         Dashboard Admin
                     </h1>
-                    <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-700">
+                    <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-100/90">
                         Monitoring operasional LMS: pengguna, performa akademik,
                         aktivitas konten, dan alert prioritas.
                     </p>
                     <div className="mt-5 flex flex-wrap gap-2">
-                        <span className="rounded-full bg-indigo-600 px-3 py-1 text-xs font-semibold text-white ring-1 ring-indigo-500/70">
+                        <span className="rounded-full bg-blue-500 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20">
                             {systemStats.total_users ?? 0} total user
                         </span>
-                        <span className="rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold text-white ring-1 ring-sky-500/70">
+                        <span className="rounded-full bg-blue-500/95 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20">
                             {totalContent} total konten
                         </span>
-                        <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white ring-1 ring-emerald-500/70">
+                        <span className="rounded-full bg-sky-400/95 px-3 py-1 text-xs font-semibold text-slate-900 ring-1 ring-white/10">
                             {academicStats.overall_average ?? 0}% rata-rata nilai
                         </span>
                     </div>

@@ -63,7 +63,7 @@ export default function Login({ status, canResetPassword }) {
                     </div>
                     {/* Branding subtle anchor */}
                     <div className="absolute bottom-12 left-12">
-                        <span className="text-white font-serif italic text-2xl font-bold">SMP 7 Batang</span>
+                        <span className="text-white font-serif italic text-2xl font-bold">SMP 3 Batang</span>
                     </div>
                 </section>
                 {/* Right Side: Login Area */}
@@ -75,7 +75,7 @@ export default function Login({ status, canResetPassword }) {
                     <div className="w-full max-w-md relative z-10">
                         {/* Branding for Mobile */}
                         <div className="lg:hidden mb-6 text-center">
-                            <span className="text-primary font-serif italic text-3xl font-bold">SMP 7 Batang</span>
+                            <span className="text-primary font-serif italic text-3xl font-bold">SMP 3 Batang</span>
                         </div>
                         <div className="mb-8">
                             <h1 className="font-serif text-3xl md:text-5xl text-on-surface font-light tracking-tight mb-2">Welcome Back</h1>

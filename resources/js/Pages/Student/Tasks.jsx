@@ -4,7 +4,7 @@ import StudentShell from "@/Components/Student/StudentShell";
 import StudentStatCard from "@/Components/Student/StudentStatCard";
 import Button from "@/Components/Button";
 import Search from "@/Components/Search";
-import Pagination from "@/Components/Pagination";
+import SimplePagination from "@/Components/SimplePagination";
 import { Head, usePage } from "@inertiajs/react";
 import {
     IconClipboardList,
@@ -226,14 +226,14 @@ export default function StudentTasks() {
                 )}
 
                 {tasks.last_page > 1 && (
-                    <div className="flex justify-center rounded-2xl border border-slate-200/90 bg-white px-4 py-4">
-                        <Pagination
-                            links={tasks.links}
+                    <div className="mt-6">
+                        <SimplePagination
                             currentPage={tasks.current_page}
                             lastPage={tasks.last_page}
                             from={tasks.from}
                             to={tasks.to}
                             total={tasks.total}
+                            links={tasks.links}
                         />
                     </div>
                 )}

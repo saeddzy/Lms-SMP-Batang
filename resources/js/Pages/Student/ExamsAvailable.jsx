@@ -14,7 +14,6 @@ import {
     IconPlayerPlayFilled,
     IconCheck,
     IconBook2,
-    IconFileText,
     IconCalendarEvent,
     IconCalendarX,
     IconCalendar,
@@ -324,13 +323,6 @@ export default function ExamsAvailable() {
                             Durasi
                         </dt>
                         <dd className="font-medium text-slate-800">{exam.duration_minutes || exam.duration} menit</dd>
-                    </div>
-                    <div>
-                        <dt className="inline-flex items-center gap-1 text-[11px] text-slate-500">
-                            <IconFileText className="h-3.5 w-3.5" />
-                            Soal
-                        </dt>
-                        <dd className="font-medium text-slate-800">{exam.questions_count ?? 0} soal</dd>
                     </div>
                     <div>
                         <dt className="text-[11px] text-slate-500">Jenis</dt>

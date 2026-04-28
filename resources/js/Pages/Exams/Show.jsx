@@ -521,13 +521,6 @@ export default function Show() {
                                             : "Durasi belum diatur"}
                                 </span>
                                 <span className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 ring-1 ring-slate-200">
-                                    <IconListCheck className="h-3.5 w-3.5" />
-                                    {exam.questions?.length ??
-                                        exam.total_questions ??
-                                        0}{" "}
-                                    soal
-                                </span>
-                                <span className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 ring-1 ring-slate-200">
                                     <IconTargetArrow className="h-3.5 w-3.5" />
                                     Ambang Lulus {exam.passing_marks ?? exam.passing_score ?? 0}%
                                 </span>

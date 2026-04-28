@@ -98,7 +98,7 @@ class StudentDashboardController extends Controller
                 return [
                     'id' => $submission->id,
                     'type' => 'task_submission',
-                    'title' => 'Mengumpulkan tugas: ' . $submission->task->title,
+                    'title' => 'Kamu mengumpulkan tugas: ' . $submission->task->title,
                     'subject' => $submission->task->subject->name,
                     'class' => $submission->task->schoolClass->name,
                     'date' => $submission->submitted_at,
@@ -107,17 +107,19 @@ class StudentDashboardController extends Controller
                 ];
             });
 
-        // Recent quiz attempts
+        // Recent quiz attempts and results
         $quizAttempts = QuizAttempt::where('student_id', $user->id)
             ->with(['quiz.subject', 'quiz.schoolClass'])
             ->latest('finished_at')
             ->take(5)
             ->get()
             ->map(function ($attempt) {
+                $title = 'Kamu telah menyelesaikan kuis: ' . $attempt->quiz->title;
+
                 return [
                     'id' => $attempt->id,
                     'type' => 'quiz_attempt',
-                    'title' => 'Mengerjakan kuis: ' . $attempt->quiz->title,
+                    'title' => $title,
                     'subject' => $attempt->quiz->subject->name,
                     'class' => $attempt->quiz->schoolClass->name,
                     'date' => $attempt->finished_at,
@@ -126,17 +128,19 @@ class StudentDashboardController extends Controller
                 ];
             });
 
-        // Recent exam attempts
+        // Recent exam attempts and results
         $examAttempts = ExamAttempt::where('student_id', $user->id)
             ->with(['exam.subject', 'exam.schoolClass'])
             ->latest('finished_at')
             ->take(5)
             ->get()
             ->map(function ($attempt) {
+                $title = 'Kamu telah menyelesaikan ujian: ' . $attempt->exam->title;
+
                 return [
                     'id' => $attempt->id,
                     'type' => 'exam_attempt',
-                    'title' => 'Mengikuti ujian: ' . $attempt->exam->title,
+                    'title' => $title,
                     'subject' => $attempt->exam->subject->name,
                     'class' => $attempt->exam->schoolClass->name,
                     'date' => $attempt->finished_at,
@@ -145,10 +149,32 @@ class StudentDashboardController extends Controller
                 ];
             });
 
+        // Recent materials available for the student
+        $materials = Material::whereHas('schoolClass.students', function ($query) use ($user) {
+                $query->where('users.id', $user->id);
+            })
+            ->where('is_active', true)
+            ->with(['subject', 'schoolClass', 'teacher'])
+            ->latest()
+            ->take(5)
+            ->get()
+            ->map(function ($material) {
+                return [
+                    'id' => $material->id,
+                    'type' => 'material_available',
+                    'title' => 'Materi baru tersedia: ' . $material->title,
+                    'subject' => $material->subject?->name,
+                    'class' => $material->schoolClass?->name,
+                    'teacher' => $material->teacher?->name,
+                    'date' => $material->created_at,
+                ];
+            });
+
         // Combine and sort by date
-        $activities = $taskSubmissions->concat($quizAttempts)->concat($examAttempts)
+        $activities = $taskSubmissions->concat($quizAttempts)->concat($examAttempts)->concat($materials)
             ->sortByDesc('date')
-            ->take(10);
+            ->take(10)
+            ->values();
 
         return $activities;
     }
@@ -467,7 +493,8 @@ class StudentDashboardController extends Controller
 
         $completedTasks = TaskSubmission::where('student_id', $user->id)
             ->whereNotNull('submitted_at')
-            ->count();
+            ->distinct('task_id')
+            ->count('task_id');
 
         // Quiz stats
         $totalQuizzes = Quiz::whereHas('schoolClass.students', function ($query) use ($user) {
@@ -476,11 +503,13 @@ class StudentDashboardController extends Controller
 
         $completedQuizzes = QuizAttempt::where('student_id', $user->id)
             ->whereNotNull('finished_at')
-            ->count();
+            ->distinct('quiz_id')
+            ->count('quiz_id');
 
         $passedQuizzes = QuizAttempt::where('student_id', $user->id)
             ->where('passed', true)
-            ->count();
+            ->distinct('quiz_id')
+            ->count('quiz_id');
 
         // Exam stats
         $totalExams = Exam::whereHas('schoolClass.students', function ($query) use ($user) {
@@ -489,11 +518,13 @@ class StudentDashboardController extends Controller
 
         $completedExams = ExamAttempt::where('student_id', $user->id)
             ->whereNotNull('finished_at')
-            ->count();
+            ->distinct('exam_id')
+            ->count('exam_id');
 
         $passedExams = ExamAttempt::where('student_id', $user->id)
             ->where('passed', true)
-            ->count();
+            ->distinct('exam_id')
+            ->count('exam_id');
 
         // Average grades
         $rows = $this->buildUnifiedStudentGradeRows($user);
@@ -787,7 +818,7 @@ class StudentDashboardController extends Controller
             });
         }
 
-        $tasks = $query->paginate(15)->withQueryString();
+        $tasks = $query->paginate(5)->withQueryString();
 
         return Inertia::render('Student/Tasks', [
             'tasks' => $tasks,

@@ -197,6 +197,11 @@ export default function Index() {
                             const pointsUsed = Number(quiz.questions ?? quiz.questions_count ?? 0)
                                 ? quiz.questions_count
                                 : quiz.questions_count ?? 0;
+                            const quizDuration =
+                                quiz.duration ??
+                                quiz.duration_minutes ??
+                                quiz.time_limit ??
+                                "—";
 
                             return (
                                 <article key={quiz.id} className="rounded-lg border border-slate-200 bg-white p-5">
@@ -232,7 +237,7 @@ export default function Index() {
                                                 Durasi
                                             </dt>
                                             <dd className="font-medium text-stone-900">
-                                                {quiz.duration ?? quiz.time_limit ?? "?"} menit
+                                                {quizDuration} menit
                                             </dd>
                                         </div>
                                         <div className="flex justify-between gap-2">

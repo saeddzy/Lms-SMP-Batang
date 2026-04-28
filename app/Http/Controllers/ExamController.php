@@ -30,6 +30,7 @@ class ExamController extends Controller
 
         $query = Exam::with(['subject', 'schoolClass', 'teacher'])
             ->withCount([
+                'questions',
                 'attempts as participants_count' => function ($q) {
                     $q->select(DB::raw('COUNT(DISTINCT student_id)'));
                 },
@@ -60,24 +61,32 @@ class ExamController extends Controller
 
         // Filter by type
         if ($request->filled('type')) {
-            $query->where('type', $request->type);
+            $query->where(function ($typeQuery) use ($request) {
+                $typeQuery->where('type', $request->type)
+                    ->orWhere('exam_type', $request->type);
+            });
         }
 
         // Filter by status
         if ($request->filled('status')) {
             switch ($request->status) {
-                case 'scheduled':
+                case 'active':
+                    $query->where('is_active', true)
+                        ->where('is_cancelled', false)
+                        ->where('start_time', '<=', now())
+                        ->where('end_time', '>', now());
+                    break;
+                case 'upcoming':
                     $query->where('start_time', '>', now());
                     break;
-                case 'ongoing':
-                    $query->where('start_time', '<=', now())
-                          ->where('end_time', '>=', now());
-                    break;
-                case 'completed':
+                case 'expired':
                     $query->where('end_time', '<', now());
                     break;
-                case 'cancelled':
-                    $query->where('is_cancelled', true);
+                case 'inactive':
+                    $query->where(function ($inactiveQuery) {
+                        $inactiveQuery->where('is_active', false)
+                            ->orWhere('is_cancelled', true);
+                    });
                     break;
             }
         }
@@ -99,6 +108,24 @@ class ExamController extends Controller
         }
 
         $exams = $query->latest()->paginate(15)->withQueryString();
+        $exams->getCollection()->transform(function (Exam $exam) {
+            $status = 'inactive';
+
+            if (!$exam->is_active || $exam->is_cancelled) {
+                $status = 'inactive';
+            } elseif ($exam->start_time && now()->lt($exam->start_time)) {
+                $status = 'upcoming';
+            } elseif ($exam->end_time && now()->gte($exam->end_time)) {
+                $status = 'expired';
+            } elseif ($exam->start_time && $exam->end_time) {
+                $status = 'active';
+            }
+
+            return array_merge($exam->toArray(), [
+                'status' => $status,
+                'duration' => $exam->duration_minutes ?? $exam->duration,
+            ]);
+        });
 
         if (auth()->user()->hasRole('guru')) {
             $subjects = Subject::whereHas('classSubjects', function($q) {

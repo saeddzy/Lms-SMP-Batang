@@ -256,7 +256,11 @@ export default function StudentQuizzes() {
                             Durasi
                         </dt>
                         <dd className="font-medium text-slate-800">
-                            {q.duration_minutes ?? q.duration ?? "—"} menit
+                            {q.duration_minutes ??
+                                q.duration ??
+                                q.time_limit ??
+                                "—"}{" "}
+                            menit
                         </dd>
                     </div>
                     <div>

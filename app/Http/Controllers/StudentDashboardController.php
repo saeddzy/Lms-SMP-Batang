@@ -308,6 +308,8 @@ class StudentDashboardController extends Controller
                 'class' => $quiz->schoolClass?->name ?? 'ΓÇö',
                 'start_time' => $quiz->start_time,
                 'end_time' => $quiz->end_time,
+                'duration_minutes' => $quiz->time_limit,
+                'duration' => $quiz->time_limit,
                 'time_limit' => $quiz->time_limit,
                 'passing_score' => $quiz->passing_score,
                 'questions_count' => $quiz->questions_count,
@@ -884,16 +886,75 @@ class StudentDashboardController extends Controller
     public function exams(Request $request)
     {
         $user = auth()->user();
-        
-        // Get student's enrolled classes
+        $search = trim((string) $request->input('search', ''));
+        $baseQuery = $this->studentExamsBaseQuery($user, $search);
+
+        $activeExams = $this->annotateStudentExamCollection(
+            (clone $baseQuery)
+                ->where('start_time', '<=', now())
+                ->where('end_time', '>=', now())
+                ->orderBy('start_time')
+                ->take(3)
+                ->get()
+        );
+
+        $upcomingExams = $this->annotateStudentExamCollection(
+            (clone $baseQuery)
+                ->where('start_time', '>', now())
+                ->orderBy('start_time')
+                ->take(3)
+                ->get()
+        );
+
+        $finishedExams = $this->annotateStudentExamCollection(
+            (clone $baseQuery)
+                ->where('end_time', '<', now())
+                ->latest('end_time')
+                ->take(3)
+                ->get()
+        );
+
+        $attempts = ExamAttempt::where('student_id', $user->id)
+            ->with(['exam.subject', 'exam.schoolClass', 'exam.teacher'])
+            ->latest('finished_at')
+            ->paginate(15)
+            ->withQueryString();
+
+        $attempts->setCollection(
+            AttemptStatusHelper::annotateExamAttempts($attempts->getCollection())
+        );
+
+        $summary = [
+            'active' => (clone $baseQuery)
+                ->where('start_time', '<=', now())
+                ->where('end_time', '>=', now())
+                ->count(),
+            'waiting' => ExamAttempt::where('student_id', $user->id)
+                ->whereIn('attempt_status', ['submitted', 'menunggu_penilaian'])
+                ->count(),
+            'finished' => ExamAttempt::where('student_id', $user->id)
+                ->whereNotNull('finished_at')
+                ->count(),
+        ];
+
+        return Inertia::render('Student/ExamsAvailable', [
+            'activeExams' => $activeExams,
+            'upcomingExams' => $upcomingExams,
+            'finishedExams' => $finishedExams,
+            'attempts' => $attempts,
+            'summary' => $summary,
+            'filters' => $request->only(['search']),
+        ]);
+    }
+
+    private function studentExamsBaseQuery(User $user, ?string $search = null)
+    {
         $enrolledClasses = $user->enrolledClasses()->pluck('school_classes.id');
-        
-        // Get available exams for student's classes
-        $exams = Exam::whereIn('class_id', $enrolledClasses)
+
+        return Exam::whereIn('class_id', $enrolledClasses)
             ->where('is_cancelled', false)
             ->where('is_active', true)
-            ->when($request->filled('search'), function ($query) use ($request) {
-                $search = trim((string) $request->input('search'));
+            ->when($search !== null && $search !== '', function ($query) use ($search) {
                 $query->where(function ($inner) use ($search) {
                     $inner->where('title', 'like', "%{$search}%")
                         ->orWhere('description', 'like', "%{$search}%")
@@ -905,6 +966,7 @@ class StudentDashboardController extends Controller
                         });
                 });
             })
+            ->withCount('questions')
             ->with([
                 'subject',
                 'schoolClass',
@@ -913,35 +975,21 @@ class StudentDashboardController extends Controller
                     $query->where('student_id', $user->id)
                         ->latest('created_at');
                 },
-            ])
-            ->orderBy('created_at', 'desc') // Order by creation date since scheduled_date might be null
-            ->paginate(10)
-            ->withQueryString();
+            ]);
+    }
 
-        $exams->setCollection(
-            $exams->getCollection()->map(function ($exam) {
-                $attempts = $exam->attempts ?? collect();
-                $annotatedAttempts = AttemptStatusHelper::annotateExamAttempts(
-                    $attempts->values()
-                );
-                $exam->setRelation('attempts', $annotatedAttempts);
-                return $exam;
-            })
-        );
-        $summary = [
-            'total_attempts' => ExamAttempt::where('student_id', $user->id)->count(),
-            'passed' => ExamAttempt::where('student_id', $user->id)->where('passed', true)->count(),
-            'avg_score' => round(
-                (float) (ExamAttempt::where('student_id', $user->id)->whereNotNull('score')->avg('score') ?? 0),
-                1
-            ),
-        ];
+    private function annotateStudentExamCollection($exams)
+    {
+        return $exams->map(function ($exam) {
+            $attempts = $exam->attempts ?? collect();
+            $annotatedAttempts = AttemptStatusHelper::annotateExamAttempts(
+                $attempts->values()
+            );
 
-        return Inertia::render('Student/ExamsAvailable', [
-            'exams' => $exams,
-            'summary' => $summary,
-            'filters' => $request->only(['search']),
-        ]);
+            $exam->setRelation('attempts', $annotatedAttempts);
+
+            return $exam;
+        })->values();
     }
 
     /**

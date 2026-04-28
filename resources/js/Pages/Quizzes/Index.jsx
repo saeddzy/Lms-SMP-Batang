@@ -4,7 +4,7 @@ import Button from "@/Components/Button";
 import Search from "@/Components/Search";
 import Pagination from "@/Components/Pagination";
 import { Head, Link, router, usePage } from "@inertiajs/react";
-import hasAnyPermission from "@/Utils/Permissions";
+import hasAnyPermission, { hasRole } from "@/Utils/Permissions";
 import ToggleSwitch from "@/Components/ToggleSwitch";
 import {
     IconClockHour4,
@@ -54,10 +54,25 @@ function shortDateTime(value) {
 }
 
 export default function Index() {
-    const { quizzes, filters = {}, auth = {} } = usePage().props;
+    const {
+        quizzes,
+        subjects = [],
+        classes = [],
+        teachers = [],
+        filters = {},
+        auth = {},
+    } = usePage().props;
     const canMutate = auth.canMutateTeachingContent ?? false;
+    const isAdmin = hasRole("admin");
     const searchQuery = filters.search ?? "";
     const selectedStatus = filters.status ?? "";
+    const filterQuery = {
+        search: searchQuery,
+        status: selectedStatus,
+        subject_id: filters.subject_id ?? "",
+        class_id: filters.class_id ?? "",
+        teacher_id: filters.teacher_id ?? "",
+    };
     const quizItems = quizzes?.data ?? [];
     const totalQuiz = quizzes?.total ?? quizItems.length ?? 0;
     const activeQuiz = quizItems.filter((q) => q.status === "active").length;
@@ -83,8 +98,15 @@ export default function Index() {
         router.get(
             route("quizzes.index"),
             {
-                search: filters.search ?? "",
+                search: filterQuery.search,
                 status,
+                ...(isAdmin
+                    ? {
+                          subject_id: filterQuery.subject_id,
+                          class_id: filterQuery.class_id,
+                          teacher_id: filterQuery.teacher_id,
+                      }
+                    : {}),
             },
             {
                 preserveScroll: true,
@@ -164,11 +186,82 @@ export default function Index() {
                     <Search
                         url={route("quizzes.index")}
                         placeholder="Cari judul / deskripsi kuis..."
-                        filter={{
-                            search: searchQuery,
-                            status: selectedStatus,
-                        }}
+                        filter={
+                            isAdmin
+                                ? filterQuery
+                                : {
+                                      search: filterQuery.search,
+                                      status: filterQuery.status,
+                                  }
+                        }
                     />
+                    {isAdmin && (
+                        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+                            <select
+                                value={filterQuery.subject_id}
+                                onChange={(e) =>
+                                    router.get(
+                                        route("quizzes.index"),
+                                        {
+                                            ...filterQuery,
+                                            subject_id: e.target.value,
+                                        },
+                                        { preserveScroll: true, replace: true }
+                                    )
+                                }
+                                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#163d8f] focus:outline-none focus:ring-1 focus:ring-[#163d8f]"
+                            >
+                                <option value="">Semua mapel</option>
+                                {subjects.map((subject) => (
+                                    <option key={subject.id} value={subject.id}>
+                                        {subject.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <select
+                                value={filterQuery.class_id}
+                                onChange={(e) =>
+                                    router.get(
+                                        route("quizzes.index"),
+                                        {
+                                            ...filterQuery,
+                                            class_id: e.target.value,
+                                        },
+                                        { preserveScroll: true, replace: true }
+                                    )
+                                }
+                                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#163d8f] focus:outline-none focus:ring-1 focus:ring-[#163d8f]"
+                            >
+                                <option value="">Semua kelas</option>
+                                {classes.map((schoolClass) => (
+                                    <option key={schoolClass.id} value={schoolClass.id}>
+                                        {schoolClass.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <select
+                                value={filterQuery.teacher_id}
+                                onChange={(e) =>
+                                    router.get(
+                                        route("quizzes.index"),
+                                        {
+                                            ...filterQuery,
+                                            teacher_id: e.target.value,
+                                        },
+                                        { preserveScroll: true, replace: true }
+                                    )
+                                }
+                                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#163d8f] focus:outline-none focus:ring-1 focus:ring-[#163d8f]"
+                            >
+                                <option value="">Semua guru</option>
+                                {teachers.map((teacher) => (
+                                    <option key={teacher.id} value={teacher.id}>
+                                        {teacher.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     <div className="mt-3 flex flex-wrap gap-2">
                         {statusOptions.map((status) => {
                             const isActive = selectedStatus === status.value;

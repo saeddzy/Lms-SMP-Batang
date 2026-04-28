@@ -7,6 +7,7 @@ use App\Models\Subject;
 use App\Models\SchoolClass;
 use App\Models\ClassSubject;
 use App\Models\TaskSubmission;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
@@ -49,6 +50,11 @@ class TaskController extends Controller
         // Filter by class
         if ($request->filled('class_id')) {
             $query->where('class_id', $request->class_id);
+        }
+
+        // Filter by task creator/teacher (admin use-case)
+        if ($request->filled('teacher_id')) {
+            $query->where('created_by', (int) $request->teacher_id);
         }
 
         // Filter by teacher (for teachers, only show their tasks)
@@ -124,11 +130,17 @@ class TaskController extends Controller
             $classes = SchoolClass::where('is_active', true)->get();
         }
 
+        $teachers = User::role('guru')
+            ->select('id', 'name', 'email')
+            ->orderBy('name')
+            ->get();
+
         return Inertia::render('Tasks/Index', [
             'tasks' => $tasks,
             'subjects' => $subjects,
             'classes' => $classes,
-            'filters' => $request->only(['subject_id', 'class_id', 'search', 'status'])
+            'teachers' => $teachers,
+            'filters' => $request->only(['subject_id', 'class_id', 'teacher_id', 'search', 'status'])
         ]);
     }
 

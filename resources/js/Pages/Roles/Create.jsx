@@ -3,29 +3,30 @@ import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Head, useForm, usePage } from "@inertiajs/react";
 import Input from "@/Components/Input";
 import Button from "@/Components/Button";
-import Card from "@/Components/Card";
 import Checkbox from "@/Components/Checkbox";
 import Swal from "sweetalert2";
+
 export default function Create() {
-    // destruct permissions from usepage props
     const { permissions = [] } = usePage().props;
 
-    // define state with helper inertia
     const { data, setData, post, errors, processing } = useForm({
         name: "",
         selectedPermissions: [],
     });
 
-    // define method handleSelectedPermissions
-    const handleSelectedPermissions = (e) => {
-        let items = data.selectedPermissions;
+    const handleSelectedPermissions = (permissionName, checked) => {
+        if (checked) {
+            setData("selectedPermissions", (prev) =>
+                prev.includes(permissionName) ? prev : [...prev, permissionName]
+            );
+            return;
+        }
 
-        items.push(e.target.value);
-
-        setData("selectedPermissions", items);
+        setData("selectedPermissions", (prev) =>
+            prev.filter((item) => item !== permissionName)
+        );
     };
 
-    // define method handleStoreData
     const handleStoreData = async (e) => {
         e.preventDefault();
 
@@ -43,71 +44,87 @@ export default function Create() {
     };
 
     return (
-        <DashboardLayout title="Create Role">
-            <Head title={"Create Roles"} />
-                <Card title={"Create new role"}>
-                    <form onSubmit={handleStoreData}>
-                        <div className="mb-4">
-                            <Input
-                                label={"Role Name"}
-                                type={"text"}
-                                value={data.name}
-                                onChange={(e) =>
-                                    setData("name", e.target.value)
-                                }
-                                errors={errors.name}
-                                placeholder="Input role name.."
-                            />
-                        </div>
-                        <div className="mb-4">
-                            {/* <div className={`p-4 rounded-t-lg border bg-white`}>
-                                <div className="flex items-center gap-2 text-sm text-gray-700">
-                                    Permissions
-                                </div>
-                            </div> */}
-                            <div className="grid grid-cols-2 gap-4">
-                                {Object.entries(permissions).map(
-                                    ([group, permissionItems], i) => (
-                                        <div
-                                            key={i}
-                                            className="p-4 bg-white rounded-lg shadow-md"
-                                        >
-                                            <h3 className="font-bold text-lg mb-2">
-                                                {group}
-                                            </h3>
-                                            <div className="flex flex-wrap gap-2">
-                                                {permissionItems.map(
-                                                    (permission) => (
-                                                        <Checkbox
-                                                            label={permission}
-                                                            value={permission}
-                                                            onChange={
-                                                                handleSelectedPermissions
-                                                            }
-                                                            key={permission}
-                                                        />
-                                                    )
-                                                )}
-                                            </div>
-                                            {errors?.selectedPermissions && (
-                                                <div className="text-xs text-red-500 mt-4">
-                                                    {errors.selectedPermissions}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )
-                                )}
+        <DashboardLayout title="Tambah Role">
+            <Head title="Tambah Role" />
+
+            <div className="mx-auto max-w-5xl">
+                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <div className="h-1 w-full bg-gradient-to-r from-[#163d8f] via-[#2453b8] to-[#5b84d9]" />
+                    <div className="border-b border-slate-200 bg-slate-50/70 px-6 py-5">
+                        <h2 className="text-xl font-semibold text-slate-900">
+                            Tambah Role Baru
+                        </h2>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Buat role baru dan tentukan daftar permission yang diizinkan.
+                        </p>
+                    </div>
+
+                    <form onSubmit={handleStoreData} className="space-y-6 p-6">
+                        <section className="space-y-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Informasi Role
+                            </p>
+                            <div className="max-w-xl">
+                                <Input.Label htmlFor="name" value="Nama Role" />
+                                <Input.Text
+                                    id="name"
+                                    value={data.name}
+                                    onChange={(e) => setData("name", e.target.value)}
+                                    placeholder="Contoh: wali-kelas"
+                                    required
+                                />
+                                <Input.Error message={errors.name} />
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button type={"submit"}  />
+                        </section>
+
+                        <section className="space-y-4 border-t border-slate-100 pt-6">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Hak Akses Permission
+                            </p>
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                {Object.entries(permissions).map(([group, permissionItems]) => (
+                                    <div
+                                        key={group}
+                                        className="rounded-lg border border-slate-200 bg-slate-50/50 p-4"
+                                    >
+                                        <h3 className="mb-3 text-sm font-semibold text-slate-800">
+                                            {group}
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {permissionItems.map((permission) => (
+                                                <Checkbox
+                                                    key={permission}
+                                                    label={permission}
+                                                    value={permission}
+                                                    checked={data.selectedPermissions.includes(permission)}
+                                                    onChange={(e) =>
+                                                        handleSelectedPermissions(
+                                                            permission,
+                                                            e.target.checked
+                                                        )
+                                                    }
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <Input.Error message={errors.selectedPermissions} />
+                        </section>
+
+                        <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
+                            <Button type="cancel" url={route("roles.index")} />
                             <Button
-                                type={"cancel"}
-                                url={route("roles.index")}
-                            />
+                                type="submit"
+                                processing={processing}
+                                disabled={processing}
+                            >
+                                Simpan
+                            </Button>
                         </div>
                     </form>
-                </Card>
+                </div>
+            </div>
         </DashboardLayout>
     );
 }

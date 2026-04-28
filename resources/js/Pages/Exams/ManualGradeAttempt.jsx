@@ -42,23 +42,58 @@ export default function ManualGradeAttempt() {
         <DashboardLayout title={`Nilai esai — ${exam.title}`}>
             <Head title={`Nilai esai — ${exam.title}`} />
 
-            <div className="mx-auto max-w-3xl space-y-6">
-                <Link
-                    href={route("exams.show", exam.id)}
-                    className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-                >
-                    <IconArrowLeft className="h-4 w-4" stroke={1.5} />
-                    Kembali ke ujian
-                </Link>
-
-                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h1 className="text-xl font-bold text-slate-900">
-                        Penilaian esai
-                    </h1>
-                    <p className="mt-1 text-sm text-slate-600">
-                        {exam.title} · {sc?.name ?? "—"} ·{" "}
-                        {attempt.student?.name ?? "Siswa"}
-                    </p>
+            <div className="mx-auto max-w-5xl space-y-6">
+                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <div className="h-1 w-full bg-gradient-to-r from-[#163d8f] via-[#2453b8] to-[#5b84d9]" />
+                    <div className="border-b border-slate-200 bg-slate-50/70 px-6 py-5">
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Penilaian esai ujian
+                                </p>
+                                <h1 className="mt-1 text-2xl font-semibold text-slate-900">
+                                    {exam.title}
+                                </h1>
+                                <p className="mt-1 text-sm text-slate-600">
+                                    {sc?.name ?? "—"} ·{" "}
+                                    {attempt.student?.name ?? "Siswa"}
+                                </p>
+                            </div>
+                            <Link
+                                href={route("exams.show", exam.id)}
+                                className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                            >
+                                <IconArrowLeft className="h-4 w-4" stroke={1.5} />
+                                Kembali ke detail ujian
+                            </Link>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 px-6 py-4 sm:grid-cols-3">
+                        <div className="rounded-md border border-slate-200 bg-slate-50/80 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Jumlah jawaban esai
+                            </p>
+                            <p className="mt-1 text-lg font-semibold text-slate-900">
+                                {essayAnswers.length}
+                            </p>
+                        </div>
+                        <div className="rounded-md border border-slate-200 bg-slate-50/80 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Attempt
+                            </p>
+                            <p className="mt-1 text-lg font-semibold text-slate-900">
+                                #{attempt.id}
+                            </p>
+                        </div>
+                        <div className="rounded-md border border-slate-200 bg-slate-50/80 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Status
+                            </p>
+                            <p className="mt-1 text-sm font-semibold text-amber-700">
+                                Menunggu penilaian esai
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
                 <form onSubmit={submit} className="space-y-6">
@@ -68,7 +103,7 @@ export default function ManualGradeAttempt() {
                         return (
                             <div
                                 key={ans.id}
-                                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+                                className="rounded-lg border border-slate-200 bg-white p-6"
                             >
                                 <p className="text-xs font-semibold uppercase text-slate-500">
                                     Soal esai · maks. {max} poin
@@ -118,7 +153,7 @@ export default function ManualGradeAttempt() {
                                                 };
                                                 setData("grades", next);
                                             }}
-                                            className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                                            className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-[#163d8f] focus:outline-none focus:ring-1 focus:ring-[#163d8f]"
                                         />
                                     </div>
                                 </div>
@@ -140,7 +175,7 @@ export default function ManualGradeAttempt() {
                                             };
                                             setData("grades", next);
                                         }}
-                                        className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                                        className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-[#163d8f] focus:outline-none focus:ring-1 focus:ring-[#163d8f]"
                                     />
                                 </div>
                             </div>
@@ -154,7 +189,7 @@ export default function ManualGradeAttempt() {
                     <button
                         type="submit"
                         disabled={processing}
-                        className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 sm:w-auto sm:px-8"
+                        className="w-full rounded-md bg-[#163d8f] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f2e6f] disabled:opacity-50 sm:w-auto sm:px-8"
                     >
                         {processing ? "Menyimpan…" : "Simpan semua nilai esai"}
                     </button>

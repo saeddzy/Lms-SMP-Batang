@@ -6,6 +6,7 @@ use App\Models\Exam;
 use App\Models\Subject;
 use App\Models\SchoolClass;
 use App\Models\ClassSubject;
+use App\Models\User;
 use App\Models\ExamAttempt;
 use App\Models\ExamAttemptAnswer;
 use App\Models\ExamQuestion;
@@ -50,6 +51,11 @@ class ExamController extends Controller
         // Filter by class
         if ($request->filled('class_id')) {
             $query->where('class_id', $request->class_id);
+        }
+
+        // Filter by exam creator/teacher (admin use-case)
+        if ($request->filled('teacher_id')) {
+            $query->where('created_by', (int) $request->teacher_id);
         }
 
         // Filter by teacher (for teachers, only show their exams)
@@ -146,11 +152,17 @@ class ExamController extends Controller
             $classes = SchoolClass::where('is_active', true)->get();
         }
 
+        $teachers = User::role('guru')
+            ->select('id', 'name', 'email')
+            ->orderBy('name')
+            ->get();
+
         return Inertia::render('Exams/Index', [
             'exams' => $exams,
             'subjects' => $subjects,
             'classes' => $classes,
-            'filters' => $request->only(['subject_id', 'class_id', 'search', 'type', 'status'])
+            'teachers' => $teachers,
+            'filters' => $request->only(['subject_id', 'class_id', 'teacher_id', 'search', 'type', 'status'])
         ]);
     }
 
@@ -197,6 +209,7 @@ class ExamController extends Controller
             'classes' => $classes,
             'selectedClassId' => $selectedClassId,
             'selectedSubjectId' => $selectedSubjectId,
+            'classSubjectsMap' => $this->buildClassSubjectsMap($classes),
         ]);
     }
 
@@ -441,6 +454,7 @@ class ExamController extends Controller
             'exam' => $examData,
             'subjects' => $subjects,
             'classes' => $classes,
+            'classSubjectsMap' => $this->buildClassSubjectsMap($classes),
         ]);
     }
 
@@ -1059,5 +1073,31 @@ class ExamController extends Controller
         if ($ca !== null && ! is_string($ca) && is_scalar($ca)) {
             $request->merge(['correct_answer' => (string) $ca]);
         }
+    }
+
+    private function buildClassSubjectsMap($classes): array
+    {
+        $classIds = collect($classes)->pluck('id')->filter()->values();
+        if ($classIds->isEmpty()) {
+            return [];
+        }
+
+        return ClassSubject::query()
+            ->with('subject:id,name,is_active')
+            ->whereIn('class_id', $classIds)
+            ->where('is_active', true)
+            ->get(['id', 'class_id', 'subject_id'])
+            ->groupBy('class_id')
+            ->map(function ($rows) {
+                return $rows
+                    ->map(fn ($row) => [
+                        'id' => $row->subject_id,
+                        'name' => $row->subject?->name,
+                    ])
+                    ->filter(fn ($subject) => !empty($subject['id']) && !empty($subject['name']))
+                    ->values()
+                    ->all();
+            })
+            ->toArray();
     }
 }

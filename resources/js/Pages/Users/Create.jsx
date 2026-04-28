@@ -1,121 +1,171 @@
-import React from 'react'
-import DashboardLayout from '@/Layouts/DashboardLayout';
-import { Head, useForm, usePage } from '@inertiajs/react';
-import Input from '@/Components/Input';
-import Button from '@/Components/Button';
-import Card from '@/Components/Card';
-import Select2 from '@/Components/Select2';
-import Swal from 'sweetalert2';
-export default function Create() {
+import React from "react";
+import DashboardLayout from "@/Layouts/DashboardLayout";
+import { Head, useForm, usePage } from "@inertiajs/react";
+import Input from "@/Components/Input";
+import Button from "@/Components/Button";
+import Select2 from "@/Components/Select2";
+import Swal from "sweetalert2";
 
-    // destruct roles from usepage props
+export default function Create() {
     const { roles = [] } = usePage().props;
 
-    // define state with helper inertia
-    const { data, setData, post, errors } = useForm({
-        name : '',
-        email: '',
-        selectedRoles : [],
-        password: '',
-        password_confirmation: ''
+    const { data, setData, post, errors, processing } = useForm({
+        name: "",
+        email: "",
+        selectedRoles: [],
+        password: "",
+        password_confirmation: "",
     });
 
-    // define method handleSelectedroles
-    const formattedRoles = roles.map(role => ({
+    const formattedRoles = roles.map((role) => ({
         value: role.name,
-        label: role.name
+        label: role.name,
     }));
 
-    // Get selected roles for display
-    const selectedRoleOptions = data.selectedRoles.map(roleName => 
-        formattedRoles.find(role => role.value === roleName)
-    ).filter(Boolean);
-
-
+    const selectedRoleOptions = data.selectedRoles
+        .map((roleName) => formattedRoles.find((role) => role.value === roleName))
+        .filter(Boolean);
 
     const handleSelectedRoles = (selected) => {
-        const selectedValues = selected ? selected.map(option => option.value) : [];
-        setData('selectedRoles', selectedValues);
-    }
+        const selectedValues = selected ? selected.map((option) => option.value) : [];
+        setData("selectedRoles", selectedValues);
+    };
 
-    // define method handleStoreData
     const handleStoreData = async (e) => {
         e.preventDefault();
 
-        post(route('users.store'), {
+        post(route("users.store"), {
             onSuccess: () => {
                 Swal.fire({
-                    title: 'Success!',
-                    text: 'Data created successfully!',
-                    icon: 'success',
+                    title: "Berhasil!",
+                    text: "User berhasil dibuat.",
+                    icon: "success",
                     showConfirmButton: false,
-                    timer: 1500
-                })
-            }
+                    timer: 1500,
+                });
+            },
         });
-    }
+    };
 
     return (
-        <DashboardLayout title="Create User">
-            <Head title={'Create Users'}/>
-                <Card title={'Create new user'}>
-                    <form onSubmit={handleStoreData}>
-                        <div className='mb-4'>
-                            <Input label={'Name'} type={'text'} value={data.name} onChange={e => setData('name', e.target.value)} errors={errors.name} placeholder="Input name user.."/>
-                        </div>
-                        <div className='mb-4'>
-                            <Input label={'Email'} type={'email'} value={data.email} onChange={e => setData('email', e.target.value)} errors={errors.email} placeholder="Input email user.."/>
-                        </div>
-                        <div className='mb-4'>
-                        <div className='flex items-center gap-2 text-sm text-gray-700'>
-                                    Roles
-                                </div>
-                        <Select2 
-                            isMulti={true}
-                            value={selectedRoleOptions}
-                            onChange={handleSelectedRoles} 
-                            options={formattedRoles} 
-                            placeholder="Pilih Role..." 
-                        />
-                        {errors.selectedRoles && <div className='text-xs text-red-500 mt-1'>{errors.selectedRoles}</div>}
-                            {/* {selectedOptions && selectedOptions.length > 0 && (
+        <DashboardLayout title="Tambah User">
+            <Head title="Tambah User" />
+
+            <div className="mx-auto max-w-5xl">
+                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <div className="h-1 w-full bg-gradient-to-r from-[#163d8f] via-[#2453b8] to-[#5b84d9]" />
+                    <div className="border-b border-slate-200 bg-slate-50/70 px-6 py-5">
+                        <h2 className="text-xl font-semibold text-slate-900">
+                            Tambah User Baru
+                        </h2>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Buat akun pengguna dan tentukan role akses sistem LMS.
+                        </p>
+                    </div>
+
+                    <form onSubmit={handleStoreData} className="space-y-6 p-6">
+                        <section className="space-y-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Informasi Akun
+                            </p>
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                 <div>
-                                    <h4>Rasa yang Anda pilih:</h4>
-                                    <ul>
-                                        {selectedOptions.map((option) => (
-                                            <li key={option.value}>{option.label}</li>
-                                        ))}
-                                    </ul>
+                                    <Input.Label htmlFor="name" value="Nama" />
+                                    <Input.Text
+                                        id="name"
+                                        value={data.name}
+                                        onChange={(e) => setData("name", e.target.value)}
+                                        placeholder="Contoh: Ahmad Fauzi"
+                                        required
+                                    />
+                                    <Input.Error message={errors.name} />
                                 </div>
-                            )} */}
-                        </div>
-                        {/* <div className='mb-4'>
-                            <div className={`p-4 rounded-t-lg border bg-white`}>
-                                <div className='flex items-center gap-2 text-sm text-gray-700'>
-                                    Roles
+
+                                <div>
+                                    <Input.Label htmlFor="email" value="Email" />
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        value={data.email}
+                                        onChange={(e) => setData("email", e.target.value)}
+                                        placeholder="Contoh: ahmad@sekolah.sch.id"
+                                        required
+                                    />
+                                    <Input.Error message={errors.email} />
                                 </div>
                             </div>
-                            <div className='p-4 rounded-b-lg border border-t-0 bg-gray-100'>
-                                <div className='flex flex-row flex-wrap gap-4'>
-                                    {roles.map((role, i) => (
-                                        <Checkbox label={role.name} value={role.name} onChange={handleSelectedRoles} key={i}/>
-                                    ))}
-                                </div>
-                                {errors.selectedRoles && <div className='text-xs text-red-500 mt-4'>{errors.selectedRoles}</div>}
+                        </section>
+
+                        <section className="space-y-4 border-t border-slate-100 pt-6">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Hak Akses
+                            </p>
+                            <div>
+                                <Input.Label htmlFor="selectedRoles" value="Role" />
+                                <Select2
+                                    id="selectedRoles"
+                                    isMulti={true}
+                                    isSearchable={true}
+                                    value={selectedRoleOptions}
+                                    onChange={handleSelectedRoles}
+                                    options={formattedRoles}
+                                    placeholder="Pilih role user..."
+                                />
+                                <Input.Error message={errors.selectedRoles} />
                             </div>
-                        </div> */}
-                        <div className='mb-4'>
-                            <Input label={'Password'} type={'password'} value={data.password} onChange={e => setData('password', e.target.value)} errors={errors.password} placeholder="Input password user.."/>
-                        </div>
-                        <div className='mb-4'>
-                            <Input label={'Password Confirmation'} type={'password'} value={data.password_confirmation} onChange={e => setData('password_confirmation', e.target.value)} errors={errors.password_confirmation} placeholder="Input password confirmation..."/>
-                        </div>
-                        <div className='flex items-center gap-2'>
-                            <Button type={'submit'} />
-                            <Button type={'cancel'} url={route('users.index')}/>
+                        </section>
+
+                        <section className="space-y-4 border-t border-slate-100 pt-6">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Keamanan
+                            </p>
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                <div>
+                                    <Input.Label htmlFor="password" value="Password" />
+                                    <Input
+                                        id="password"
+                                        type="password"
+                                        value={data.password}
+                                        onChange={(e) => setData("password", e.target.value)}
+                                        placeholder="Masukkan password"
+                                        required
+                                    />
+                                    <Input.Error message={errors.password} />
+                                </div>
+
+                                <div>
+                                    <Input.Label
+                                        htmlFor="password_confirmation"
+                                        value="Konfirmasi Password"
+                                    />
+                                    <Input
+                                        id="password_confirmation"
+                                        type="password"
+                                        value={data.password_confirmation}
+                                        onChange={(e) =>
+                                            setData("password_confirmation", e.target.value)
+                                        }
+                                        placeholder="Ulangi password"
+                                        required
+                                    />
+                                    <Input.Error message={errors.password_confirmation} />
+                                </div>
+                            </div>
+                        </section>
+
+                        <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
+                            <Button type="cancel" url={route("users.index")} />
+                            <Button
+                                type="submit"
+                                processing={processing}
+                                disabled={processing}
+                            >
+                                Simpan
+                            </Button>
                         </div>
                     </form>
-                </Card>
+                </div>
+            </div>
         </DashboardLayout>
-    )
+    );
 }

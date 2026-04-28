@@ -2,10 +2,8 @@ import React, { useState } from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import Input from "@/Components/Input";
 import Button from "@/Components/Button";
-import Card from "@/Components/Card";
 import Select2 from "@/Components/Select2";
 import { Head, useForm, usePage } from "@inertiajs/react";
-import hasAnyPermission from "@/Utils/Permissions";
 
 export default function Edit() {
     const { schoolClass, subjects, students, teachers } = usePage().props;
@@ -67,18 +65,24 @@ export default function Edit() {
         <DashboardLayout title="Edit Kelas">
             <Head title="Edit Kelas" />
 
-            <div className="max-w-4xl mx-auto">
-                <Card>
-                    <Card.Header>
-                        <Card.Title>Edit Kelas: {schoolClass.name}</Card.Title>
-                        <Card.Description>
-                            Perbarui informasi kelas sesuai kebutuhan
-                        </Card.Description>
-                    </Card.Header>
+            <div className="mx-auto max-w-5xl">
+                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <div className="h-1 w-full bg-gradient-to-r from-[#163d8f] via-[#2453b8] to-[#5b84d9]" />
+                    <div className="border-b border-slate-200 bg-slate-50/70 px-6 py-5">
+                        <h2 className="text-xl font-semibold text-slate-900">
+                            Edit Kelas: {schoolClass.name}
+                        </h2>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Perbarui informasi kelas sesuai kebutuhan.
+                        </p>
+                    </div>
 
-                    <form onSubmit={handleSubmit}>
-                        <Card.Content>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <form onSubmit={handleSubmit} className="space-y-6 p-6">
+                        <section className="space-y-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Informasi Utama
+                            </p>
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                 <div>
                                     <Input.Label htmlFor="name" value="Nama Kelas" />
                                     <Input.Text
@@ -137,38 +141,45 @@ export default function Edit() {
                                                 type="checkbox"
                                                 checked={data.is_active}
                                                 onChange={(e) => setData('is_active', e.target.checked)}
-                                                className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                                                className="rounded border-slate-300 text-[#163d8f] shadow-sm focus:ring-[#163d8f]"
                                             />
-                                            <span className="ml-2 text-sm text-gray-600">Aktif</span>
+                                            <span className="ml-2 text-sm text-slate-600">Aktif</span>
                                         </label>
                                     </div>
                                     <Input.Error message={errors.is_active} />
                                 </div>
                             </div>
+                        </section>
 
-                            <div className="mt-6">
+                        <section className="space-y-4 border-t border-slate-100 pt-6">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Deskripsi
+                            </p>
+                            <div>
                                 <Input.Label htmlFor="description" value="Deskripsi (Opsional)" />
                                 <textarea
                                     id="description"
                                     value={data.description}
                                     onChange={(e) => setData('description', e.target.value)}
                                     rows={4}
-                                    className="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-[#163d8f] focus:ring-[#163d8f]"
                                     placeholder="Masukkan deskripsi kelas"
                                 />
                                 <Input.Error message={errors.description} />
                             </div>
+                        </section>
 
-                            {/* Teacher Assignment Section */}
-                            {schoolClass.class_subjects && schoolClass.class_subjects.length > 0 && (
-                                <div className="mt-8 pt-6 border-t border-gray-200">
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Penugasan Guru per Mata Pelajaran</h3>
+                        {schoolClass.class_subjects && schoolClass.class_subjects.length > 0 && (
+                                <section className="space-y-4 border-t border-slate-100 pt-6">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                        Penugasan Guru per Mata Pelajaran
+                                    </p>
                                     <div className="space-y-4">
                                         {schoolClass.class_subjects.map((classSubject) => (
-                                            <div key={classSubject.id} className="bg-gray-50 p-4 rounded-lg">
+                                            <div key={classSubject.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-4">
                                                 <div className="flex items-center gap-4">
                                                     <div className="flex-1">
-                                                        <label className="block text-sm font-medium text-gray-700">
+                                                        <label className="block text-sm font-medium text-slate-700">
                                                             {classSubject.subject?.name || 'Mata Pelajaran'}
                                                         </label>
                                                     </div>
@@ -188,27 +199,23 @@ export default function Edit() {
                                             </div>
                                         ))}
                                     </div>
-                                </div>
+                                </section>
                             )}
-                        </Card.Content>
-
-                        <Card.Footer>
-                            <div className="flex justify-end gap-3">
-                                <Button
-                                    type="cancel"
-                                    url={route('classes.show', schoolClass.id)}
-                                />
-                                <Button
-                                    type="submit"
-                                    processing={processing}
-                                    disabled={processing}
-                                >
-                                    Simpan Perubahan
-                                </Button>
-                            </div>
-                        </Card.Footer>
+                        <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
+                            <Button
+                                type="cancel"
+                                url={route('classes.show', schoolClass.id)}
+                            />
+                            <Button
+                                type="submit"
+                                processing={processing}
+                                disabled={processing}
+                            >
+                                Simpan Perubahan
+                            </Button>
+                        </div>
                     </form>
-                </Card>
+                </div>
             </div>
         </DashboardLayout>
     );

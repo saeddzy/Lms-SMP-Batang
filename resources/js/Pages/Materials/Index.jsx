@@ -4,7 +4,7 @@ import Button from "@/Components/Button";
 import Search from "@/Components/Search";
 import Pagination from "@/Components/Pagination";
 import { Head, Link, router, usePage } from "@inertiajs/react";
-import hasAnyPermission from "@/Utils/Permissions";
+import hasAnyPermission, { hasRole } from "@/Utils/Permissions";
 import { materialClassName } from "@/Utils/materialClassName";
 import ToggleSwitch from "@/Components/ToggleSwitch";
 
@@ -12,10 +12,35 @@ const badge =
     "inline-flex items-center rounded-lg px-2.5 py-0.5 text-xs font-medium ring-1 ring-stone-200/80 bg-stone-50 text-stone-700";
 
 export default function Index() {
-    const { materials, filters = {}, auth = {} } = usePage().props;
+    const {
+        materials,
+        subjects = [],
+        classes = [],
+        teachers = [],
+        filters = {},
+        auth = {},
+    } = usePage().props;
     const canMutate = auth.canMutateTeachingContent ?? false;
+    const isAdmin = hasRole("admin");
     const searchQuery = filters.search ?? "";
     const totalMaterials = materials?.total ?? materials?.data?.length ?? 0;
+    const filterQuery = {
+        search: filters.search ?? "",
+        subject_id: filters.subject_id ?? "",
+        class_id: filters.class_id ?? "",
+        teacher_id: filters.teacher_id ?? "",
+        type: filters.type ?? "",
+        status: filters.status ?? "",
+    };
+
+    const applyFilter = (patch = {}) => {
+        const next = { ...filterQuery, ...patch };
+        router.get(route("materials.index"), next, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
+    };
 
     const getTypeLabel = (type) => {
         switch (type) {
@@ -33,6 +58,63 @@ export default function Index() {
                 return type ?? "—";
         }
     };
+
+    const selectedSubject = subjects.find(
+        (s) => String(s.id) === String(filterQuery.subject_id)
+    );
+    const selectedClass = classes.find(
+        (c) => String(c.id) === String(filterQuery.class_id)
+    );
+    const selectedTeacher = teachers.find(
+        (t) => String(t.id) === String(filterQuery.teacher_id)
+    );
+
+    const activeFilters = [
+        filterQuery.search
+            ? {
+                  key: "search",
+                  label: `Cari: "${filterQuery.search}"`,
+                  clear: () => applyFilter({ search: "" }),
+              }
+            : null,
+        filterQuery.subject_id
+            ? {
+                  key: "subject_id",
+                  label: `Mapel: ${selectedSubject?.name ?? filterQuery.subject_id}`,
+                  clear: () => applyFilter({ subject_id: "" }),
+              }
+            : null,
+        filterQuery.class_id
+            ? {
+                  key: "class_id",
+                  label: `Kelas: ${selectedClass?.name ?? filterQuery.class_id}`,
+                  clear: () => applyFilter({ class_id: "" }),
+              }
+            : null,
+        filterQuery.teacher_id
+            ? {
+                  key: "teacher_id",
+                  label: `Guru: ${selectedTeacher?.name ?? filterQuery.teacher_id}`,
+                  clear: () => applyFilter({ teacher_id: "" }),
+              }
+            : null,
+        filterQuery.type
+            ? {
+                  key: "type",
+                  label: `Tipe: ${getTypeLabel(filterQuery.type)}`,
+                  clear: () => applyFilter({ type: "" }),
+              }
+            : null,
+        filterQuery.status !== ""
+            ? {
+                  key: "status",
+                  label: `Status: ${
+                      String(filterQuery.status) === "1" ? "Aktif" : "Tidak aktif"
+                  }`,
+                  clear: () => applyFilter({ status: "" }),
+              }
+            : null,
+    ].filter(Boolean);
 
     return (
         <DashboardLayout title="Materi pembelajaran">
@@ -77,10 +159,126 @@ export default function Index() {
                         <Search
                             url={route("materials.index")}
                             placeholder="Cari materi..."
-                            filter={filters}
+                            filter={isAdmin ? filterQuery : { search: filterQuery.search ?? "" }}
                         />
                     </div>
                 </div>
+
+                {isAdmin && (
+                <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+                        <div>
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Mapel
+                            </label>
+                            <select
+                                value={filterQuery.subject_id}
+                                onChange={(e) => applyFilter({ subject_id: e.target.value })}
+                                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#163d8f] focus:outline-none focus:ring-1 focus:ring-[#163d8f]"
+                            >
+                                <option value="">Semua mapel</option>
+                                {subjects.map((subject) => (
+                                    <option key={subject.id} value={subject.id}>
+                                        {subject.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Kelas
+                            </label>
+                            <select
+                                value={filterQuery.class_id}
+                                onChange={(e) => applyFilter({ class_id: e.target.value })}
+                                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#163d8f] focus:outline-none focus:ring-1 focus:ring-[#163d8f]"
+                            >
+                                <option value="">Semua kelas</option>
+                                {classes.map((schoolClass) => (
+                                    <option key={schoolClass.id} value={schoolClass.id}>
+                                        {schoolClass.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Guru
+                            </label>
+                            <select
+                                value={filterQuery.teacher_id}
+                                onChange={(e) => applyFilter({ teacher_id: e.target.value })}
+                                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#163d8f] focus:outline-none focus:ring-1 focus:ring-[#163d8f]"
+                            >
+                                <option value="">Semua guru</option>
+                                {teachers.map((teacher) => (
+                                    <option key={teacher.id} value={teacher.id}>
+                                        {teacher.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Tipe
+                            </label>
+                            <select
+                                value={filterQuery.type}
+                                onChange={(e) => applyFilter({ type: e.target.value })}
+                                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#163d8f] focus:outline-none focus:ring-1 focus:ring-[#163d8f]"
+                            >
+                                <option value="">Semua tipe</option>
+                                <option value="pdf">Dokumen</option>
+                                <option value="video">Video</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Status
+                            </label>
+                            <select
+                                value={filterQuery.status}
+                                onChange={(e) => applyFilter({ status: e.target.value })}
+                                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#163d8f] focus:outline-none focus:ring-1 focus:ring-[#163d8f]"
+                            >
+                                <option value="">Semua status</option>
+                                <option value="1">Aktif</option>
+                                <option value="0">Tidak aktif</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div className="mt-3 flex justify-end">
+                        <Link
+                            href={route("materials.index")}
+                            className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                        >
+                            Reset filter
+                        </Link>
+                    </div>
+                </div>
+                )}
+
+                {isAdmin && activeFilters.length > 0 && (
+                    <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Filter aktif
+                            </p>
+                            {activeFilters.map((item) => (
+                                <button
+                                    key={item.key}
+                                    type="button"
+                                    onClick={item.clear}
+                                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                                    title="Klik untuk menghapus filter ini"
+                                >
+                                    <span>{item.label}</span>
+                                    <span className="text-slate-400">x</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {materials?.data?.length > 0 ? (
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">

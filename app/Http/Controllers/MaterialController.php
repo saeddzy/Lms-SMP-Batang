@@ -6,6 +6,7 @@ use App\Models\Material;
 use App\Models\Subject;
 use App\Models\SchoolClass;
 use App\Models\ClassSubject;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
@@ -76,6 +77,11 @@ class MaterialController extends Controller
             $query->where('class_id', $request->class_id);
         }
 
+        // Filter by uploader/teacher
+        if ($request->filled('teacher_id')) {
+            $query->where('uploaded_by', (int) $request->teacher_id);
+        }
+
         // Filter by teacher (for teachers, only show their materials)
         if (auth()->user()->hasRole('guru')) {
             $query->whereHas('classSubject', function($q) {
@@ -97,6 +103,11 @@ class MaterialController extends Controller
                       $classQuery->where('name', 'like', "%{$search}%");
                   });
             });
+        }
+
+        // Filter by material type
+        if ($request->filled('type')) {
+            $query->where('material_type', $request->type);
         }
 
         // Filter by status
@@ -125,11 +136,24 @@ class MaterialController extends Controller
             $classes = SchoolClass::where('is_active', true)->get();
         }
 
+        $teachers = User::role('guru')
+            ->select('id', 'name', 'email')
+            ->orderBy('name')
+            ->get();
+
         return Inertia::render('Materials/Index', [
             'materials' => $materials,
             'subjects' => $subjects,
             'classes' => $classes,
-            'filters' => $request->only(['subject_id', 'class_id', 'search', 'type', 'status'])
+            'teachers' => $teachers,
+            'filters' => $request->only([
+                'subject_id',
+                'class_id',
+                'teacher_id',
+                'search',
+                'type',
+                'status',
+            ])
         ]);
     }
 

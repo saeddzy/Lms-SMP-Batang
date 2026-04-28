@@ -100,7 +100,14 @@ class GradeController extends Controller
             'subjectsForClass' => $subjectsForClass,
             'selectedClassId' => $selectedClassId,
             'selectedSubjectId' => $selectedSubjectId ?: null,
-            'filters' => $request->only(['class_id', 'subject_id', 'search']),
+            'filters' => $request->only([
+                'class_id',
+                'subject_id',
+                'search',
+                'sort',
+                'performance',
+                'score_range',
+            ]),
         ]);
     }
 
@@ -162,6 +169,10 @@ class GradeController extends Controller
     private function buildClassBoard(Request $request, SchoolClass $class, ?int $subjectId, ?array $allowedClassSubjectIds = null): array
     {
         $classId = $class->id;
+        $performanceFilter = (string) $request->input('performance', '');
+        $scoreRangeFilter = (string) $request->input('score_range', '');
+        $sort = (string) $request->input('sort', 'score_desc');
+        $passingScore = 75.0;
 
         $studentsQuery = $class->students();
         if ($request->filled('search')) {
@@ -257,8 +268,49 @@ class GradeController extends Controller
                 'quiz_avg' => $quizAvg,
                 'exam_avg' => $examAvg,
                 'overall_avg' => $overallAvg,
+                'is_passed' => $overallAvg >= $passingScore,
             ];
         }
+
+        // Filter by performance status.
+        if ($performanceFilter === 'passed') {
+            $rows = array_values(array_filter(
+                $rows,
+                fn (array $row) => (bool) ($row['is_passed'] ?? false)
+            ));
+        } elseif ($performanceFilter === 'not_passed') {
+            $rows = array_values(array_filter(
+                $rows,
+                fn (array $row) => ! (bool) ($row['is_passed'] ?? false)
+            ));
+        }
+
+        // Filter by score range.
+        $rows = array_values(array_filter($rows, function (array $row) use ($scoreRangeFilter): bool {
+            $score = (float) ($row['overall_avg'] ?? 0);
+            return match ($scoreRangeFilter) {
+                '90_100' => $score >= 90 && $score <= 100,
+                '80_89' => $score >= 80 && $score < 90,
+                '70_79' => $score >= 70 && $score < 80,
+                'lt_70' => $score < 70,
+                default => true,
+            };
+        }));
+
+        // Sort rows.
+        usort($rows, function (array $a, array $b) use ($sort): int {
+            $nameA = mb_strtolower((string) ($a['student_name'] ?? ''));
+            $nameB = mb_strtolower((string) ($b['student_name'] ?? ''));
+            $scoreA = (float) ($a['overall_avg'] ?? 0);
+            $scoreB = (float) ($b['overall_avg'] ?? 0);
+
+            return match ($sort) {
+                'name_asc' => $nameA <=> $nameB,
+                'name_desc' => $nameB <=> $nameA,
+                'score_asc' => $scoreA <=> $scoreB,
+                default => $scoreB <=> $scoreA,
+            };
+        });
 
         return $rows;
     }

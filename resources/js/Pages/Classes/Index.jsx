@@ -142,7 +142,7 @@ export default function Index() {
                                             schoolClass.id
                                         )}
                                         text="Masuk Kelas"
-                                        className="h-auto w-auto rounded-md border-blue-700 bg-blue-700 px-3 py-1.5 text-white hover:bg-blue-800 hover:text-white"
+                                        className="h-auto w-auto rounded-md !border-[#163d8f] !bg-[#163d8f] px-3 py-1.5 !text-white hover:!bg-[#0f2e6f] hover:!text-white"
                                     />
                                 )}
                                 {hasAnyPermission(["classes edit"]) && (

@@ -6,6 +6,7 @@ use App\Models\Quiz;
 use App\Models\Subject;
 use App\Models\SchoolClass;
 use App\Models\ClassSubject;
+use App\Models\User;
 use App\Models\QuizAttempt;
 use App\Models\QuizAttemptAnswer;
 use App\Models\QuizQuestion;
@@ -49,6 +50,11 @@ class QuizController extends Controller
         // Filter by class
         if ($request->filled('class_id')) {
             $query->where('class_id', $request->class_id);
+        }
+
+        // Filter by quiz creator/teacher (admin use-case)
+        if ($request->filled('teacher_id')) {
+            $query->where('created_by', (int) $request->teacher_id);
         }
 
         // Filter by teacher (for teachers, only show their quizzes)
@@ -133,11 +139,17 @@ class QuizController extends Controller
             $classes = SchoolClass::where('is_active', true)->get();
         }
 
+        $teachers = User::role('guru')
+            ->select('id', 'name', 'email')
+            ->orderBy('name')
+            ->get();
+
         return Inertia::render('Quizzes/Index', [
             'quizzes' => $quizzes,
             'subjects' => $subjects,
             'classes' => $classes,
-            'filters' => $request->only(['subject_id', 'class_id', 'search', 'status'])
+            'teachers' => $teachers,
+            'filters' => $request->only(['subject_id', 'class_id', 'teacher_id', 'search', 'status'])
         ]);
     }
 
@@ -252,6 +264,7 @@ class QuizController extends Controller
     public function show(Quiz $quiz)
     {
         Gate::authorize('view', $quiz);
+        $isStudent = auth()->user()->hasRole('siswa');
 
         $load = [
             'subject',
@@ -260,14 +273,14 @@ class QuizController extends Controller
             'creator',
             'questions' => fn ($q) => $q->orderBy('order'),
         ];
-        if (auth()->user()->can('quizzes view_results') && !auth()->user()->hasRole('siswa')) {
+        if (auth()->user()->can('quizzes view_results') && !$isStudent) {
             $load[] = 'schoolClass.students';
         }
         $quiz->load($load);
         $quiz->loadMissing('classSubject');
 
         // Load attempts for teachers and admins
-        if (auth()->user()->can('quizzes view_results') && !auth()->user()->hasRole('siswa')) {
+        if (auth()->user()->can('quizzes view_results') && !$isStudent) {
             $attempts = $quiz->attempts()
                 ->with(['student', 'answers.question'])
                 ->orderBy('started_at', 'desc')
@@ -285,7 +298,7 @@ class QuizController extends Controller
         $canManageQuiz = auth()->user()->hasRole('admin')
             || ($cs && $cs->isAssignedSlotTeacher(auth()->user()));
 
-        return Inertia::render('Quizzes/Show', [
+        return Inertia::render($isStudent ? 'Student/QuizDetail' : 'Quizzes/Show', [
             'quiz' => $quiz,
             'attempts' => $attempts ?? [],
             'canManageQuiz' => $canManageQuiz,

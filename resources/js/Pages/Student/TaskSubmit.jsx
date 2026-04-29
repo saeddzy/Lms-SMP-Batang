@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import StudentShell from "@/Components/Student/StudentShell";
-import Button from "@/Components/Button";
 import Card from "@/Components/Card";
 import Input from "@/Components/Input";
-import { Head, useForm, usePage } from "@inertiajs/react";
+import { Head, Link, useForm, usePage } from "@inertiajs/react";
 import {
     IconClock,
     IconFile,
@@ -445,14 +444,16 @@ export default function TaskSubmit() {
                             </div>
 
                             <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-slate-200 pt-6">
-                                <Button
-                                    type="cancel"
-                                    url={route("student.tasks")}
-                                />
+                                <Link
+                                    href={route("student.tasks")}
+                                    className="inline-flex items-center rounded-md border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                                >
+                                    Kembali
+                                </Link>
                                 <button
                                     type="submit"
                                     disabled={processing}
-                                    className="inline-flex items-center rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition hover:from-indigo-500 hover:to-violet-500 disabled:opacity-50"
+                                    className="inline-flex items-center rounded-md bg-[#1E429F] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1A3A8C] disabled:opacity-50"
                                 >
                                     {processing
                                         ? "Mengirim…"

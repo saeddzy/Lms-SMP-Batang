@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\GradesRecapExport;
 use App\Models\ExamAttempt;
 use App\Models\FinalGrade;
 use App\Models\QuizAttempt;
@@ -16,6 +17,8 @@ use App\Models\TaskSubmission;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
+use Maatwebsite\Excel\Facades\Excel;
 use Inertia\Inertia;
 
 class GradeController extends Controller
@@ -103,6 +106,7 @@ class GradeController extends Controller
             'filters' => $request->only([
                 'class_id',
                 'subject_id',
+                'period',
                 'search',
                 'sort',
                 'performance',
@@ -183,7 +187,12 @@ class GradeController extends Controller
             });
         }
 
-        $students = $studentsQuery->orderBy('name')->get(['users.id', 'users.name', 'users.email']);
+        $studentColumns = ['users.id', 'users.name', 'users.email'];
+        if (Schema::hasColumn('users', 'nis')) {
+            $studentColumns[] = 'users.nis';
+        }
+
+        $students = $studentsQuery->orderBy('name')->get($studentColumns);
         if ($students->isEmpty()) {
             return [];
         }
@@ -264,6 +273,7 @@ class GradeController extends Controller
                 'student_id' => $student->id,
                 'student_name' => $student->name,
                 'student_email' => $student->email ?? '',
+                'student_nis' => $student->nis ?? null,
                 'task_avg' => $taskAvg,
                 'quiz_avg' => $quizAvg,
                 'exam_avg' => $examAvg,
@@ -679,6 +689,158 @@ class GradeController extends Controller
             'subjects' => $subjects,
             'filters' => $request->only(['subject_id', 'academic_year'])
         ]);
+    }
+
+    public function exportExcel(Request $request)
+    {
+        Gate::authorize('grades index');
+
+        /** @var User $user */
+        $user = auth()->user();
+        $rows = $this->buildExportRows($request, $user);
+
+        if ($rows === []) {
+            return redirect()
+                ->route('grades.index', $request->query())
+                ->with('error', 'Belum ada data nilai untuk diexport');
+        }
+
+        $selectedClassId = $request->filled('class_id') ? (int) $request->class_id : null;
+        $className = 'Semua_Kelas';
+        if ($selectedClassId) {
+            $class = SchoolClass::query()->find($selectedClassId);
+            if ($class) {
+                $className = preg_replace('/[^A-Za-z0-9]+/', '_', $class->name) ?: 'Kelas';
+            }
+        }
+
+        $fileName = sprintf('Rekap_Nilai_%s.xlsx', $className);
+
+        return Excel::download(new GradesRecapExport($rows), $fileName);
+    }
+
+    /**
+     * @return array<int, array<int, string|int|float|null>>
+     */
+    private function buildExportRows(Request $request, User $user): array
+    {
+        $selectedClassId = $request->filled('class_id') ? (int) $request->class_id : null;
+        $selectedSubjectId = $request->filled('subject_id') ? (int) $request->subject_id : null;
+
+        $classes = $this->gradesIndexClassesForUser($user);
+        if ($selectedClassId) {
+            $classes = $classes->where('id', $selectedClassId)->values();
+        }
+
+        $period = trim((string) $request->input('period', ''));
+        $periodYear = preg_match('/^\d{4}$/', $period) ? (int) $period : null;
+
+        $rows = [];
+        foreach ($classes as $class) {
+            if (! $this->teacherCanViewClassGrades($user, $class)) {
+                continue;
+            }
+
+            $allowedClassSubjectIds = null;
+            if ($user->hasRole('guru')) {
+                if ($selectedSubjectId) {
+                    $taughtSubjectIds = $class->classSubjects()
+                        ->forTeacher($user)
+                        ->pluck('subject_id')
+                        ->unique()
+                        ->all();
+
+                    if (! in_array($selectedSubjectId, $taughtSubjectIds, true)) {
+                        continue;
+                    }
+                }
+
+                $allowedClassSubjectIds = $class->classSubjects()
+                    ->forTeacher($user)
+                    ->pluck('id')
+                    ->all();
+            }
+
+            $classBoard = $this->buildClassBoard($request, $class, $selectedSubjectId, $allowedClassSubjectIds);
+            foreach ($classBoard as $row) {
+                $nisFromData = trim((string) ($row['student_nis'] ?? ''));
+                $studentEmail = (string) ($row['student_email'] ?? '');
+                $nis = $nisFromData !== ''
+                    ? $nisFromData
+                    : ($studentEmail !== '' && str_contains($studentEmail, '@')
+                    ? explode('@', $studentEmail)[0]
+                    : '-');
+
+                if ($periodYear !== null) {
+                    // Approximate period filtering by latest graded activity year.
+                    $latestYear = $this->latestStudentActivityYear(
+                        (int) $row['student_id'],
+                        (int) $class->id,
+                        $selectedSubjectId,
+                        $allowedClassSubjectIds
+                    );
+                    if ($latestYear !== $periodYear) {
+                        continue;
+                    }
+                }
+
+                $rows[] = [
+                    $row['student_name'] ?? '-',
+                    $nis,
+                    $class->name ?? '-',
+                    (float) ($row['task_avg'] ?? 0),
+                    (float) ($row['quiz_avg'] ?? 0),
+                    (float) ($row['exam_avg'] ?? 0),
+                    (float) ($row['overall_avg'] ?? 0),
+                ];
+            }
+        }
+
+        return $rows;
+    }
+
+    private function latestStudentActivityYear(
+        int $studentId,
+        int $classId,
+        ?int $subjectId,
+        ?array $allowedClassSubjectIds
+    ): ?int {
+        $scopeActivity = function ($q) use ($classId, $subjectId, $allowedClassSubjectIds) {
+            $q->where('class_id', $classId);
+            if ($subjectId) {
+                $q->whereHas('classSubject', fn ($cs) => $cs->where('subject_id', $subjectId));
+            }
+            if ($allowedClassSubjectIds !== null) {
+                if ($allowedClassSubjectIds === []) {
+                    $q->whereRaw('1 = 0');
+                } else {
+                    $q->whereIn('class_subject_id', $allowedClassSubjectIds);
+                }
+            }
+        };
+
+        $taskYear = TaskSubmission::query()
+            ->where('student_id', $studentId)
+            ->whereNotNull('score')
+            ->whereHas('task', $scopeActivity)
+            ->max('updated_at');
+        $quizYear = QuizAttempt::query()
+            ->where('student_id', $studentId)
+            ->whereNotNull('score')
+            ->whereHas('quiz', $scopeActivity)
+            ->max('updated_at');
+        $examYear = ExamAttempt::query()
+            ->where('student_id', $studentId)
+            ->whereNotNull('score')
+            ->whereHas('exam', $scopeActivity)
+            ->max('updated_at');
+
+        $latest = collect([$taskYear, $quizYear, $examYear])->filter()->max();
+        if (! $latest) {
+            return null;
+        }
+
+        return (int) date('Y', strtotime((string) $latest));
     }
 
     private function getGradeLetter($score)

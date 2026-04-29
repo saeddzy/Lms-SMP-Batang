@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import Button from "@/Components/Button";
 import Search from "@/Components/Search";
@@ -44,6 +44,7 @@ export default function Index() {
         auth = {},
     } = usePage().props;
     const canInputGrades = auth.canInputGrades ?? false;
+    const [isExporting, setIsExporting] = useState(false);
     const activeSort = filters.sort ?? "score_desc";
     const activePerformance = filters.performance ?? "";
     const activeScoreRange = filters.score_range ?? "";
@@ -66,6 +67,13 @@ export default function Index() {
                 replace: true,
             }
         );
+    };
+
+    const handleExportExcel = () => {
+        setIsExporting(true);
+        const exportUrl = buildExportHref(filters, selectedClassId, selectedSubjectId);
+        window.location.href = exportUrl;
+        setTimeout(() => setIsExporting(false), 4000);
     };
 
     const summary = useMemo(() => {
@@ -100,16 +108,14 @@ export default function Index() {
                                 </p>
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                <a
-                                    href={buildExportHref(
-                                        filters,
-                                        selectedClassId,
-                                        selectedSubjectId
-                                    )}
-                                    className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-800 hover:bg-emerald-100"
+                                <button
+                                    type="button"
+                                    onClick={handleExportExcel}
+                                    disabled={isExporting}
+                                    className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-                                    Download CSV (Excel)
-                                </a>
+                                    {isExporting ? "Mengekspor..." : "Export ke Excel"}
+                                </button>
                                 {canInputGrades && hasAnyPermission(["grades calculate"]) && (
                                     <Button type="add" url={route("grades.create")} />
                                 )}
@@ -124,7 +130,7 @@ export default function Index() {
                             filter={baseFilter}
                         />
 
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                             <select
                                 value={activeSort}
                                 onChange={(e) => applyFilter({ sort: e.target.value })}
@@ -144,6 +150,13 @@ export default function Index() {
                                 <option value="passed">Tuntas (>=75)</option>
                                 <option value="not_passed">Belum tuntas (&lt;75)</option>
                             </select>
+                            <input
+                                type="text"
+                                value={filters.period ?? ""}
+                                onChange={(e) => applyFilter({ period: e.target.value })}
+                                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#163d8f] focus:outline-none focus:ring-1 focus:ring-[#163d8f]"
+                                placeholder="Periode (opsional, contoh: 2026)"
+                            />
                         </div>
 
 

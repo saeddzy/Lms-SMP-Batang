@@ -1,9 +1,7 @@
 import React, { useMemo, useState } from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
-import Button from "@/Components/Button";
 import Search from "@/Components/Search";
 import { Head, Link, router, usePage } from "@inertiajs/react";
-import hasAnyPermission from "@/Utils/Permissions";
 
 function buildExportHref(filters, selectedClassId, selectedSubjectId) {
     const params = new URLSearchParams();
@@ -41,9 +39,7 @@ export default function Index() {
         filters = {},
         selectedClassId,
         selectedSubjectId,
-        auth = {},
     } = usePage().props;
-    const canInputGrades = auth.canInputGrades ?? false;
     const [isExporting, setIsExporting] = useState(false);
     const activeSort = filters.sort ?? "score_desc";
     const activePerformance = filters.performance ?? "";
@@ -116,9 +112,6 @@ export default function Index() {
                                 >
                                     {isExporting ? "Mengekspor..." : "Export ke Excel"}
                                 </button>
-                                {canInputGrades && hasAnyPermission(["grades calculate"]) && (
-                                    <Button type="add" url={route("grades.create")} />
-                                )}
                             </div>
                         </div>
                     </div>

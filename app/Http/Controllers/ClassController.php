@@ -99,9 +99,9 @@ class ClassController extends Controller
         Gate::authorize('create', SchoolClass::class);
 
         $subjects = Subject::where('is_active', true)->get();
-        $students = User::role('siswa')->select('id', 'name', 'email')->get();
+        $students = User::role('siswa')->select('id', 'name', 'email', 'nis', 'nip')->get();
         $teachers = auth()->user()->hasRole('admin')
-            ? User::role('guru')->select('id', 'name', 'email')->orderBy('name')->get()
+            ? User::role('guru')->select('id', 'name', 'email', 'nis', 'nip')->orderBy('name')->get()
             : collect();
 
         return Inertia::render('Classes/Create', [
@@ -152,7 +152,7 @@ class ClassController extends Controller
             ClassSubject::create([
                 'class_id' => $schoolClass->id,
                 'subject_id' => $subjectId,
-                'teacher_id' => $subject?->teacher_id,
+                'teacher_id' => $subject?->teacher_id ?? $homeroomTeacherId,
                 'is_active' => true,
             ]);
         }
@@ -303,8 +303,8 @@ class ClassController extends Controller
         $class->load(['subjects', 'students', 'classSubjects.subject', 'classSubjects.teacher']);
 
         $subjects = Subject::where('is_active', true)->get();
-        $students = User::role('siswa')->select('id', 'name', 'email')->get();
-        $teachers = User::role('guru')->select('id', 'name', 'email')->get();
+        $students = User::role('siswa')->select('id', 'name', 'email', 'nis', 'nip')->get();
+        $teachers = User::role('guru')->select('id', 'name', 'email', 'nis', 'nip')->get();
 
         return Inertia::render('Classes/Edit', [
             'schoolClass' => $class,
@@ -356,7 +356,7 @@ class ClassController extends Controller
             ClassSubject::create([
                 'class_id' => $class->id,
                 'subject_id' => $subjectId,
-                'teacher_id' => $subject?->teacher_id,
+                'teacher_id' => $subject?->teacher_id ?? $class->teacher_id,
                 'is_active' => true,
             ]);
         }

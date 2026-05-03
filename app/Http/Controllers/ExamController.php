@@ -153,7 +153,7 @@ class ExamController extends Controller
         }
 
         $teachers = User::role('guru')
-            ->select('id', 'name', 'email')
+            ->select('id', 'name', 'email', 'nis', 'nip')
             ->orderBy('name')
             ->get();
 
@@ -641,7 +641,7 @@ class ExamController extends Controller
         return Inertia::render('Exams/Attempt', [
             'exam' => $exam,
             'attempt' => $attempt,
-            'timeRemaining' => max(0, (int) now()->diffInSeconds($examEndTime)),
+            'timeRemaining' => \App\Helpers\ExamTimeHelper::getRemainingSeconds($attempt),
         ]);
     }
 

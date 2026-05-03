@@ -137,7 +137,7 @@ class MaterialController extends Controller
         }
 
         $teachers = User::role('guru')
-            ->select('id', 'name', 'email')
+            ->select('id', 'name', 'email', 'nis', 'nip')
             ->orderBy('name')
             ->get();
 

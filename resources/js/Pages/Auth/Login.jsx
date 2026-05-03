@@ -2,7 +2,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 
 export default function Login({ status, canResetPassword }) {
     const { data, setData, post, processing, errors, reset } = useForm({
-        email: '',
+        login: '',
         password: '',
         remember: false,
     });
@@ -89,22 +89,23 @@ export default function Login({ status, canResetPassword }) {
                         <form onSubmit={submit} className="space-y-5">
                             {/* Input: Email */}
                             <div className="space-y-3">
-                                <label className="block font-body text-sm font-semibold tracking-widest uppercase text-on-surface-variant ml-1" htmlFor="email">Email</label>
+                                <label className="block font-body text-sm font-semibold tracking-widest uppercase text-on-surface-variant ml-1" htmlFor="login">NIS, NIP, atau Email</label>
                                 <div className="relative group">
                                     <input
-                                        id="email"
-                                        type="email"
-                                        name="email"
-                                        value={data.email}
+                                        id="login"
+                                        type="text"
+                                        name="login"
+                                        value={data.login}
                                         className="w-full h-10 md:h-14 px-6 bg-surface-container-low border-none rounded-3xl focus:ring-2 focus:ring-primary-container focus:bg-surface-container-lowest transition-all duration-300 font-body text-base md:text-lg placeholder:text-outline-variant"
                                         autoComplete="username"
-                                        onChange={(e) => setData('email', e.target.value)}
+                                        placeholder="Nomor NIS, NIP, atau email"
+                                        onChange={(e) => setData('login', e.target.value)}
                                     />
                                     <div className="absolute right-6 top-1/2 -translate-y-1/2 text-outline-variant group-focus-within:text-primary transition-colors">
-                                        <span className="material-symbols-outlined">mail</span>
+                                        <span className="material-symbols-outlined">badge</span>
                                     </div>
                                 </div>
-                                {errors.email && <div className="text-red-500 text-sm mt-2">{errors.email}</div>}
+                                {errors.login && <div className="text-red-500 text-sm mt-2">{errors.login}</div>}
                             </div>
                             {/* Input: Password */}
                             <div className="space-y-3">

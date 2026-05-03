@@ -6,6 +6,7 @@ import Pagination from "@/Components/Pagination";
 import { Head, usePage } from "@inertiajs/react";
 import Search from "@/Components/Search";
 import hasAnyPermission from "@/Utils/Permissions";
+import { userSecondaryLabel } from "@/Utils/userDisplay";
 export default function Index() {
     // destruct users props
     const { users, filters } = usePage().props;
@@ -25,7 +26,7 @@ export default function Index() {
                     <div className="w-full md:w-4/6">
                         <Search
                             url={route("users.index")}
-                            placeholder={"Search users data by name..."}
+                            placeholder={"Cari nama, NIS, NIP, atau email..."}
                             filter={filters}
                         />
                     </div>
@@ -51,7 +52,7 @@ export default function Index() {
                                     <Table.Td>
                                         {user.name}
                                         <div className="text-sm text-gray-400">
-                                            {user.email}
+                                            {userSecondaryLabel(user) || "—"}
                                         </div>
                                     </Table.Td>
                                     <Table.Td>

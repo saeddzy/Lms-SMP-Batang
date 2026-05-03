@@ -1,5 +1,6 @@
 import React from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
+import { userSecondaryLabel } from "@/Utils/userDisplay";
 import Table from "@/Components/Table";
 import Button from "@/Components/Button";
 import Search from "@/Components/Search";
@@ -112,9 +113,9 @@ export default function Index() {
                                                         <div className="font-medium text-gray-900">
                                                             {subject.teacher.name}
                                                         </div>
-                                                        {subject.teacher.email && (
+                                                        {userSecondaryLabel(subject.teacher) && (
                                                             <div className="text-gray-500">
-                                                                {subject.teacher.email}
+                                                                {userSecondaryLabel(subject.teacher)}
                                                             </div>
                                                         )}
                                                     </div>

@@ -75,7 +75,7 @@ class SubjectController extends Controller
     {
         Gate::authorize('create', Subject::class);
 
-        $teachers = User::role('guru')->select('id', 'name', 'email')->get();
+        $teachers = User::role('guru')->select('id', 'name', 'email', 'nis', 'nip')->get();
 
         return Inertia::render('Subjects/Create', [
             'teachers' => $teachers,
@@ -249,7 +249,7 @@ class SubjectController extends Controller
                 abort(403, 'Teachers must access subjects within a class context.');
             }
         }
-        $teachers = User::role('guru')->select('id', 'name', 'email')->get();
+        $teachers = User::role('guru')->select('id', 'name', 'email', 'nis', 'nip')->get();
 
         return Inertia::render('Subjects/Edit', [
             'subject' => $subject,

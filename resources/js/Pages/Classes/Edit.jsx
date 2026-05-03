@@ -4,6 +4,7 @@ import Input from "@/Components/Input";
 import Button from "@/Components/Button";
 import Select2 from "@/Components/Select2";
 import { Head, useForm, usePage } from "@inertiajs/react";
+import { formatUserOptionLabel } from "@/Utils/userDisplay";
 
 export default function Edit() {
     const { schoolClass, subjects, students, teachers } = usePage().props;
@@ -58,7 +59,7 @@ export default function Edit() {
 
     const studentOptions = students.map(student => ({
         value: student.id,
-        label: student.email ? `${student.name} (${student.email})` : student.name
+        label: formatUserOptionLabel(student),
     }));
 
     return (

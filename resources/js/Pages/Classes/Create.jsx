@@ -5,6 +5,7 @@ import Input from '@/Components/Input';
 import Button from '@/Components/Button';
 import Select2 from '@/Components/Select2';
 import Swal from 'sweetalert2';
+import { formatUserOptionLabel } from '@/Utils/userDisplay';
 
 export default function Create() {
     const { subjects = [], students = [], teachers = [] } = usePage().props;
@@ -26,12 +27,12 @@ export default function Create() {
 
     const formattedStudents = students.map(student => ({
         value: student.id,
-        label: student.email ? `${student.name} (${student.email})` : student.name
+        label: formatUserOptionLabel(student),
     }));
 
     const formattedTeachers = teachers.map(teacher => ({
         value: teacher.id,
-        label: teacher.email ? `${teacher.name} (${teacher.email})` : teacher.name
+        label: formatUserOptionLabel(teacher),
     }));
 
     const handleStoreData = async (e) => {

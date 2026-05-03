@@ -4,6 +4,7 @@ import Input from "@/Components/Input";
 import Button from "@/Components/Button";
 import Select2 from "@/Components/Select2";
 import { Head, useForm, usePage } from "@inertiajs/react";
+import { formatUserOptionLabel } from "@/Utils/userDisplay";
 
 export default function Edit() {
     const { subject, teachers } = usePage().props;
@@ -94,11 +95,11 @@ export default function Edit() {
                                         isSearchable={true}
                                         options={teachers.map(teacher => ({
                                             value: teacher.id,
-                                            label: `${teacher.name} (${teacher.email})`
+                                            label: formatUserOptionLabel(teacher),
                                         }))}
                                         value={selectedTeacher ? {
                                             value: selectedTeacher.id,
-                                            label: `${selectedTeacher.name} (${selectedTeacher.email})`
+                                            label: formatUserOptionLabel(selectedTeacher),
                                         } : null}
                                         onChange={(selected) => setData('teacher_id', selected ? selected.value : null)}
                                         placeholder="Pilih guru pengampu..."

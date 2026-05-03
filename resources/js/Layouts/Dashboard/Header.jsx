@@ -6,6 +6,7 @@ import {
     IconChevronDown,
     IconMenu2,
 } from "@tabler/icons-react";
+import { userCompactLogin } from "@/Utils/userDisplay";
 
 export default function Header({
     title,
@@ -80,7 +81,7 @@ export default function Header({
                                 {user.name}
                             </p>
                             <p className="truncate text-xs text-stone-500">
-                                {user.email}
+                                {userCompactLogin(user) || "—"}
                             </p>
                         </div>
                         <Dropdown.Link href={route("profile.edit")}>

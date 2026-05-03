@@ -11,6 +11,8 @@ export default function Create() {
 
     const { data, setData, post, errors, processing } = useForm({
         name: "",
+        nis: "",
+        nip: "",
         email: "",
         selectedRoles: [],
         password: "",
@@ -82,16 +84,50 @@ export default function Create() {
                                 </div>
 
                                 <div>
-                                    <Input.Label htmlFor="email" value="Email" />
+                                    <Input.Label
+                                        htmlFor="email"
+                                        value="Email (opsional)"
+                                    />
                                     <Input
                                         id="email"
                                         type="email"
                                         value={data.email}
                                         onChange={(e) => setData("email", e.target.value)}
-                                        placeholder="Contoh: ahmad@sekolah.sch.id"
-                                        required
+                                        placeholder="Untuk login atau reset password"
                                     />
                                     <Input.Error message={errors.email} />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                <div>
+                                    <Input.Label htmlFor="nis" value="NIS (Nomor Induk Siswa)" />
+                                    <Input
+                                        id="nis"
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={data.nis}
+                                        onChange={(e) => setData("nis", e.target.value)}
+                                        placeholder="Wajib jika role memuat Siswa"
+                                    />
+                                    <p className="mt-1 text-xs text-slate-500">
+                                        Digunakan siswa untuk login (selain email).
+                                    </p>
+                                    <Input.Error message={errors.nis} />
+                                </div>
+                                <div>
+                                    <Input.Label htmlFor="nip" value="NIP (Nomor Induk Pegawai)" />
+                                    <Input
+                                        id="nip"
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={data.nip}
+                                        onChange={(e) => setData("nip", e.target.value)}
+                                        placeholder="Wajib jika role Guru atau Admin"
+                                    />
+                                    <p className="mt-1 text-xs text-slate-500">
+                                        Digunakan guru/admin untuk login (selain email).
+                                    </p>
+                                    <Input.Error message={errors.nip} />
                                 </div>
                             </div>
                         </section>

@@ -11,7 +11,9 @@ export default function Edit() {
 
     const { data, setData, put, errors, processing } = useForm({
         name: user.name,
-        email: user.email,
+        nis: user.nis ?? "",
+        nip: user.nip ?? "",
+        email: user.email ?? "",
         selectedRoles: user.roles.map((role) => role.name),
     });
 
@@ -80,16 +82,44 @@ export default function Edit() {
                                 </div>
 
                                 <div>
-                                    <Input.Label htmlFor="email" value="Email" />
+                                    <Input.Label
+                                        htmlFor="email"
+                                        value="Email (opsional)"
+                                    />
                                     <Input
                                         id="email"
                                         type="email"
                                         value={data.email}
                                         onChange={(e) => setData("email", e.target.value)}
-                                        placeholder="Contoh: ahmad@sekolah.sch.id"
-                                        required
+                                        placeholder="Untuk login atau reset password"
                                     />
                                     <Input.Error message={errors.email} />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                <div>
+                                    <Input.Label htmlFor="nis" value="NIS (Nomor Induk Siswa)" />
+                                    <Input
+                                        id="nis"
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={data.nis}
+                                        onChange={(e) => setData("nis", e.target.value)}
+                                        placeholder="Wajib jika role memuat Siswa"
+                                    />
+                                    <Input.Error message={errors.nis} />
+                                </div>
+                                <div>
+                                    <Input.Label htmlFor="nip" value="NIP (Nomor Induk Pegawai)" />
+                                    <Input
+                                        id="nip"
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={data.nip}
+                                        onChange={(e) => setData("nip", e.target.value)}
+                                        placeholder="Wajib jika role Guru atau Admin"
+                                    />
+                                    <Input.Error message={errors.nip} />
                                 </div>
                             </div>
                         </section>

@@ -4,6 +4,7 @@ import Table from "@/Components/Table";
 import Button from "@/Components/Button";
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import hasAnyPermission from "@/Utils/Permissions";
+import { userCompactLogin } from "@/Utils/userDisplay";
 
 export default function Show() {
     const {
@@ -227,12 +228,14 @@ export default function Show() {
     const filteredEnrollments = (schoolClass.enrollments ?? [])
         .filter((enrollment) => {
             const studentName = (enrollment.student?.name ?? "").toLowerCase();
-            const studentEmail = (enrollment.student?.email ?? "").toLowerCase();
+            const studentLoginId = (
+                userCompactLogin(enrollment.student) ?? ""
+            ).toLowerCase();
 
             if (debouncedStudentQuery) {
                 const isMatch =
                     studentName.includes(debouncedStudentQuery) ||
-                    studentEmail.includes(debouncedStudentQuery);
+                    studentLoginId.includes(debouncedStudentQuery);
                 if (!isMatch) return false;
             }
 
@@ -746,7 +749,7 @@ export default function Show() {
                                                     type="text"
                                                     value={studentSearchQuery}
                                                     onChange={(e) => setStudentSearchQuery(e.target.value)}
-                                                    placeholder="Cari siswa (nama atau email)..."
+                                                    placeholder="Cari siswa (nama, NIS, atau email)..."
                                                     className="w-full rounded-md border border-slate-300 bg-white py-2 pl-9 pr-9 text-sm text-slate-700 shadow-sm focus:border-[#163d8f] focus:outline-none focus:ring-1 focus:ring-[#163d8f]"
                                                 />
                                                 {studentSearchQuery.trim() && (
@@ -794,7 +797,7 @@ export default function Show() {
                                                 )}
                                                 <Table.Th>#</Table.Th>
                                                 <Table.Th>Nama Siswa</Table.Th>
-                                                <Table.Th>Email</Table.Th>
+                                                <Table.Th>NIS / NIP / Email</Table.Th>
                                                 <Table.Th>Tanggal Bergabung</Table.Th>
                                                 {hasAnyPermission(["classes manage_students"]) && (
                                                     <Table.Th>Aksi</Table.Th>
@@ -818,7 +821,9 @@ export default function Show() {
                                                         )}
                                                         <Table.Td>{i + 1}</Table.Td>
                                                         <Table.Td>{enrollment.student?.name ?? "—"}</Table.Td>
-                                                        <Table.Td>{enrollment.student?.email ?? "—"}</Table.Td>
+                                                        <Table.Td>
+                                                            {userCompactLogin(enrollment.student) || "—"}
+                                                        </Table.Td>
                                                         <Table.Td>
                                                             {enrollment.enrolled_at
                                                                 ? new Date(enrollment.enrolled_at).toLocaleDateString("id-ID")

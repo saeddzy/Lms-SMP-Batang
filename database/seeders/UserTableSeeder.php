@@ -15,13 +15,15 @@ class UserTableSeeder extends Seeder
      */
     public function run(): void
     {
-        // Create admin user
-        $admin = User::firstOrCreate([
-            'email' => 'izaldev@gmail.com',
-        ], [
-            'name' => 'Syahrizaldev',
-            'password' => bcrypt('password'),
-        ]);
+        // Create admin user (login: NIP atau email lama)
+        $admin = User::updateOrCreate(
+            ['email' => 'izaldev@gmail.com'],
+            [
+                'name' => 'Syahrizaldev',
+                'nip' => '198001012009011001',
+                'password' => bcrypt('password'),
+            ],
+        );
 
         $adminRole = Role::where('name', 'admin')->first();
         if ($adminRole) {
@@ -29,12 +31,14 @@ class UserTableSeeder extends Seeder
         }
 
         // Create teacher user
-        $teacher = User::firstOrCreate([
-            'email' => 'guru@example.com',
-        ], [
-            'name' => 'Guru SMP',
-            'password' => bcrypt('password'),
-        ]);
+        $teacher = User::updateOrCreate(
+            ['email' => 'guru@example.com'],
+            [
+                'name' => 'Guru SMP',
+                'nip' => '198502152010012002',
+                'password' => bcrypt('password'),
+            ],
+        );
 
         $teacherRole = Role::where('name', 'guru')->first();
         if ($teacherRole) {
@@ -42,12 +46,14 @@ class UserTableSeeder extends Seeder
         }
 
         // Create student user
-        $student = User::firstOrCreate([
-            'email' => 'siswa@example.com',
-        ], [
-            'name' => 'Siswa SMP',
-            'password' => bcrypt('password'),
-        ]);
+        $student = User::updateOrCreate(
+            ['email' => 'siswa@example.com'],
+            [
+                'name' => 'Siswa SMP',
+                'nis' => '2024123456',
+                'password' => bcrypt('password'),
+            ],
+        );
 
         $studentRole = Role::where('name', 'siswa')->first();
         if ($studentRole) {

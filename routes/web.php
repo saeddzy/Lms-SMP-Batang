@@ -1,20 +1,20 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\PermissionController;
-use App\Http\Controllers\RoleController;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\ClassController;
-use App\Http\Controllers\SubjectController;
-use App\Http\Controllers\MaterialController;
-use App\Http\Controllers\TaskController;
-use App\Http\Controllers\QuizController;
-use App\Http\Controllers\ExamController;
-use App\Http\Controllers\ExamAttemptController;
-use App\Http\Controllers\GradeController;
-use App\Http\Controllers\StudentDashboardController;
-use App\Http\Controllers\TeacherDashboardController;
 use App\Http\Controllers\AdminDashboardController;
+use App\Http\Controllers\ClassController;
+use App\Http\Controllers\ExamAttemptController;
+use App\Http\Controllers\ExamController;
+use App\Http\Controllers\GradeController;
+use App\Http\Controllers\MaterialController;
+use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\QuizController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\StudentDashboardController;
+use App\Http\Controllers\SubjectController;
+use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TeacherDashboardController;
+use App\Http\Controllers\UserController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -88,6 +88,7 @@ Route::middleware('auth')->group(function () {
     // Tasks — rute submit sebelum resource agar {task} tidak tertangkap sebagai "submit"
     Route::get('tasks/{task}/submit', [TaskController::class, 'submitPage'])->name('tasks.submit-page');
     Route::post('tasks/{task}/submit', [TaskController::class, 'submit'])->name('tasks.submit');
+    Route::get('tasks/{task}/submissions/{submission}/file', [TaskController::class, 'downloadSubmissionFile'])->name('tasks.submission.file');
     Route::post('tasks/{task}/grade/{submission}', [TaskController::class, 'gradeSubmission'])->name('tasks.grade-submission');
     Route::patch('tasks/{task}/toggle-status', [TaskController::class, 'toggleStatus'])->name('tasks.toggle-status');
     Route::resource('tasks', TaskController::class);
@@ -133,6 +134,7 @@ Route::middleware('auth')->group(function () {
     Route::get('grades/students/{student}/report', [GradeController::class, 'studentReport'])->name('grades.student-report');
     Route::get('grades/students-by-class/{class}', [GradeController::class, 'getStudentsByClass'])->name('grades.students-by-class');
     Route::post('grades/bulk-create', [GradeController::class, 'bulkCreate'])->name('grades.bulk-create');
+    Route::post('grades/activity-weights', [GradeController::class, 'saveActivityWeights'])->name('grades.activity-weights');
 
     // Dashboard Routes
     Route::get('/student/dashboard', [StudentDashboardController::class, 'index'])->name('student.dashboard');
@@ -152,4 +154,4 @@ Route::middleware('auth')->group(function () {
     Route::get('/admin/reports', [AdminDashboardController::class, 'reports'])->name('admin.reports');
 });
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';

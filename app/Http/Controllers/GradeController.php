@@ -2,24 +2,26 @@
 
 namespace App\Http\Controllers;
 
-use App\Exports\GradesRecapExport;
+use App\Exports\GradesExportCombinedSheet;
+use App\Models\Exam;
 use App\Models\ExamAttempt;
 use App\Models\FinalGrade;
+use App\Models\GradeActivityWeight;
+use App\Models\GradeComponent;
+use App\Models\Quiz;
 use App\Models\QuizAttempt;
 use App\Models\SchoolClass;
 use App\Models\StudentEnrollment;
 use App\Models\Subject;
 use App\Models\Task;
-use App\Models\Quiz;
-use App\Models\Exam;
-use App\Models\GradeComponent;
 use App\Models\TaskSubmission;
 use App\Models\User;
+use App\Support\ClassGradeBoard;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Schema;
-use Maatwebsite\Excel\Facades\Excel;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Excel as ExcelExporter;
 
 class GradeController extends Controller
 {
@@ -40,6 +42,7 @@ class GradeController extends Controller
 
         $classBoard = [];
         $subjectsForClass = [];
+        $gradingMeta = null;
 
         if ($selectedClassId) {
             $class = SchoolClass::query()
@@ -95,6 +98,15 @@ class GradeController extends Controller
             }
 
             $classBoard = $this->buildClassBoard($request, $class, $selectedSubjectId, $allowedClassSubjectIds);
+
+            if ($selectedSubjectId) {
+                $gradingMeta = $this->gradingMetaForScope(
+                    $request,
+                    $class,
+                    (int) $selectedSubjectId,
+                    $allowedClassSubjectIds
+                );
+            }
         }
 
         return Inertia::render('Grades/Index', [
@@ -103,6 +115,7 @@ class GradeController extends Controller
             'subjectsForClass' => $subjectsForClass,
             'selectedClassId' => $selectedClassId,
             'selectedSubjectId' => $selectedSubjectId ?: null,
+            'gradingMeta' => $gradingMeta,
             'filters' => $request->only([
                 'class_id',
                 'subject_id',
@@ -116,9 +129,173 @@ class GradeController extends Controller
     }
 
     /**
+     * Konteks pembobotan per aktivitas (hanya jika kelas + mapel dipilih).
+     *
+     * @param  list<int>|null  $allowedClassSubjectIds
+     * @return array<string, mixed>|null
+     */
+    private function gradingMetaForScope(
+        Request $request,
+        SchoolClass $class,
+        int $subjectId,
+        ?array $allowedClassSubjectIds
+    ): ?array {
+        $key = $this->academicYearKey($request);
+        $catalog = ClassGradeBoard::catalog($class->id, $subjectId, $allowedClassSubjectIds);
+
+        $weights = GradeActivityWeight::query()
+            ->where('class_id', $class->id)
+            ->where('subject_id', $subjectId)
+            ->where('academic_year', $key)
+            ->get();
+
+        $sum = round((float) $weights->sum('weight'), 2);
+
+        return [
+            'academic_year_key' => $key,
+            'tasks' => $catalog['tasks']->map(fn ($t) => [
+                'id' => $t->id,
+                'title' => $t->title,
+            ])->values()->all(),
+            'quizzes' => $catalog['quizzes']->map(fn ($q) => [
+                'id' => $q->id,
+                'title' => $q->title,
+            ])->values()->all(),
+            'exams' => $catalog['exams']->map(fn ($e) => [
+                'id' => $e->id,
+                'title' => $e->title,
+            ])->values()->all(),
+            'weights' => $weights->map(fn ($w) => [
+                'activity_type' => $w->activity_type,
+                'activity_id' => (int) $w->activity_id,
+                'weight' => (float) $w->weight,
+            ])->values()->all(),
+            'weight_sum' => $sum,
+            'weights_ready' => abs($sum - 100.0) < 0.02,
+        ];
+    }
+
+    private function academicYearKey(Request $request): string
+    {
+        return mb_substr(trim((string) $request->input('period', '')), 0, 32);
+    }
+
+    /**
+     * Simpan pembobotan nilai per tugas/kuis/ujian (total 100%).
+     */
+    public function saveActivityWeights(Request $request)
+    {
+        Gate::authorize('grades index');
+
+        /** @var User $user */
+        $user = auth()->user();
+
+        $validated = $request->validate([
+            'class_id' => 'required|exists:school_classes,id',
+            'subject_id' => 'required|exists:subjects,id',
+            'academic_year' => 'nullable|string|max:32',
+            'weights' => 'required|array',
+            'weights.*.activity_type' => 'required|in:task,quiz,exam',
+            'weights.*.activity_id' => 'required|integer|min:1',
+            'weights.*.weight' => 'required|numeric|min:0|max:100',
+        ]);
+
+        $class = SchoolClass::query()->whereKey($validated['class_id'])->firstOrFail();
+
+        if (! $this->teacherCanViewClassGrades($user, $class)) {
+            abort(403, 'Anda tidak memiliki akses ke nilai kelas ini.');
+        }
+
+        $subjectId = (int) $validated['subject_id'];
+
+        $allowedClassSubjectIds = null;
+        if ($user->hasRole('guru')) {
+            $allowedClassSubjectIds = $class->classSubjects()
+                ->forTeacher($user)
+                ->pluck('id')
+                ->all();
+
+            $taughtSubjectIds = $class->classSubjects()
+                ->forTeacher($user)
+                ->pluck('subject_id')
+                ->unique()
+                ->all();
+
+            if (! in_array($subjectId, $taughtSubjectIds, true)) {
+                abort(403, 'Anda tidak mengampu mapel ini di kelas ini.');
+            }
+        }
+
+        $catalog = ClassGradeBoard::catalog($class->id, $subjectId, $allowedClassSubjectIds);
+        $allowedKeys = [];
+        foreach ($catalog['tasks'] as $t) {
+            $allowedKeys['task:'.$t->id] = true;
+        }
+        foreach ($catalog['quizzes'] as $q) {
+            $allowedKeys['quiz:'.$q->id] = true;
+        }
+        foreach ($catalog['exams'] as $e) {
+            $allowedKeys['exam:'.$e->id] = true;
+        }
+
+        foreach ($validated['weights'] as $row) {
+            $k = $row['activity_type'].':'.$row['activity_id'];
+            if (! isset($allowedKeys[$k])) {
+                return back()->withErrors([
+                    'weights' => 'Ada aktivitas yang tidak termasuk lingkup kelas/mapel ini.',
+                ]);
+            }
+        }
+
+        $sum = collect($validated['weights'])->sum(fn ($r) => (float) $r['weight']);
+        if (abs($sum - 100.0) > 0.02) {
+            return back()->withErrors([
+                'weights' => 'Total bobot harus tepat 100%. Saat ini: '.round($sum, 2).'%.',
+            ]);
+        }
+
+        $year = mb_substr(trim((string) ($validated['academic_year'] ?? '')), 0, 32);
+
+        GradeActivityWeight::query()
+            ->where('class_id', $class->id)
+            ->where('subject_id', $subjectId)
+            ->where('academic_year', $year)
+            ->delete();
+
+        foreach ($validated['weights'] as $row) {
+            $w = (float) $row['weight'];
+            if ($w <= 0) {
+                continue;
+            }
+
+            GradeActivityWeight::query()->create([
+                'class_id' => $class->id,
+                'subject_id' => $subjectId,
+                'academic_year' => $year,
+                'activity_type' => $row['activity_type'],
+                'activity_id' => (int) $row['activity_id'],
+                'weight' => round($w, 2),
+                'updated_by' => $user->id,
+            ]);
+        }
+
+        return redirect()
+            ->route('grades.index', [
+                'class_id' => $class->id,
+                'subject_id' => $subjectId,
+                'period' => $year !== '' ? $year : null,
+                'search' => $request->input('search'),
+                'sort' => $request->input('sort'),
+                'performance' => $request->input('performance'),
+                'score_range' => $request->input('score_range'),
+            ])
+            ->with('success', 'Pembobotan nilai disimpan. Nilai akhir memakai rumus Σ(bobot × nilai) ÷ 100.');
+    }
+
+    /**
      * Kelas yang boleh muncul di filter Manajemen Nilai (admin: semua; guru: wali atau pengampu mapel).
      *
-     * @return \Illuminate\Database\Eloquent\Collection<int, SchoolClass>
+     * @return Collection<int, SchoolClass>
      */
     private function gradesIndexClassesForUser(User $user)
     {
@@ -165,164 +342,20 @@ class GradeController extends Controller
     }
 
     /**
-     * Rekap per siswa: rata-rata % tugas, kuis, ujian (opsional filter mapel).
+     * Rekap per siswa: % tugas, kuis (tertinggi per kuis), ujian; nilai akhir berbobot jika diatur (Σ bobot×nilai ÷ 100).
      *
      * @param  list<int>|null  $allowedClassSubjectIds  null = admin (semua slot kelas); array = batasi ke slot mapel guru
      * @return list<array<string, mixed>>
      */
     private function buildClassBoard(Request $request, SchoolClass $class, ?int $subjectId, ?array $allowedClassSubjectIds = null): array
     {
-        $classId = $class->id;
-        $performanceFilter = (string) $request->input('performance', '');
-        $scoreRangeFilter = (string) $request->input('score_range', '');
-        $sort = (string) $request->input('sort', 'score_desc');
-        $passingScore = 75.0;
-
-        $studentsQuery = $class->students();
-        if ($request->filled('search')) {
-            $search = trim((string) $request->search);
-            $studentsQuery->where(function ($q) use ($search) {
-                $q->where('users.name', 'like', '%'.$search.'%')
-                    ->orWhere('users.email', 'like', '%'.$search.'%');
-            });
-        }
-
-        $studentColumns = ['users.id', 'users.name', 'users.email'];
-        if (Schema::hasColumn('users', 'nis')) {
-            $studentColumns[] = 'users.nis';
-        }
-
-        $students = $studentsQuery->orderBy('name')->get($studentColumns);
-        if ($students->isEmpty()) {
-            return [];
-        }
-
-        $studentIds = $students->pluck('id')->all();
-
-        $scopeActivity = function ($q) use ($classId, $subjectId, $allowedClassSubjectIds) {
-            $q->where('class_id', $classId);
-            if ($subjectId) {
-                $q->whereHas('classSubject', fn ($cs) => $cs->where('subject_id', $subjectId));
-            }
-            if ($allowedClassSubjectIds !== null) {
-                if ($allowedClassSubjectIds === []) {
-                    $q->whereRaw('1 = 0');
-                } else {
-                    $q->whereIn('class_subject_id', $allowedClassSubjectIds);
-                }
-            }
-        };
-
-        $taskSubs = TaskSubmission::query()
-            ->whereIn('student_id', $studentIds)
-            ->whereNotNull('score')
-            ->whereHas('task', $scopeActivity)
-            ->with('task')
-            ->get();
-
-        $quizAttempts = QuizAttempt::query()
-            ->whereIn('student_id', $studentIds)
-            ->whereNotNull('score')
-            ->whereHas('quiz', $scopeActivity)
-            ->get();
-
-        $examAttempts = ExamAttempt::query()
-            ->whereIn('student_id', $studentIds)
-            ->whereNotNull('score')
-            ->whereHas('exam', $scopeActivity)
-            ->get();
-
-        $taskByStudent = $taskSubs->groupBy('student_id');
-        $quizByStudent = $quizAttempts->groupBy('student_id');
-        $examByStudent = $examAttempts->groupBy('student_id');
-
-        $rows = [];
-        foreach ($students as $student) {
-            $sid = $student->id;
-
-            $taskPcts = collect($taskByStudent->get($sid, collect()))->map(function (TaskSubmission $sub) {
-                $t = $sub->task;
-                if (! $t || ! $t->max_score || (float) $t->max_score <= 0) {
-                    return null;
-                }
-
-                return ((float) $sub->score / (float) $t->max_score) * 100;
-            })->filter(fn ($v) => $v !== null);
-
-            $taskAvg = $taskPcts->isEmpty() ? 0 : round((float) $taskPcts->avg(), 1);
-
-            $quizScores = collect($quizByStudent->get($sid, collect()))->pluck('score');
-            $quizAvg = $quizScores->isEmpty() ? 0 : round((float) $quizScores->avg(), 1);
-
-            $examScores = collect($examByStudent->get($sid, collect()))->pluck('score');
-            $examAvg = $examScores->isEmpty() ? 0 : round((float) $examScores->avg(), 1);
-
-            $overallParts = collect();
-            if ($taskPcts->isNotEmpty()) {
-                $overallParts->push($taskAvg);
-            }
-            if ($quizScores->isNotEmpty()) {
-                $overallParts->push($quizAvg);
-            }
-            if ($examScores->isNotEmpty()) {
-                $overallParts->push($examAvg);
-            }
-            $overallAvg = $overallParts->isEmpty() ? 0 : round((float) $overallParts->avg(), 1);
-
-            $rows[] = [
-                'student_id' => $student->id,
-                'student_name' => $student->name,
-                'student_email' => $student->email ?? '',
-                'student_nis' => $student->nis ?? null,
-                'task_avg' => $taskAvg,
-                'quiz_avg' => $quizAvg,
-                'exam_avg' => $examAvg,
-                'overall_avg' => $overallAvg,
-                'is_passed' => $overallAvg >= $passingScore,
-            ];
-        }
-
-        // Filter by performance status.
-        if ($performanceFilter === 'passed') {
-            $rows = array_values(array_filter(
-                $rows,
-                fn (array $row) => (bool) ($row['is_passed'] ?? false)
-            ));
-        } elseif ($performanceFilter === 'not_passed') {
-            $rows = array_values(array_filter(
-                $rows,
-                fn (array $row) => ! (bool) ($row['is_passed'] ?? false)
-            ));
-        }
-
-        // Filter by score range.
-        $rows = array_values(array_filter($rows, function (array $row) use ($scoreRangeFilter): bool {
-            $score = (float) ($row['overall_avg'] ?? 0);
-            return match ($scoreRangeFilter) {
-                '90_100' => $score >= 90 && $score <= 100,
-                '80_89' => $score >= 80 && $score < 90,
-                '70_79' => $score >= 70 && $score < 80,
-                'lt_70' => $score < 70,
-                default => true,
-            };
-        }));
-
-        // Sort rows.
-        usort($rows, function (array $a, array $b) use ($sort): int {
-            $nameA = mb_strtolower((string) ($a['student_name'] ?? ''));
-            $nameB = mb_strtolower((string) ($b['student_name'] ?? ''));
-            $scoreA = (float) ($a['overall_avg'] ?? 0);
-            $scoreB = (float) ($b['overall_avg'] ?? 0);
-
-            return match ($sort) {
-                'name_asc' => $nameA <=> $nameB,
-                'name_desc' => $nameB <=> $nameA,
-                'score_asc' => $scoreA <=> $scoreB,
-                default => $scoreB <=> $scoreA,
-            };
-        });
-
-        return $rows;
+        return ClassGradeBoard::build(
+            $request,
+            $class,
+            $subjectId,
+            $allowedClassSubjectIds,
+            $this->academicYearKey($request)
+        );
     }
 
     /**
@@ -385,9 +418,9 @@ class GradeController extends Controller
             ->where('class_id', $validated['class_id'])
             ->first();
 
-        if (!$enrollment) {
+        if (! $enrollment) {
             return back()->withErrors([
-                'student_id' => 'Siswa tidak terdaftar di kelas ini.'
+                'student_id' => 'Siswa tidak terdaftar di kelas ini.',
             ])->withInput();
         }
 
@@ -402,7 +435,7 @@ class GradeController extends Controller
 
         if ($existingGrade) {
             return back()->withErrors([
-                'component_id' => 'Nilai untuk komponen ini sudah ada untuk siswa tersebut pada periode yang sama.'
+                'component_id' => 'Nilai untuk komponen ini sudah ada untuk siswa tersebut pada periode yang sama.',
             ])->withInput();
         }
 
@@ -540,8 +573,9 @@ class GradeController extends Controller
                     ->where('class_id', $validated['class_id'])
                     ->first();
 
-                if (!$enrollment) {
+                if (! $enrollment) {
                     $errors[] = "Siswa ID {$gradeData['student_id']} tidak terdaftar di kelas ini";
+
                     continue;
                 }
 
@@ -554,6 +588,7 @@ class GradeController extends Controller
 
                 if ($existingGrade) {
                     $errors[] = "Nilai untuk siswa ID {$gradeData['student_id']} sudah ada";
+
                     continue;
                 }
 
@@ -573,13 +608,13 @@ class GradeController extends Controller
 
                 $created++;
             } catch (\Exception $e) {
-                $errors[] = "Error untuk siswa ID {$gradeData['student_id']}: " . $e->getMessage();
+                $errors[] = "Error untuk siswa ID {$gradeData['student_id']}: ".$e->getMessage();
             }
         }
 
         $message = "Berhasil menambahkan {$created} nilai.";
-        if (!empty($errors)) {
-            $message .= " Errors: " . implode(', ', $errors);
+        if (! empty($errors)) {
+            $message .= ' Errors: '.implode(', ', $errors);
         }
 
         return redirect()->route('grades.index')
@@ -625,12 +660,12 @@ class GradeController extends Controller
             ];
         });
 
-        $student = \App\Models\User::find($studentId);
+        $student = User::find($studentId);
 
         return Inertia::render('Grades/StudentReport', [
             'student' => $student,
             'subjectGrades' => $subjectGrades,
-            'filters' => $request->only(['academic_year'])
+            'filters' => $request->only(['academic_year']),
         ]);
     }
 
@@ -687,26 +722,28 @@ class GradeController extends Controller
             'class' => $class,
             'studentReports' => $studentReports,
             'subjects' => $subjects,
-            'filters' => $request->only(['subject_id', 'academic_year'])
+            'filters' => $request->only(['subject_id', 'academic_year']),
         ]);
     }
 
-    public function exportExcel(Request $request)
+    public function exportExcel(Request $request, ExcelExporter $excel)
     {
         Gate::authorize('grades index');
 
         /** @var User $user */
         $user = auth()->user();
-        $rows = $this->buildExportRows($request, $user);
+        $payload = $this->buildExportPayload($request, $user);
 
-        if ($rows === []) {
+        if ($payload === null) {
             return redirect()
                 ->route('grades.index', $request->query())
                 ->with('error', 'Belum ada data nilai untuk diexport');
         }
 
         $selectedClassId = $request->filled('class_id') ? (int) $request->class_id : null;
-        $className = 'Semua_Kelas';
+        $selectedSubjectId = $request->filled('subject_id') ? (int) $request->subject_id : null;
+
+        $className = 'Semua_kelas';
         if ($selectedClassId) {
             $class = SchoolClass::query()->find($selectedClassId);
             if ($class) {
@@ -714,15 +751,34 @@ class GradeController extends Controller
             }
         }
 
-        $fileName = sprintf('Rekap_Nilai_%s.xlsx', $className);
+        $subjectSlug = 'Semua_mapel';
+        if ($selectedSubjectId) {
+            $subject = Subject::query()->find($selectedSubjectId);
+            if ($subject) {
+                $subjectSlug = preg_replace('/[^A-Za-z0-9]+/', '_', $subject->name) ?: 'Mapel';
+            }
+        }
 
-        return Excel::download(new GradesRecapExport($rows), $fileName);
+        $fileName = sprintf('Rekap_Nilai_%s_%s.xlsx', $className, $subjectSlug);
+
+        return $excel->download(
+            new GradesExportCombinedSheet(
+                $payload['bobot_meta'],
+                $payload['bobot_rows'],
+                $payload['nilai_group_row'],
+                $payload['nilai_headings'],
+                $payload['nilai_rows'],
+            ),
+            $fileName
+        );
     }
 
     /**
-     * @return array<int, array<int, string|int|float|null>>
+     * Data untuk Excel satu lembar: meta, nilai per aktivitas, bobot di kanan.
+     *
+     * @return array{bobot_meta: array, bobot_rows: array, nilai_group_row: array, nilai_headings: array, nilai_rows: array}|null
      */
-    private function buildExportRows(Request $request, User $user): array
+    private function buildExportPayload(Request $request, User $user): ?array
     {
         $selectedClassId = $request->filled('class_id') ? (int) $request->class_id : null;
         $selectedSubjectId = $request->filled('subject_id') ? (int) $request->subject_id : null;
@@ -734,8 +790,103 @@ class GradeController extends Controller
 
         $period = trim((string) $request->input('period', ''));
         $periodYear = preg_match('/^\d{4}$/', $period) ? (int) $period : null;
+        $academicYearKey = $this->academicYearKey($request);
 
-        $rows = [];
+        $mergedDefs = [];
+        foreach ($classes as $class) {
+            if (! $this->teacherCanViewClassGrades($user, $class)) {
+                continue;
+            }
+
+            $allowedClassSubjectIds = null;
+            if ($user->hasRole('guru')) {
+                if ($selectedSubjectId) {
+                    $taughtSubjectIds = $class->classSubjects()
+                        ->forTeacher($user)
+                        ->pluck('subject_id')
+                        ->unique()
+                        ->all();
+
+                    if (! in_array($selectedSubjectId, $taughtSubjectIds, true)) {
+                        continue;
+                    }
+                }
+
+                $allowedClassSubjectIds = $class->classSubjects()
+                    ->forTeacher($user)
+                    ->pluck('id')
+                    ->all();
+            }
+
+            foreach ($this->exportActivityDefinitions($class, $selectedSubjectId, $allowedClassSubjectIds, $academicYearKey) as $def) {
+                $mergedDefs[$def['key']] = $def;
+            }
+        }
+
+        $orderedDefs = $this->sortExportActivityDefinitions(array_values($mergedDefs));
+
+        $bobotRows = [];
+        foreach ($orderedDefs as $def) {
+            $bobotRows[] = [
+                $def['segment'],
+                $def['title'],
+                $def['weight'] !== null ? round((float) $def['weight'], 2) : '—',
+            ];
+        }
+
+        $subjectName = 'Semua mapel';
+        if ($selectedSubjectId) {
+            $subjectName = Subject::query()->find($selectedSubjectId)?->name ?? '—';
+        }
+
+        $classLabel = $classes->count() === 1
+            ? ($classes->first()?->name ?? '—')
+            : 'Beberapa kelas ('.$classes->count().')';
+
+        $bobotMeta = [
+            'class' => $classLabel,
+            'subject' => $subjectName,
+            'period' => $period,
+        ];
+
+        $activityHeaders = [];
+        foreach ($orderedDefs as $def) {
+            $w = $def['weight'];
+            $wTxt = $w !== null
+                ? ' [bobot '.$this->formatPercentLabel((float) $w).'%]'
+                : '';
+            $activityHeaders[] = $def['segment'].': '.$def['title'].$wTxt.' (nilai %)';
+        }
+
+        $nilaiHeadings = array_merge(
+            ['Nama siswa', 'NIS', 'Kelas'],
+            $activityHeaders,
+            ['Rerata tugas (%)', 'Rerata kuis (%)', 'Rerata ujian (%)', 'Nilai akhir (%)', 'Perhitungan akhir']
+        );
+
+        $nilaiGroupRow = array_merge(
+            ['Identitas siswa', 'Identitas siswa', 'Identitas siswa'],
+            array_map(
+                function (array $def) {
+                    return match ($def['segment']) {
+                        'Tugas' => 'Detail nilai tugas (%)',
+                        'Kuis' => 'Detail nilai kuis (%)',
+                        'Ujian' => 'Detail nilai ujian (%)',
+                        default => '—',
+                    };
+                },
+                $orderedDefs
+            ),
+            [
+                'Ringkasan / nilai akhir',
+                'Ringkasan / nilai akhir',
+                'Ringkasan / nilai akhir',
+                'Ringkasan / nilai akhir',
+                'Ringkasan / nilai akhir',
+            ]
+        );
+
+        $nilaiRows = [];
         foreach ($classes as $class) {
             if (! $this->teacherCanViewClassGrades($user, $class)) {
                 continue;
@@ -768,11 +919,10 @@ class GradeController extends Controller
                 $nis = $nisFromData !== ''
                     ? $nisFromData
                     : ($studentEmail !== '' && str_contains($studentEmail, '@')
-                    ? explode('@', $studentEmail)[0]
-                    : '-');
+                        ? explode('@', $studentEmail)[0]
+                        : '-');
 
                 if ($periodYear !== null) {
-                    // Approximate period filtering by latest graded activity year.
                     $latestYear = $this->latestStudentActivityYear(
                         (int) $row['student_id'],
                         (int) $class->id,
@@ -784,19 +934,161 @@ class GradeController extends Controller
                     }
                 }
 
-                $rows[] = [
-                    $row['student_name'] ?? '-',
-                    $nis,
-                    $class->name ?? '-',
-                    (float) ($row['task_avg'] ?? 0),
-                    (float) ($row['quiz_avg'] ?? 0),
-                    (float) ($row['exam_avg'] ?? 0),
-                    (float) ($row['overall_avg'] ?? 0),
-                ];
+                $cells = [];
+                foreach ($orderedDefs as $def) {
+                    $cells[] = $this->detailScoreForExport(
+                        $row['detail'] ?? null,
+                        $def['activity_type'],
+                        $def['id']
+                    );
+                }
+
+                $nilaiRows[] = array_merge(
+                    [
+                        $row['student_name'] ?? '-',
+                        $nis,
+                        $class->name ?? '-',
+                    ],
+                    $cells,
+                    [
+                        (float) ($row['task_avg'] ?? 0),
+                        (float) ($row['quiz_avg'] ?? 0),
+                        (float) ($row['exam_avg'] ?? 0),
+                        (float) ($row['overall_avg'] ?? 0),
+                        ! empty($row['uses_weighted_formula'])
+                            ? 'Σ(bobot×nilai)÷100'
+                            : 'Rata kategori (tugas / kuis / ujian)',
+                    ]
+                );
             }
         }
 
-        return $rows;
+        if ($nilaiRows === []) {
+            return null;
+        }
+
+        return [
+            'bobot_meta' => $bobotMeta,
+            'bobot_rows' => $bobotRows,
+            'nilai_group_row' => $nilaiGroupRow,
+            'nilai_headings' => $nilaiHeadings,
+            'nilai_rows' => $nilaiRows,
+        ];
+    }
+
+    private function formatPercentLabel(float $value): string
+    {
+        $r = round($value, 2);
+
+        return rtrim(rtrim(sprintf('%.2f', $r), '0'), '.');
+    }
+
+    /**
+     * @return array<int, array{key: string, segment: string, activity_type: string, id: int, title: string, weight: ?float}>
+     */
+    private function exportActivityDefinitions(
+        SchoolClass $class,
+        ?int $subjectId,
+        ?array $allowedClassSubjectIds,
+        string $academicYearKey
+    ): array {
+        $catalog = ClassGradeBoard::catalog($class->id, $subjectId, $allowedClassSubjectIds);
+
+        $weightsKeyed = collect();
+        if ($subjectId !== null) {
+            $weightsKeyed = GradeActivityWeight::query()
+                ->where('class_id', $class->id)
+                ->where('subject_id', $subjectId)
+                ->where('academic_year', $academicYearKey)
+                ->get()
+                ->keyBy(fn ($w) => $w->activity_type.':'.$w->activity_id);
+        }
+
+        $defs = [];
+        foreach ($catalog['tasks'] as $t) {
+            $k = 'task:'.$t->id;
+            $defs[] = [
+                'key' => $k,
+                'segment' => 'Tugas',
+                'activity_type' => 'task',
+                'id' => (int) $t->id,
+                'title' => $t->title,
+                'weight' => isset($weightsKeyed[$k]) ? (float) $weightsKeyed[$k]->weight : null,
+            ];
+        }
+        foreach ($catalog['quizzes'] as $q) {
+            $k = 'quiz:'.$q->id;
+            $defs[] = [
+                'key' => $k,
+                'segment' => 'Kuis',
+                'activity_type' => 'quiz',
+                'id' => (int) $q->id,
+                'title' => $q->title,
+                'weight' => isset($weightsKeyed[$k]) ? (float) $weightsKeyed[$k]->weight : null,
+            ];
+        }
+        foreach ($catalog['exams'] as $e) {
+            $k = 'exam:'.$e->id;
+            $defs[] = [
+                'key' => $k,
+                'segment' => 'Ujian',
+                'activity_type' => 'exam',
+                'id' => (int) $e->id,
+                'title' => $e->title,
+                'weight' => isset($weightsKeyed[$k]) ? (float) $weightsKeyed[$k]->weight : null,
+            ];
+        }
+
+        return $defs;
+    }
+
+    /**
+     * @param  array<int, array{key: string, segment: string, activity_type: string, id: int, title: string, weight: ?float}>  $defs
+     * @return array<int, array{key: string, segment: string, activity_type: string, id: int, title: string, weight: ?float}>
+     */
+    private function sortExportActivityDefinitions(array $defs): array
+    {
+        $order = ['Tugas' => 0, 'Kuis' => 1, 'Ujian' => 2];
+        usort($defs, function ($a, $b) use ($order) {
+            $oa = $order[$a['segment']] ?? 99;
+            $ob = $order[$b['segment']] ?? 99;
+            if ($oa !== $ob) {
+                return $oa <=> $ob;
+            }
+
+            return strcasecmp((string) $a['title'], (string) $b['title']);
+        });
+
+        return $defs;
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $detail
+     */
+    private function detailScoreForExport(?array $detail, string $activityType, int $id): float|string
+    {
+        if ($detail === null) {
+            return '—';
+        }
+
+        $listKey = match ($activityType) {
+            'task' => 'tasks',
+            'quiz' => 'quizzes',
+            'exam' => 'exams',
+            default => null,
+        };
+
+        if ($listKey === null) {
+            return '—';
+        }
+
+        foreach ($detail[$listKey] ?? [] as $item) {
+            if ((int) ($item['id'] ?? 0) === $id && isset($item['score']) && $item['score'] !== null) {
+                return round((float) $item['score'], 1);
+            }
+        }
+
+        return '—';
     }
 
     private function latestStudentActivityYear(
@@ -845,10 +1137,19 @@ class GradeController extends Controller
 
     private function getGradeLetter($score)
     {
-        if ($score >= 90) return 'A';
-        if ($score >= 80) return 'B';
-        if ($score >= 70) return 'C';
-        if ($score >= 60) return 'D';
+        if ($score >= 90) {
+            return 'A';
+        }
+        if ($score >= 80) {
+            return 'B';
+        }
+        if ($score >= 70) {
+            return 'C';
+        }
+        if ($score >= 60) {
+            return 'D';
+        }
+
         return 'E';
     }
 }

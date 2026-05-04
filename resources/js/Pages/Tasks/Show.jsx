@@ -8,7 +8,9 @@ import { Head, Link, router, usePage } from "@inertiajs/react";
 import hasAnyPermission from "@/Utils/Permissions";
 import { hasRole } from "@/Utils/Permissions";
 import {
+    IconBrandYoutube,
     IconClipboardList,
+    IconPaperclip,
     IconUsers,
     IconChartBar,
     IconSchool,
@@ -182,15 +184,23 @@ export default function Show() {
                                     </p>
                                 </div>
                             ) : null}
-                            {mySubmission.file_path ? (
+                            {mySubmission.file_path && mySubmission.id ? (
                                 <a
-                                    href={`/storage/${String(
-                                        mySubmission.file_path
-                                    ).replace(/^\/+/, "")}`}
+                                    href={route(
+                                        "tasks.submission.file",
+                                        {
+                                            task: task.id,
+                                            submission: mySubmission.id,
+                                        }
+                                    )}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex text-sm font-medium text-indigo-600 hover:text-indigo-800"
+                                    className="inline-flex items-center gap-2 rounded-lg bg-[#163d8f] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0f2e6f]"
                                 >
+                                    <IconPaperclip
+                                        className="h-4 w-4"
+                                        stroke={1.75}
+                                    />
                                     Unduh / buka lampiran
                                 </a>
                             ) : null}
@@ -199,8 +209,12 @@ export default function Show() {
                                     href={mySubmission.youtube_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex text-sm font-medium text-rose-600 hover:text-rose-800"
+                                    className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
                                 >
+                                    <IconBrandYoutube
+                                        className="h-5 w-5"
+                                        stroke={1.5}
+                                    />
                                     Buka tautan YouTube
                                 </a>
                             ) : null}
@@ -325,6 +339,7 @@ export default function Show() {
                                     <Table.Th>#</Table.Th>
                                     <Table.Th>Siswa</Table.Th>
                                     <Table.Th>Status</Table.Th>
+                                    <Table.Th>Berkas / video</Table.Th>
                                     <Table.Th>Dikumpulkan</Table.Th>
                                     <Table.Th>Nilai</Table.Th>
                                 </tr>
@@ -350,6 +365,70 @@ export default function Show() {
                                                         </span>
                                                     )}
                                                 </Table.Td>
+                                                <Table.Td className="max-w-[14rem]">
+                                                    {!sub?.submitted_at ? (
+                                                        "—"
+                                                    ) : (
+                                                        <div className="flex flex-col gap-1.5 text-xs">
+                                                            {sub.file_path &&
+                                                            sub.id ? (
+                                                                <a
+                                                                    href={route(
+                                                                        "tasks.submission.file",
+                                                                        {
+                                                                            task: task.id,
+                                                                            submission:
+                                                                                sub.id,
+                                                                        }
+                                                                    )}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="inline-flex w-fit items-center gap-1 rounded-md bg-[#163d8f] px-2.5 py-1 font-semibold text-white hover:bg-[#0f2e6f]"
+                                                                >
+                                                                    <IconPaperclip
+                                                                        className="h-3.5 w-3.5 shrink-0"
+                                                                        stroke={
+                                                                            2
+                                                                        }
+                                                                    />
+                                                                    Lampiran
+                                                                </a>
+                                                            ) : null}
+                                                            {sub.youtube_url ? (
+                                                                <a
+                                                                    href={
+                                                                        sub.youtube_url
+                                                                    }
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="inline-flex w-fit items-center gap-1 rounded-md bg-rose-600 px-2.5 py-1 font-semibold text-white hover:bg-rose-700"
+                                                                >
+                                                                    <IconBrandYoutube
+                                                                        className="h-3.5 w-3.5 shrink-0"
+                                                                        stroke={
+                                                                            1.5
+                                                                        }
+                                                                    />
+                                                                    YouTube
+                                                                </a>
+                                                            ) : null}
+                                                            {sub.content &&
+                                                            !sub.file_path &&
+                                                            !sub.youtube_url ? (
+                                                                <span className="text-slate-600">
+                                                                    Teks
+                                                                </span>
+                                                            ) : null}
+                                                            {!sub.content &&
+                                                            !sub.file_path &&
+                                                            !sub.youtube_url ? (
+                                                                <span className="text-slate-400">
+                                                                    —
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
+                                                    )}
+                                                </Table.Td>
                                                 <Table.Td className="text-sm text-slate-600">
                                                     {sub?.submitted_at
                                                         ? formatStudentDateTime(
@@ -372,7 +451,7 @@ export default function Show() {
                                 ) : (
                                     <tr>
                                         <Table.Td
-                                            colSpan={5}
+                                            colSpan={6}
                                             className="py-10 text-center text-slate-500"
                                         >
                                             Belum ada siswa atau pengumpulan untuk

@@ -4,7 +4,9 @@ import { Head, Link, useForm, usePage } from "@inertiajs/react";
 import { formatStudentDateTime } from "@/Components/Student/StudentShell";
 import {
     IconArrowLeft,
+    IconBrandYoutube,
     IconChevronDown,
+    IconPaperclip,
     IconSearch,
 } from "@tabler/icons-react";
 
@@ -27,9 +29,13 @@ function SubmissionGradePanel({ task, submission }) {
         );
     };
 
-    const fileHref =
+    const fileDownloadUrl =
         submission.file_path &&
-        `/storage/${String(submission.file_path).replace(/^\/+/, "")}`;
+        submission.id &&
+        route("tasks.submission.file", {
+            task: task.id,
+            submission: submission.id,
+        });
 
     return (
         <div className="space-y-4 text-sm">
@@ -43,15 +49,45 @@ function SubmissionGradePanel({ task, submission }) {
                     </p>
                 </div>
             ) : null}
-            {fileHref ? (
-                <a
-                    href={fileHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex text-sm font-medium text-[#163d8f] hover:text-[#0f2e6f]"
-                >
-                    Buka lampiran
-                </a>
+            {fileDownloadUrl ? (
+                <div>
+                    <p className="text-xs font-semibold uppercase text-slate-500">
+                        Lampiran berkas
+                    </p>
+                    <a
+                        href={fileDownloadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-2 rounded-lg bg-[#163d8f] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0f2e6f] active:scale-[0.99]"
+                    >
+                        <IconPaperclip className="h-4 w-4" stroke={1.75} />
+                        Buka & unduh lampiran
+                    </a>
+                    {submission.file_name ? (
+                        <p className="mt-1.5 text-xs text-slate-500">
+                            {submission.file_name}
+                        </p>
+                    ) : null}
+                </div>
+            ) : null}
+            {submission.youtube_url ? (
+                <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-4">
+                    <p className="text-xs font-semibold uppercase text-rose-800">
+                        Tautan video YouTube
+                    </p>
+                    <a
+                        href={submission.youtube_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rose-700"
+                    >
+                        <IconBrandYoutube className="h-5 w-5" stroke={1.5} />
+                        Buka video siswa
+                    </a>
+                    <p className="mt-2 break-all text-xs text-rose-900/80">
+                        {submission.youtube_url}
+                    </p>
+                </div>
             ) : null}
 
             <form

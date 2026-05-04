@@ -2,23 +2,136 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Task;
-use App\Models\Subject;
-use App\Models\SchoolClass;
 use App\Models\ClassSubject;
+use App\Models\SchoolClass;
+use App\Models\Subject;
+use App\Models\Task;
 use App\Models\TaskSubmission;
 use App\Models\User;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
-use Carbon\Carbon;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class TaskController extends Controller
 {
     /** Ukuran maks. lampiran tugas (MB dikonversi ke KB untuk Laravel `max`). */
     private const TASK_FILE_MAX_KB = 20480; // 20 MB
+
+    /**
+     * Normalisasi path relatif ke disk `public` dan variasi umum data lama (URL penuh, prefix ekstra).
+     *
+     * @return list<string>
+     */
+    private function submissionFilePathCandidates(?string $raw): array
+    {
+        if ($raw === null || $raw === '') {
+            return [];
+        }
+
+        $s = trim((string) $raw);
+        $s = str_replace("\0", '', $s);
+        // Path kadang tersimpan ter-encode (URL / double-encoded)
+        $s = rawurldecode($s);
+        $s = trim($s);
+
+        if (preg_match('#^https?://#i', $s)) {
+            $path = parse_url($s, PHP_URL_PATH);
+            $s = is_string($path) ? rawurldecode($path) : '';
+        }
+
+        $s = str_replace('\\', '/', $s);
+        $s = ltrim($s, '/');
+
+        foreach (['storage/app/public/', 'public/storage/', 'public/', 'app/public/'] as $pfx) {
+            while (str_starts_with($s, $pfx)) {
+                $s = substr($s, strlen($pfx));
+            }
+        }
+        while (str_starts_with($s, 'storage/')) {
+            $s = substr($s, 6);
+        }
+
+        if ($s === '') {
+            return [];
+        }
+
+        $base = basename($s);
+        $candidates = [$s];
+        if ($base !== '' && $base !== $s && ! str_contains($s, 'task-submissions')) {
+            $candidates[] = 'task-submissions/'.$base;
+        }
+
+        return array_values(array_unique(array_filter($candidates)));
+    }
+
+    /**
+     * Cek file di disk public — Flysystem "exists" kadang beda dengan file_exists di Windows/path Unicode.
+     */
+    private function publicDiskPathExists(FilesystemAdapter $disk, string $relative): ?string
+    {
+        $relative = str_replace('\\', '/', $relative);
+        if ($relative === '') {
+            return null;
+        }
+
+        try {
+            if ($disk->exists($relative)) {
+                return $disk->path($relative);
+            }
+        } catch (\Throwable) {
+            // lanjut ke fallback
+        }
+
+        try {
+            $absolute = $disk->path($relative);
+            if (is_file($absolute) && is_readable($absolute)) {
+                return $absolute;
+            }
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Jika file_path di DB terpotong atau mismatch tipis, cari satu berkas di task-submissions yang cocok dengan awalan nama.
+     */
+    private function guessPublicSubmissionFileByPrefix(string $rawPath): ?string
+    {
+        $s = str_replace('\\', '/', trim($rawPath));
+        $s = ltrim($s, '/');
+        foreach (['storage/app/public/', 'public/storage/', 'public/', 'app/public/'] as $pfx) {
+            while (str_starts_with($s, $pfx)) {
+                $s = substr($s, strlen($pfx));
+            }
+        }
+        while (str_starts_with($s, 'storage/')) {
+            $s = substr($s, 6);
+        }
+        if (! str_starts_with($s, 'task-submissions/')) {
+            return null;
+        }
+        $leaf = basename($s);
+        if ($leaf === '' || strlen($leaf) < 6) {
+            return null;
+        }
+        $dir = storage_path('app/public/task-submissions');
+        if (! is_dir($dir)) {
+            return null;
+        }
+        $pattern = $dir.DIRECTORY_SEPARATOR.$leaf.'*';
+        $matches = glob($pattern);
+        if ($matches !== false && count($matches) === 1 && is_file($matches[0])) {
+            return $matches[0];
+        }
+
+        return null;
+    }
 
     /**
      * Display a listing of the resource.
@@ -42,7 +155,7 @@ class TaskController extends Controller
 
         // Filter by subject
         if ($request->filled('subject_id')) {
-            $query->whereHas('classSubject', function($q) use ($request) {
+            $query->whereHas('classSubject', function ($q) use ($request) {
                 $q->where('subject_id', $request->subject_id);
             });
         }
@@ -69,7 +182,7 @@ class TaskController extends Controller
             switch ($request->status) {
                 case 'active':
                     $query->where('is_active', true)
-                          ->where('due_date', '>', now());
+                        ->where('due_date', '>', now());
                     break;
                 case 'overdue':
                     $query->where('due_date', '<', now());
@@ -85,14 +198,14 @@ class TaskController extends Controller
             $search = trim((string) $request->search);
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%")
-                  ->orWhereHas('subject', function ($subjectQuery) use ($search) {
-                      $subjectQuery->where('name', 'like', "%{$search}%")
-                          ->orWhere('code', 'like', "%{$search}%");
-                  })
-                  ->orWhereHas('schoolClass', function ($classQuery) use ($search) {
-                      $classQuery->where('name', 'like', "%{$search}%");
-                  });
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhereHas('subject', function ($subjectQuery) use ($search) {
+                        $subjectQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('schoolClass', function ($classQuery) use ($search) {
+                        $classQuery->where('name', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -140,7 +253,7 @@ class TaskController extends Controller
             'subjects' => $subjects,
             'classes' => $classes,
             'teachers' => $teachers,
-            'filters' => $request->only(['subject_id', 'class_id', 'teacher_id', 'search', 'status'])
+            'filters' => $request->only(['subject_id', 'class_id', 'teacher_id', 'search', 'status']),
         ]);
     }
 
@@ -213,7 +326,7 @@ class TaskController extends Controller
             ->where('subject_id', $validated['subject_id'])
             ->first();
 
-        if (!$classSubject) {
+        if (! $classSubject) {
             return back()->withErrors(['subject_id' => 'Mata pelajaran tidak ditemukan untuk kelas ini.']);
         }
 
@@ -349,7 +462,7 @@ class TaskController extends Controller
             ->where('subject_id', $validated['subject_id'])
             ->first();
 
-        if (!$classSubject) {
+        if (! $classSubject) {
             return back()->withErrors(['subject_id' => 'Mata pelajaran tidak ditemukan untuk kelas ini.']);
         }
 
@@ -391,11 +504,11 @@ class TaskController extends Controller
     {
         Gate::authorize('view', $task);
 
-        if (!auth()->user()->hasRole('siswa')) {
+        if (! auth()->user()->hasRole('siswa')) {
             abort(403, 'Hanya siswa yang dapat mengumpulkan tugas.');
         }
 
-        if (!$task->schoolClass->students()->where('users.id', auth()->id())->exists()) {
+        if (! $task->schoolClass->students()->where('users.id', auth()->id())->exists()) {
             abort(403, 'Anda tidak terdaftar di kelas ini.');
         }
 
@@ -421,16 +534,16 @@ class TaskController extends Controller
     public function submit(Request $request, Task $task)
     {
         // Check if user is a student and enrolled in the class
-        if (!auth()->user()->hasRole('siswa')) {
+        if (! auth()->user()->hasRole('siswa')) {
             abort(403, 'Hanya siswa yang dapat mengumpulkan tugas.');
         }
 
-        if (!$task->schoolClass->students()->where('users.id', auth()->id())->exists()) {
+        if (! $task->schoolClass->students()->where('users.id', auth()->id())->exists()) {
             abort(403, 'Anda tidak terdaftar di kelas ini.');
         }
 
         // Check if task is still active and not overdue
-        if (!$task->is_active || $task->due_date < now()) {
+        if (! $task->is_active || $task->due_date < now()) {
             return back()->with('error', 'Tugas sudah tidak dapat dikumpulkan.');
         }
 
@@ -508,6 +621,63 @@ class TaskController extends Controller
     }
 
     /**
+     * Unduh / buka lampiran pengumpulan (otentikasi; menggantikan file publik mentah yang bisa 403).
+     */
+    public function downloadSubmissionFile(Task $task, TaskSubmission $submission)
+    {
+        if ((int) $submission->task_id !== (int) $task->id) {
+            abort(404);
+        }
+
+        $user = auth()->user();
+        $submission->loadMissing('task.classSubject');
+        $task = $submission->task;
+
+        if ($user->hasRole('admin') && $user->can('tasks view')) {
+            // ok
+        } elseif ($user->hasRole('siswa')) {
+            if ((int) $submission->student_id !== (int) $user->id) {
+                abort(403);
+            }
+            if (! $user->enrolledClasses()->where('school_classes.id', $task->class_id)->exists()) {
+                abort(403);
+            }
+        } elseif ($user->hasRole('guru')) {
+            Gate::authorize('view', $task);
+        } else {
+            abort(403);
+        }
+
+        $rawPath = $submission->file_path;
+        if (! $rawPath) {
+            abort(404);
+        }
+
+        $disk = Storage::disk('public');
+        $downloadName = $submission->file_name ?: 'lampiran';
+
+        foreach ($this->submissionFilePathCandidates($rawPath) as $rel) {
+            $absolute = $this->publicDiskPathExists($disk, $rel);
+            if ($absolute !== null) {
+                $response = new BinaryFileResponse($absolute);
+                $response->setContentDisposition('inline', $downloadName);
+
+                return $response;
+            }
+        }
+
+        $guessed = $this->guessPublicSubmissionFileByPrefix((string) $rawPath);
+        if ($guessed !== null) {
+            $response = new BinaryFileResponse($guessed);
+            $response->setContentDisposition('inline', $downloadName);
+
+            return $response;
+        }
+
+        abort(404);
+    }
+
+    /**
      * Grade a task submission (for teachers)
      */
     public function gradeSubmission(Request $request, Task $task, TaskSubmission $submission)
@@ -519,14 +689,10 @@ class TaskController extends Controller
         }
 
         $submission->task->loadMissing('classSubject.subject');
-        if (!auth()->user()->hasRole('guru')
-            || !$submission->task->classSubject
-            || !$submission->task->classSubject->isTaughtBy(auth()->user())) {
-            abort(403, 'Anda tidak memiliki akses untuk menilai tugas ini.');
-        }
+        Gate::authorize('view', $task);
 
         $validated = $request->validate([
-            'score' => 'required|numeric|min:0|max:' . $submission->task->max_score,
+            'score' => 'required|numeric|min:0|max:'.$submission->task->max_score,
             'feedback' => 'nullable|string|max:1000',
         ]);
 
@@ -545,7 +711,7 @@ class TaskController extends Controller
     {
         Gate::authorize('tasks edit', $task);
 
-        $task->update(['is_active' => !$task->is_active]);
+        $task->update(['is_active' => ! $task->is_active]);
 
         $status = $task->is_active ? 'diaktifkan' : 'dinonaktifkan';
 
@@ -571,7 +737,7 @@ class TaskController extends Controller
                         'id' => $row->subject_id,
                         'name' => $row->subject?->name,
                     ])
-                    ->filter(fn ($subject) => !empty($subject['id']) && !empty($subject['name']))
+                    ->filter(fn ($subject) => ! empty($subject['id']) && ! empty($subject['name']))
                     ->values()
                     ->all();
             })

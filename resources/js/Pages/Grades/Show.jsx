@@ -177,7 +177,8 @@ export default function Show() {
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    )}
+
                 </div>
 
                 {grade.assessment && (

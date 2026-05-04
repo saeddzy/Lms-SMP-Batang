@@ -20,10 +20,26 @@ class QuizPolicy
         }
 
         if ($user->hasRole('guru') && $user->can('quizzes view')) {
-            if (!$quiz->classSubject) {
-                return false;
+            // Pembuat kuis selalu boleh melihat (data lama kadang tanpa class_subject)
+            if ((int) ($quiz->created_by ?? 0) === (int) $user->id) {
+                return true;
             }
-            return $quiz->classSubject->isVisibleToTeacher($user);
+            // Selaras dengan daftar kuis: guru pengampu / guru mapel / konteks forTeacher
+            if ($quiz->class_subject_id) {
+                return ClassSubject::query()
+                    ->whereKey($quiz->class_subject_id)
+                    ->forTeacher($user)
+                    ->exists();
+            }
+            $quiz->loadMissing('classSubject', 'schoolClass');
+            if ($quiz->classSubject) {
+                return $quiz->classSubject->isVisibleToTeacher($user);
+            }
+            if ($quiz->schoolClass && (int) $quiz->schoolClass->teacher_id === (int) $user->id) {
+                return true;
+            }
+
+            return false;
         }
 
         if ($user->hasRole('siswa') && $user->can('quizzes view')) {
@@ -55,7 +71,7 @@ class QuizPolicy
         }
 
         if ($user->hasRole('guru') && $user->can('quizzes edit')) {
-            if (!$quiz->classSubject) {
+            if (! $quiz->classSubject) {
                 return false;
             }
 
@@ -72,7 +88,7 @@ class QuizPolicy
         }
 
         if ($user->hasRole('guru') && $user->can('quizzes delete')) {
-            if (!$quiz->classSubject) {
+            if (! $quiz->classSubject) {
                 return false;
             }
 

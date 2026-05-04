@@ -3,7 +3,7 @@ import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Head, useForm, usePage } from "@inertiajs/react";
 import Input from "@/Components/Input";
 import Button from "@/Components/Button";
-import Checkbox from "@/Components/Checkbox";
+import RolePermissionsSection from "@/Components/RolePermissionsSection";
 import Swal from "sweetalert2";
 
 export default function Edit() {
@@ -16,19 +16,6 @@ export default function Edit() {
         ),
         _method: "put",
     });
-
-    const handleSelectedPermissions = (permissionName, checked) => {
-        if (checked) {
-            setData("selectedPermissions", (prev) =>
-                prev.includes(permissionName) ? prev : [...prev, permissionName]
-            );
-            return;
-        }
-
-        setData("selectedPermissions", (prev) =>
-            prev.filter((item) => item !== permissionName)
-        );
-    };
 
     const handleUpdatedata = async (e) => {
         e.preventDefault();
@@ -79,40 +66,14 @@ export default function Edit() {
                             </div>
                         </section>
 
-                        <section className="space-y-4 border-t border-slate-100 pt-6">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                Hak Akses Permission
-                            </p>
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                {Object.entries(permissions).map(([group, permissionItems]) => (
-                                    <div
-                                        key={group}
-                                        className="rounded-lg border border-slate-200 bg-slate-50/50 p-4"
-                                    >
-                                        <h3 className="mb-3 text-sm font-semibold text-slate-800">
-                                            {group}
-                                        </h3>
-                                        <div className="space-y-2">
-                                            {permissionItems.map((permission) => (
-                                                <Checkbox
-                                                    key={permission}
-                                                    label={permission}
-                                                    value={permission}
-                                                    checked={data.selectedPermissions.includes(permission)}
-                                                    onChange={(e) =>
-                                                        handleSelectedPermissions(
-                                                            permission,
-                                                            e.target.checked
-                                                        )
-                                                    }
-                                                />
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                            <Input.Error message={errors.selectedPermissions} />
-                        </section>
+                        <RolePermissionsSection
+                            permissions={permissions}
+                            selectedPermissions={data.selectedPermissions}
+                            onChange={(next) =>
+                                setData("selectedPermissions", next)
+                            }
+                            errorMessage={errors.selectedPermissions}
+                        />
 
                         <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
                             <Button type="cancel" url={route("roles.index")} />

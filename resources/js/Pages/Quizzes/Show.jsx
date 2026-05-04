@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import { formatStudentDateTime } from "@/Components/Student/StudentShell";
 import StudentStatCard from "@/Components/Student/StudentStatCard";
@@ -52,9 +52,42 @@ function quizWindowLabel(quiz) {
     return "buka";
 }
 
+const TAB_HASH = {
+    ringkasan: "ringkasan-kuis",
+    percobaan: "percobaan-kuis",
+    soal: "kelola-soal",
+};
+
+const HASH_TO_TAB = Object.fromEntries(
+    Object.entries(TAB_HASH).map(([tab, id]) => [id, tab])
+);
+
 export default function Show() {
     const { quiz, attempts = [], canManageQuiz = false } = usePage().props;
     const sc = quiz.school_class ?? quiz.schoolClass;
+
+    const [activeNav, setActiveNav] = useState("ringkasan");
+
+    const selectTab = useCallback((key) => {
+        if (!TAB_HASH[key]) return;
+        setActiveNav(key);
+        try {
+            window.history.replaceState(
+                null,
+                "",
+                `#${TAB_HASH[key]}`
+            );
+        } catch {
+            /* ignore */
+        }
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }, []);
+
+    useEffect(() => {
+        const hash = window.location.hash?.replace(/^#/, "");
+        const tab = HASH_TO_TAB[hash];
+        if (tab) setActiveNav(tab);
+    }, []);
 
     const quizHasEssay = useMemo(
         () =>
@@ -64,7 +97,7 @@ export default function Show() {
         [quiz.questions]
     );
 
-    const window = quizWindowLabel(quiz);
+    const scheduleWindow = quizWindowLabel(quiz);
 
     const completedAttempts = attempts.filter((a) => a.finished_at);
     const avgScore =
@@ -154,7 +187,11 @@ export default function Show() {
     );
 
     const attemptsTable = (
-        <section id="percobaan-kuis">
+        <section
+            id="percobaan-kuis"
+            role="tabpanel"
+            aria-labelledby="tab-percobaan"
+        >
             <Table.Card
                 title={`Percobaan (${attempts.length})`}
                 className="rounded-md border-slate-200 shadow-none"
@@ -325,44 +362,48 @@ export default function Show() {
             </div>
         ) : null;
 
-    const inner = (
-        <>
+    const ringkasanPanel = (
+        <div
+            className="space-y-6"
+            role="tabpanel"
+            aria-labelledby="tab-ringkasan"
+        >
             <section
                 id="ringkasan-kuis"
                 className="rounded-lg border border-slate-200 bg-white p-6"
             >
                 <div
                     className={`rounded-md border p-4 text-sm ${
-                        window === "buka"
+                        scheduleWindow === "buka"
                             ? "border-emerald-200 bg-emerald-50/80 text-emerald-950"
-                            : window === "belum_mulai"
+                            : scheduleWindow === "belum_mulai"
                               ? "border-amber-200 bg-amber-50/85 text-amber-950"
-                              : window === "jadwal_tidak_lengkap"
+                              : scheduleWindow === "jadwal_tidak_lengkap"
                                 ? "border-amber-200 bg-amber-50/85 text-amber-950"
                               : "border-rose-200 bg-rose-50 text-rose-900"
                     }`}
                 >
                     <p className="inline-flex items-center gap-2 font-semibold">
                         <IconAlertTriangle className="h-4 w-4" />
-                        {window === "buka" && "Jadwal pengerjaan sedang berlangsung"}
-                        {window === "belum_mulai" &&
+                        {scheduleWindow === "buka" && "Jadwal pengerjaan sedang berlangsung"}
+                        {scheduleWindow === "belum_mulai" &&
                             "Kuis belum dimulai sesuai jadwal"}
-                        {window === "berakhir" &&
+                        {scheduleWindow === "berakhir" &&
                             "Waktu pengerjaan kuis sudah berakhir"}
-                        {window === "jadwal_tidak_lengkap" &&
+                        {scheduleWindow === "jadwal_tidak_lengkap" &&
                             "Jadwal mulai/selesai belum lengkap"}
                     </p>
                     <p className="mt-1 opacity-90">
                         Status kuis:{" "}
                         {quiz.is_active ? "aktif" : "nonaktif"}
                         {" · "}
-                        {window === "buka" &&
+                        {scheduleWindow === "buka" &&
                             "Siswa bisa mengerjakan pada rentang waktu ini"}
-                        {window === "belum_mulai" &&
+                        {scheduleWindow === "belum_mulai" &&
                             "Menunggu tanggal/jam mulai yang ditetapkan"}
-                        {window === "berakhir" &&
+                        {scheduleWindow === "berakhir" &&
                             "Tanggal/jam selesai sudah lewat"}
-                        {window === "jadwal_tidak_lengkap" &&
+                        {scheduleWindow === "jadwal_tidak_lengkap" &&
                             "Atur tanggal mulai dan selesai di pengaturan kuis"}
                     </p>
                 </div>
@@ -398,19 +439,23 @@ export default function Show() {
             </section>
 
             {statsRow}
+        </div>
+    );
 
-            {attemptsTable}
-
-            <section id="kelola-soal" className="scroll-mt-24">
-                <QuestionBank
-                    mode="quiz"
-                    entityId={quiz.id}
-                    questions={quiz.questions ?? []}
-                    canManage={canManageQuiz && hasAnyPermission(["quizzes edit"])}
-                    entityLabel="kuis"
-                />
-            </section>
-        </>
+    const kelolaSoalPanel = (
+        <section
+            id="kelola-soal"
+            role="tabpanel"
+            aria-labelledby="tab-kelola-soal"
+        >
+            <QuestionBank
+                mode="quiz"
+                entityId={quiz.id}
+                questions={quiz.questions ?? []}
+                canManage={canManageQuiz && hasAnyPermission(["quizzes edit"])}
+                entityLabel="kuis"
+            />
+        </section>
     );
 
     return (
@@ -461,28 +506,48 @@ export default function Show() {
                     </div>
                 </div>
                 <div className="rounded-md border border-slate-200 bg-white px-4 py-2.5">
-                    <div className="flex flex-wrap gap-2">
-                        <a
-                            href="#ringkasan-kuis"
-                            className="rounded-md bg-[#163d8f] px-3 py-1.5 text-xs font-semibold text-white"
-                        >
-                            Ringkasan
-                        </a>
-                        <a
-                            href="#percobaan-kuis"
-                            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                            Percobaan
-                        </a>
-                        <a
-                            href="#kelola-soal"
-                            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                            Kelola Soal
-                        </a>
-                    </div>
+                    <nav
+                        className="flex flex-wrap gap-2"
+                        aria-label="Bagian detail kuis"
+                        role="tablist"
+                    >
+                        {(
+                            [
+                                ["ringkasan", "Ringkasan", "tab-ringkasan"],
+                                ["percobaan", "Percobaan", "tab-percobaan"],
+                                ["soal", "Kelola Soal", "tab-kelola-soal"],
+                            ]
+                        ).map(([key, label, tabId]) => (
+                            <button
+                                key={key}
+                                id={tabId}
+                                type="button"
+                                role="tab"
+                                aria-selected={activeNav === key}
+                                aria-controls={
+                                    key === "ringkasan"
+                                        ? "ringkasan-kuis"
+                                        : key === "percobaan"
+                                          ? "percobaan-kuis"
+                                          : "kelola-soal"
+                                }
+                                onClick={() => selectTab(key)}
+                                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#163d8f]/40 ${
+                                    activeNav === key
+                                        ? "bg-[#163d8f] text-white shadow-sm"
+                                        : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                                }`}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </nav>
                 </div>
-                {inner}
+                <div className="space-y-6">
+                    {activeNav === "ringkasan" && ringkasanPanel}
+                    {activeNav === "percobaan" && attemptsTable}
+                    {activeNav === "soal" && kelolaSoalPanel}
+                </div>
             </div>
         </DashboardLayout>
     );

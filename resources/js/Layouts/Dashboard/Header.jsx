@@ -15,7 +15,7 @@ export default function Header({
 }) {
     const titleNode =
         title == null ? null : typeof title === "string" ? (
-            <h1 className="truncate text-lg font-semibold tracking-tight text-stone-900 sm:text-xl">
+            <h1 className="line-clamp-1 text-base font-semibold leading-tight tracking-tight text-stone-900 sm:text-lg md:text-xl">
                 {title}
             </h1>
         ) : (
@@ -24,8 +24,8 @@ export default function Header({
     const user = usePage().props.auth.user;
 
     return (
-        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-4 border-b border-stone-200/80 bg-white/90 px-4 backdrop-blur-md sm:px-6 lg:px-8">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
+        <header className="sticky top-0 z-40 flex h-14 max-h-14 shrink-0 items-center justify-between gap-2 border-b border-stone-200/80 bg-white/90 px-3 backdrop-blur-md sm:h-16 sm:max-h-16 sm:gap-4 sm:px-6 lg:px-8">
+            <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
                 <button
                     type="button"
                     onClick={onOpenMobileSidebar}
@@ -35,16 +35,16 @@ export default function Header({
                     <IconMenu2 className="h-5 w-5" stroke={1.5} />
                 </button>
 
-                <div className="flex min-w-0 items-center gap-3">
+                <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden sm:gap-3">
                     {showLogo && (
                         <Link
                             href={route("dashboard")}
                             className="hidden shrink-0 sm:block"
                         >
-                            <ApplicationLogo className="h-8 w-auto fill-current text-stone-800" />
+                            <ApplicationLogo className="h-7 w-auto fill-current text-stone-800 sm:h-8" />
                         </Link>
                     )}
-                    {titleNode}
+                    <div className="min-w-0 flex-1 overflow-hidden">{titleNode}</div>
                 </div>
             </div>
 

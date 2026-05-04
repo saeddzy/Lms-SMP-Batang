@@ -91,7 +91,7 @@ export default function Features({ auth }) {
     return (
         <>
             <Head>
-                <title>Fitur LMS | SMP 3 Batang</title>
+                <title>Fitur LMS | SMP N 3 Batang</title>
                 <meta
                     name="description"
                     content="Fitur Learning Management System SMP Negeri 3 Batang untuk pembelajaran digital, tugas, kuis, ujian, dan manajemen nilai."
@@ -133,7 +133,11 @@ export default function Features({ auth }) {
             </Head>
 
             <div className="min-h-screen text-slate-800">
-                <LandingNavbar auth={auth} current="features" />
+                <LandingNavbar
+                    key={auth?.user?.id ?? "guest"}
+                    auth={auth}
+                    current="features"
+                />
 
                 <header className="feature-hero-mesh relative overflow-hidden px-4 pb-20 pt-36 md:pb-28 md:pt-40">
                     <div className="pointer-events-none absolute -right-24 top-32 h-72 w-72 rounded-full bg-indigo-400/20 blur-3xl" />
@@ -352,7 +356,7 @@ export default function Features({ auth }) {
                 <section className="px-4 pb-24 pt-4">
                     <div className="mx-auto max-w-3xl rounded-3xl border border-indigo-200/60 bg-indigo-50/50 px-6 py-12 text-center md:px-12">
                         <h2 className="font-serif text-2xl italic text-indigo-950 md:text-3xl">
-                            Siap bergabung dengan ekosistem digital SMP 3 Batang?
+                            Siap bergabung dengan ekosistem digital SMP N 3 Batang?
                         </h2>
                         <p className="mt-4 text-slate-600">
                             Login untuk guru dan staf, atau daftar sebagai siswa sesuai ketentuan sekolah.

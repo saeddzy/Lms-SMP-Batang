@@ -1,5 +1,6 @@
 import { Link } from "@inertiajs/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { IconMenu2, IconX } from "@tabler/icons-react";
 
 /**
  * Navbar publik (landing) — dipakai di beranda, Fitur, Kontak.
@@ -20,8 +21,21 @@ export default function LandingNavbar({ auth, current = "home" }) {
 
     const mobileClass = (key) =>
         current === key
-            ? "block px-5 py-4 text-sm uppercase tracking-widest font-sans text-indigo-900 font-semibold hover:bg-white/20 rounded-3xl transition-all duration-300"
-            : "block px-5 py-4 text-sm uppercase tracking-widest font-sans text-slate-600 hover:bg-white/20 rounded-3xl transition-all duration-300";
+            ? "block rounded-3xl px-6 py-5 text-left text-base uppercase tracking-[0.2em] font-sans font-semibold text-indigo-900 transition-all duration-300 hover:bg-slate-50 active:bg-slate-100"
+            : "block rounded-3xl px-6 py-5 text-left text-base uppercase tracking-[0.2em] font-sans text-slate-600 transition-all duration-300 hover:bg-slate-50 active:bg-slate-100";
+
+    useEffect(() => {
+        if (!mobileMenuOpen) return;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+            document.body.style.overflow = prev;
+        };
+    }, [mobileMenuOpen]);
+
+    useEffect(() => {
+        setMobileMenuOpen(false);
+    }, [auth?.user?.id]);
 
     return (
         <>
@@ -49,15 +63,15 @@ export default function LandingNavbar({ auth, current = "home" }) {
                     <button
                         type="button"
                         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                        className="flex-shrink-0 text-indigo-900 transition-colors hover:text-indigo-700 md:hidden"
+                        className="flex-shrink-0 rounded-lg p-1.5 text-indigo-900 transition-colors hover:bg-white/50 hover:text-indigo-700 md:hidden"
                         aria-expanded={mobileMenuOpen}
-                        aria-label="Menu"
+                        aria-label={mobileMenuOpen ? "Tutup menu" : "Buka menu"}
                     >
-                        <span
-                            className={`material-symbols-outlined hamburger-icon text-2xl ${mobileMenuOpen ? "open" : ""}`}
-                        >
-                            {mobileMenuOpen ? "close" : "menu"}
-                        </span>
+                        {mobileMenuOpen ? (
+                            <IconX className="h-7 w-7" stroke={1.75} />
+                        ) : (
+                            <IconMenu2 className="h-7 w-7" stroke={1.75} />
+                        )}
                     </button>
 
                     <Link
@@ -70,8 +84,30 @@ export default function LandingNavbar({ auth, current = "home" }) {
             </nav>
 
             {mobileMenuOpen ? (
-                <div className="animate-in fade-in slide-in-from-top-2 fixed left-0 right-0 top-20 z-40 duration-300 md:hidden">
-                    <div className="glass-card mx-auto max-w-3xl space-y-4 rounded-[2rem] border border-white/30 bg-white/15 px-6 py-6 shadow-2xl shadow-slate-900/20 backdrop-blur-3xl">
+                <div
+                    className="fixed inset-0 z-[100] flex min-h-0 flex-col bg-white/97 backdrop-blur-2xl md:hidden"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Menu navigasi"
+                >
+                    <div className="flex shrink-0 items-center justify-between border-b border-slate-100/90 px-7 py-5 pt-[max(1.25rem,env(safe-area-inset-top))]">
+                        <Link
+                            href="/"
+                            className="max-w-[70%] font-serif text-2xl leading-snug tracking-tighter text-indigo-900 sm:text-[1.65rem]"
+                            onClick={() => setMobileMenuOpen(false)}
+                        >
+                            LMS SMP N 3 Batang
+                        </Link>
+                        <button
+                            type="button"
+                            className="rounded-full p-3 text-indigo-900 transition-colors hover:bg-slate-100 active:bg-slate-200"
+                            onClick={() => setMobileMenuOpen(false)}
+                            aria-label="Tutup menu"
+                        >
+                            <IconX className="h-8 w-8" stroke={1.75} />
+                        </button>
+                    </div>
+                    <nav className="flex min-h-0 flex-1 flex-col justify-center gap-2 overflow-y-auto px-7 pb-[max(2rem,env(safe-area-inset-bottom))]">
                         <Link
                             href="/"
                             className={mobileClass("home")}
@@ -93,16 +129,16 @@ export default function LandingNavbar({ auth, current = "home" }) {
                         >
                             Kontak
                         </Link>
-                        <div className="border-t border-white/20 pt-4">
+                        <div className="mt-8 border-t border-slate-100 pt-8">
                             <Link
                                 href={authButton.href}
-                                className="bg-primary/95 text-on-primary block w-full rounded-full px-6 py-3 text-center font-sans text-xs uppercase tracking-widest transition-all duration-300 hover:bg-primary"
+                                className="bg-primary/95 text-on-primary block w-full rounded-full px-8 py-4 text-center font-sans text-sm font-semibold uppercase tracking-[0.22em] transition-all duration-300 hover:bg-primary active:opacity-95"
                                 onClick={() => setMobileMenuOpen(false)}
                             >
                                 {authButton.label}
                             </Link>
                         </div>
-                    </div>
+                    </nav>
                 </div>
             ) : null}
         </>

@@ -1,292 +1,349 @@
 import React from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Head, usePage } from "@inertiajs/react";
+import {
+    IconAlertTriangle,
+    IconBooks,
+    IconChartBar,
+    IconClipboardCheck,
+    IconSchool,
+    IconUsers,
+} from "@tabler/icons-react";
 
-function StatBlock({ label, hint, value }) {
+function StatCard({ label, value, hint, icon: Icon, tone = "indigo" }) {
+    const tones = {
+        indigo: "border-blue-300/80 bg-blue-100/90",
+        sky: "border-sky-300/80 bg-sky-100/90",
+        emerald: "border-blue-300/80 bg-blue-100/90",
+        amber: "border-indigo-300/80 bg-indigo-100/90",
+    };
+
     return (
-        <div className="rounded-2xl border border-stone-200/80 bg-white p-6 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-wider text-stone-500">
-                {label}
-            </p>
+        <div
+            className={`rounded-2xl border p-5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md ${tones[tone] ?? tones.indigo}`}
+        >
+            <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-stone-600">
+                    {label}
+                </p>
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white text-stone-700 ring-1 ring-stone-300/80">
+                    {Icon ? <Icon className="h-4 w-4" stroke={1.6} /> : null}
+                </span>
+            </div>
             <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-stone-900">
                 {value}
             </p>
-            <p className="mt-1 text-sm text-stone-500">{hint}</p>
+            <p className="mt-1 text-sm text-stone-600">{hint}</p>
         </div>
     );
 }
 
-function Panel({ title, children }) {
+function Panel({ title, children, icon: Icon }) {
     return (
-        <section className="overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-sm">
-            <div className="border-b border-stone-100 px-6 py-4">
-                <h2 className="text-sm font-semibold text-stone-900">{title}</h2>
+        <section className="overflow-hidden rounded-2xl border border-blue-100/80 bg-blue-50/70 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+            <div className="border-b border-blue-100 bg-blue-100/80 px-6 py-4">
+                <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    {Icon ? <Icon className="h-4 w-4 text-blue-700" stroke={1.6} /> : null}
+                    {title}
+                </h2>
             </div>
             <div className="p-6">{children}</div>
         </section>
     );
 }
 
-function StatusLine({ label, ok }) {
-    return (
-        <div className="flex items-center justify-between border-b border-stone-50 py-3 last:border-0">
-            <span className="text-sm text-stone-600">{label}</span>
-            <span
-                className={
-                    ok
-                        ? "text-xs font-medium text-emerald-700"
-                        : "text-xs font-medium text-red-600"
-                }
-            >
-                {ok ? "Sehat" : "Bermasalah"}
-            </span>
-        </div>
-    );
+function EmptyState({ text }) {
+    return <p className="py-6 text-center text-sm text-stone-500">{text}</p>;
 }
 
 export default function AdminDashboard() {
-    const { stats, recentActivities, systemHealth, userGrowth } = usePage().props;
+    const {
+        systemStats = {},
+        userStats = {},
+        contentStats = {},
+        academicStats = {},
+        recentActivities = [],
+        systemAlerts = [],
+    } = usePage().props;
+
+    const totalContent =
+        (systemStats.total_materials ?? 0) +
+        (systemStats.total_tasks ?? 0) +
+        (systemStats.total_quizzes ?? 0) +
+        (systemStats.total_exams ?? 0);
+
+    const todayLabel = new Date().toLocaleDateString("id-ID", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+    });
 
     return (
         <DashboardLayout title="Dashboard Admin">
             <Head title="Dashboard Admin" />
 
             <div className="space-y-8">
-                <div className="rounded-2xl border border-stone-200/80 bg-white px-8 py-10 shadow-sm">
-                    <h1 className="text-2xl font-semibold tracking-tight text-stone-900">
-                        Dashboard administrator
-                    </h1>
-                    <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-500">
-                        Pantau performa sistem dan kelola LMS SMP Batang dari satu
-                        tempat.
+                <div className="overflow-hidden rounded-3xl border border-blue-700/80 bg-gradient-to-br from-[#154497] via-[#1460BE] to-[#1E6FDB] px-8 py-10 shadow-md">
+                    <p className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white ring-1 ring-white/20 backdrop-blur-sm">
+                        {todayLabel}
                     </p>
+                    <h1 className="mt-3 text-2xl font-semibold tracking-tight text-white">
+                        Dashboard Admin
+                    </h1>
+                    <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-100/90">
+                        Monitoring operasional LMS: pengguna, performa akademik,
+                        aktivitas konten, dan alert prioritas.
+                    </p>
+                    <div className="mt-5 flex flex-wrap gap-2">
+                        <span className="rounded-full bg-blue-500 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20">
+                            {systemStats.total_users ?? 0} total user
+                        </span>
+                        <span className="rounded-full bg-blue-500/95 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20">
+                            {totalContent} total konten
+                        </span>
+                        <span className="rounded-full bg-sky-400/95 px-3 py-1 text-xs font-semibold text-slate-900 ring-1 ring-white/10">
+                            {academicStats.overall_average ?? 0}% rata-rata nilai
+                        </span>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
-                    <StatBlock
-                        label="Siswa"
-                        hint="Terdaftar di sistem"
-                        value={stats?.totalStudents ?? 0}
+                    <StatCard
+                        label="Guru aktif"
+                        value={userStats.teachers ?? 0}
+                        hint="Akun guru terdaftar"
+                        icon={IconUsers}
+                        tone="sky"
                     />
-                    <StatBlock
-                        label="Guru"
-                        hint="Pengajar aktif"
-                        value={stats?.totalTeachers ?? 0}
+                    <StatCard
+                        label="Siswa aktif"
+                        value={userStats.students ?? 0}
+                        hint="Akun siswa terdaftar"
+                        icon={IconUsers}
+                        tone="emerald"
                     />
-                    <StatBlock
-                        label="Kelas"
-                        hint="Kelas aktif"
-                        value={stats?.totalClasses ?? 0}
+                    <StatCard
+                        label="Kelas aktif"
+                        value={systemStats.active_classes ?? 0}
+                        hint={`${systemStats.total_classes ?? 0} total kelas`}
+                        icon={IconSchool}
+                        tone="amber"
                     />
-                    <StatBlock
-                        label="Materi"
-                        hint="Unggahan pembelajaran"
-                        value={stats?.totalMaterials ?? 0}
+                    <StatCard
+                        label="Konten belajar"
+                        value={totalContent}
+                        hint={`+${contentStats?.recent_content?.total ?? 0} konten (30 hari)`}
+                        icon={IconBooks}
+                        tone="indigo"
                     />
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    <Panel title="Status sistem">
-                        <div className="divide-y divide-stone-100">
-                            <StatusLine
-                                label="Database"
-                                ok={systemHealth?.database === "healthy"}
-                            />
-                            <StatusLine
-                                label="Storage"
-                                ok={systemHealth?.storage === "healthy"}
-                            />
-                            <StatusLine
-                                label="Cache"
-                                ok={systemHealth?.cache === "healthy"}
-                            />
-                            <StatusLine
-                                label="Queue"
-                                ok={systemHealth?.queue === "healthy"}
-                            />
-                        </div>
-                        <div className="mt-4 flex justify-between border-t border-stone-100 pt-4 text-sm">
-                            <span className="font-medium text-stone-800">
-                                Uptime
-                            </span>
-                            <span className="text-stone-500">
-                                {systemHealth?.uptime ?? "N/A"}
-                            </span>
-                        </div>
-                    </Panel>
-
-                    <Panel title="Pertumbuhan pengguna">
-                        {userGrowth && userGrowth.length > 0 ? (
-                            <ul className="space-y-4">
-                                {userGrowth.map((growth, i) => (
+                    <Panel title="Alert Sistem" icon={IconAlertTriangle}>
+                        {systemAlerts.length > 0 ? (
+                            <ul className="space-y-3">
+                                {systemAlerts.map((alert, i) => (
                                     <li
-                                        key={i}
-                                        className="flex items-start justify-between gap-4 border-b border-stone-50 pb-4 last:border-0 last:pb-0"
+                                        key={`${alert.title}-${i}`}
+                                        className={`rounded-xl border px-4 py-3 ${
+                                            alert.type === "warning"
+                                                ? "border-amber-300/80 bg-amber-50/80"
+                                                : "border-sky-300/80 bg-sky-50/80"
+                                        }`}
                                     >
-                                        <div>
-                                            <p className="text-sm font-medium text-stone-900">
-                                                {growth.period}
-                                            </p>
-                                            <p className="text-xs text-stone-500">
-                                                {growth.description}
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-lg font-semibold tabular-nums text-stone-900">
-                                                +{growth.newUsers}
-                                            </p>
-                                            <p className="text-xs text-stone-500">
-                                                pengguna baru
-                                            </p>
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-semibold text-stone-900">
+                                                    {alert.title}
+                                                </p>
+                                                <p className="text-xs text-stone-600">
+                                                    {alert.message}
+                                                </p>
+                                            </div>
+                                            {alert.action_url ? (
+                                                <a
+                                                    href={alert.action_url}
+                                                    className="shrink-0 text-xs font-semibold text-indigo-700 hover:text-indigo-900"
+                                                >
+                                                    Buka
+                                                </a>
+                                            ) : null}
                                         </div>
                                     </li>
                                 ))}
                             </ul>
                         ) : (
-                            <p className="py-6 text-center text-sm text-stone-500">
-                                Belum ada data pertumbuhan
-                            </p>
+                            <EmptyState text="Tidak ada alert saat ini." />
+                        )}
+                    </Panel>
+
+                    <Panel title="Distribusi Pengguna" icon={IconUsers}>
+                        <div className="space-y-3">
+                            <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-3">
+                                <div className="mb-1 flex justify-between text-xs text-stone-600">
+                                    <span>Admin</span>
+                                    <span>
+                                        {userStats?.distribution?.admins_percentage ?? 0}%
+                                    </span>
+                                </div>
+                                <div className="h-2 rounded-full bg-stone-200">
+                                    <div
+                                        className="h-2 rounded-full bg-indigo-600"
+                                        style={{
+                                            width: `${userStats?.distribution?.admins_percentage ?? 0}%`,
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                            <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-3">
+                                <div className="mb-1 flex justify-between text-xs text-stone-600">
+                                    <span>Guru</span>
+                                    <span>
+                                        {userStats?.distribution?.teachers_percentage ?? 0}%
+                                    </span>
+                                </div>
+                                <div className="h-2 rounded-full bg-stone-200">
+                                    <div
+                                        className="h-2 rounded-full bg-sky-600"
+                                        style={{
+                                            width: `${userStats?.distribution?.teachers_percentage ?? 0}%`,
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                            <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-3">
+                                <div className="mb-1 flex justify-between text-xs text-stone-600">
+                                    <span>Siswa</span>
+                                    <span>
+                                        {userStats?.distribution?.students_percentage ?? 0}%
+                                    </span>
+                                </div>
+                                <div className="h-2 rounded-full bg-stone-200">
+                                    <div
+                                        className="h-2 rounded-full bg-emerald-600"
+                                        style={{
+                                            width: `${userStats?.distribution?.students_percentage ?? 0}%`,
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </Panel>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                    <Panel title="Top Kelas Berdasarkan Nilai" icon={IconChartBar}>
+                        {academicStats?.top_classes?.length > 0 ? (
+                            <ul className="space-y-3">
+                                {academicStats.top_classes.map((cls) => (
+                                    <li
+                                        key={cls.id}
+                                        className="flex items-center justify-between rounded-xl border border-stone-200 bg-stone-50/60 px-4 py-3"
+                                    >
+                                        <div>
+                                            <p className="text-sm font-semibold text-stone-900">
+                                                {cls.name}
+                                            </p>
+                                            <p className="text-xs text-stone-500">
+                                                Wali: {cls.teacher ?? "-"}
+                                            </p>
+                                        </div>
+                                        <span className="rounded-md bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-800">
+                                            {cls.average_grade ?? 0}%
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <EmptyState text="Belum ada data performa kelas." />
+                        )}
+                    </Panel>
+
+                    <Panel title="Guru Paling Aktif" icon={IconClipboardCheck}>
+                        {contentStats?.most_active_teachers?.length > 0 ? (
+                            <ul className="space-y-3">
+                                {contentStats.most_active_teachers.map((teacher) => (
+                                    <li
+                                        key={teacher.id}
+                                        className="rounded-xl border border-stone-200 bg-stone-50/60 px-4 py-3"
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <p className="text-sm font-semibold text-stone-900">
+                                                {teacher.name}
+                                            </p>
+                                            <span className="rounded-md bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">
+                                                {teacher.total_content} konten
+                                            </span>
+                                        </div>
+                                        <p className="mt-1 text-xs text-stone-500">
+                                            Materi {teacher.materials_count} · Tugas{" "}
+                                            {teacher.tasks_count} · Kuis{" "}
+                                            {teacher.quizzes_count} · Ujian{" "}
+                                            {teacher.exams_count}
+                                        </p>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <EmptyState text="Belum ada data aktivitas guru." />
                         )}
                     </Panel>
                 </div>
 
-                <Panel title="Aktivitas terbaru">
-                    {recentActivities && recentActivities.length > 0 ? (
-                        <ul className="space-y-4">
-                            {recentActivities.map((activity, i) => (
-                                <li key={i} className="flex gap-3">
-                                    <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-stone-300" />
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-sm text-stone-800">
-                                            {activity.description}
+                <Panel title="Aktivitas Terbaru Sistem" icon={IconClipboardCheck}>
+                    {recentActivities.length > 0 ? (
+                        <ul className="space-y-3">
+                            {recentActivities.map((activity) => (
+                                <li
+                                    key={`${activity.type}-${activity.id}`}
+                                    className="rounded-xl border border-stone-200 bg-stone-50/60 px-4 py-3"
+                                >
+                                    <p className="text-sm font-semibold text-stone-900">
+                                        {activity.title ?? activity.description}
+                                    </p>
+                                    <p className="mt-0.5 text-xs text-stone-600">
+                                        {activity.details ??
+                                            `${activity.time ?? "-"} · ${activity.user ?? "-"}`}
+                                    </p>
+                                    {activity.date ? (
+                                        <p className="mt-1 text-xs text-stone-500">
+                                            {new Date(activity.date).toLocaleString("id-ID")}
                                         </p>
-                                        <p className="text-xs text-stone-500">
-                                            {activity.time} · {activity.user}
-                                        </p>
-                                    </div>
+                                    ) : null}
                                 </li>
                             ))}
                         </ul>
                     ) : (
-                        <p className="py-6 text-center text-sm text-stone-500">
-                            Belum ada aktivitas sistem
-                        </p>
+                        <EmptyState text="Belum ada aktivitas sistem." />
                     )}
                 </Panel>
 
-                <Panel title="Aksi cepat">
+                <Panel title="Aksi Cepat Admin" icon={IconClipboardCheck}>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
                         <a
                             href={route("users.create")}
-                            className="flex items-center gap-3 rounded-xl border border-stone-200/80 p-4 transition-colors hover:border-stone-300 hover:bg-stone-50"
+                            className="rounded-xl border border-indigo-300/80 bg-indigo-50/70 p-4 text-sm font-medium text-indigo-900 transition-all duration-200 hover:-translate-y-0.5 hover:bg-indigo-100"
                         >
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-stone-600">
-                                <svg
-                                    className="h-5 w-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={1.5}
-                                        d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-                                    />
-                                </svg>
-                            </span>
-                            <div>
-                                <h4 className="text-sm font-medium text-stone-900">
-                                    Tambah user
-                                </h4>
-                                <p className="text-xs text-stone-500">
-                                    Siswa atau guru baru
-                                </p>
-                            </div>
+                            + Tambah user baru
                         </a>
                         <a
                             href={route("classes.create")}
-                            className="flex items-center gap-3 rounded-xl border border-stone-200/80 p-4 transition-colors hover:border-stone-300 hover:bg-stone-50"
+                            className="rounded-xl border border-sky-300/80 bg-sky-50/70 p-4 text-sm font-medium text-sky-900 transition-all duration-200 hover:-translate-y-0.5 hover:bg-sky-100"
                         >
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-stone-600">
-                                <svg
-                                    className="h-5 w-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={1.5}
-                                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                                    />
-                                </svg>
-                            </span>
-                            <div>
-                                <h4 className="text-sm font-medium text-stone-900">
-                                    Buat kelas
-                                </h4>
-                                <p className="text-xs text-stone-500">
-                                    Kelas baru
-                                </p>
-                            </div>
+                            + Buat kelas baru
                         </a>
                         <a
                             href={route("subjects.create")}
-                            className="flex items-center gap-3 rounded-xl border border-stone-200/80 p-4 transition-colors hover:border-stone-300 hover:bg-stone-50"
+                            className="rounded-xl border border-emerald-300/80 bg-emerald-50/70 p-4 text-sm font-medium text-emerald-900 transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-100"
                         >
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-stone-600">
-                                <svg
-                                    className="h-5 w-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={1.5}
-                                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                                    />
-                                </svg>
-                            </span>
-                            <div>
-                                <h4 className="text-sm font-medium text-stone-900">
-                                    Tambah mapel
-                                </h4>
-                                <p className="text-xs text-stone-500">
-                                    Mata pelajaran baru
-                                </p>
-                            </div>
+                            + Tambah mata pelajaran
                         </a>
                         <a
                             href={route("admin.reports")}
-                            className="flex items-center gap-3 rounded-xl border border-stone-200/80 p-4 transition-colors hover:border-stone-300 hover:bg-stone-50"
+                            className="rounded-xl border border-amber-300/80 bg-amber-50/70 p-4 text-sm font-medium text-amber-900 transition-all duration-200 hover:-translate-y-0.5 hover:bg-amber-100"
                         >
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-stone-600">
-                                <svg
-                                    className="h-5 w-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={1.5}
-                                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                                    />
-                                </svg>
-                            </span>
-                            <div>
-                                <h4 className="text-sm font-medium text-stone-900">
-                                    Laporan
-                                </h4>
-                                <p className="text-xs text-stone-500">
-                                    Ringkasan sistem
-                                </p>
-                            </div>
+                            Lihat laporan lengkap
                         </a>
                     </div>
                 </Panel>

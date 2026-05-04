@@ -10,7 +10,7 @@ export default function ClassCardThumbnail({ classId, className = "" }) {
 
     return (
         <div
-            className={`relative h-36 w-full shrink-0 overflow-hidden bg-stone-100 ${className}`}
+            className={`relative h-36 w-full shrink-0 overflow-hidden bg-gradient-to-br from-[#154497] to-[#1460BE] ${className}`}
             aria-hidden
         >
             {v === 0 && <VariantFlow uid={uid} />}
@@ -36,9 +36,9 @@ function VariantFlow({ uid }) {
                     x2="100%"
                     y2="100%"
                 >
-                    <stop offset="0%" stopColor="#e0e7ff" />
-                    <stop offset="55%" stopColor="#c7d2fe" />
-                    <stop offset="100%" stopColor="#a5b4fc" />
+                    <stop offset="0%" stopColor="#154497" />
+                    <stop offset="55%" stopColor="#1460BE" />
+                    <stop offset="100%" stopColor="#1E6FDB" />
                 </linearGradient>
                 <linearGradient id={`${uid}-orb`} x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" stopColor="#ffffff" stopOpacity="0.45" />
@@ -47,16 +47,16 @@ function VariantFlow({ uid }) {
             </defs>
             <rect width="320" height="144" fill={`url(#${uid}-bg)`} />
             <circle cx="260" cy="28" r="56" fill={`url(#${uid}-orb)`} />
-            <circle cx="48" cy="120" r="42" fill="#818cf8" opacity="0.2" />
+            <circle cx="48" cy="120" r="42" fill="#60A5FA" opacity="0.3" />
             <path
                 d="M0 96 Q 80 72 160 88 T 320 80 L 320 144 L 0 144 Z"
-                fill="#4f46e5"
-                opacity="0.12"
+                fill="#154497"
+                opacity="0.15"
             />
             <path
                 d="M40 112 Q 120 88 200 100 T 320 92"
                 fill="none"
-                stroke="#4338ca"
+                stroke="#1460BE"
                 strokeWidth="1.5"
                 strokeLinecap="round"
                 opacity="0.35"
@@ -81,8 +81,8 @@ function VariantStack({ uid }) {
                     x2="100%"
                     y2="0%"
                 >
-                    <stop offset="0%" stopColor="#f1f5f9" />
-                    <stop offset="100%" stopColor="#e2e8f0" />
+                    <stop offset="0%" stopColor="#154497" />
+                    <stop offset="100%" stopColor="#1460BE" />
                 </linearGradient>
             </defs>
             <rect width="320" height="144" fill={`url(#${uid}-bg2)`} />
@@ -92,8 +92,8 @@ function VariantStack({ uid }) {
                 width="88"
                 height="72"
                 rx="14"
-                fill="#6366f1"
-                opacity="0.88"
+                fill="#1460BE"
+                opacity="0.9"
             />
             <rect
                 x="152"
@@ -101,8 +101,8 @@ function VariantStack({ uid }) {
                 width="88"
                 height="72"
                 rx="14"
-                fill="#818cf8"
-                opacity="0.55"
+                fill="#60A5FA"
+                opacity="0.6"
             />
             <rect
                 x="108"
@@ -110,8 +110,8 @@ function VariantStack({ uid }) {
                 width="88"
                 height="72"
                 rx="14"
-                fill="#c4b5fd"
-                opacity="0.9"
+                fill="#B6D4FF"
+                opacity="0.85"
             />
             <rect
                 x="36"
@@ -119,8 +119,8 @@ function VariantStack({ uid }) {
                 width="56"
                 height="4"
                 rx="2"
-                fill="#64748b"
-                opacity="0.25"
+                fill="#CBD5E1"
+                opacity="0.3"
             />
             <rect
                 x="36"
@@ -128,8 +128,8 @@ function VariantStack({ uid }) {
                 width="40"
                 height="4"
                 rx="2"
-                fill="#64748b"
-                opacity="0.18"
+                fill="#94A3B8"
+                opacity="0.25"
             />
         </svg>
     );
@@ -151,12 +151,12 @@ function VariantWindow({ uid }) {
                     x2="50%"
                     y2="100%"
                 >
-                    <stop offset="0%" stopColor="#bae6fd" />
-                    <stop offset="100%" stopColor="#e0f2fe" />
+                    <stop offset="0%" stopColor="#154497" />
+                    <stop offset="100%" stopColor="#1460BE" />
                 </linearGradient>
                 <linearGradient id={`${uid}-sun`} x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#fde68a" />
-                    <stop offset="100%" stopColor="#fcd34d" />
+                    <stop offset="0%" stopColor="#60A5FA" />
+                    <stop offset="100%" stopColor="#1460BE" />
                 </linearGradient>
             </defs>
             <rect width="320" height="144" fill={`url(#${uid}-sky)`} />

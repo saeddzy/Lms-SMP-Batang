@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -26,7 +28,15 @@ class UserController extends Controller implements HasMiddleware
     {
         // get all users
         $users = User::with('roles')
-            ->when(request('search'), fn($query) => $query->where('name', 'like', '%'.request('search').'%'))
+            ->when(request('search'), function ($query) {
+                $s = '%'.request('search').'%';
+                $query->where(function ($q) use ($s) {
+                    $q->where('name', 'like', $s)
+                        ->orWhere('email', 'like', $s)
+                        ->orWhere('nis', 'like', $s)
+                        ->orWhere('nip', 'like', $s);
+                });
+            })
             ->latest()
             ->paginate(6);
 
@@ -51,17 +61,23 @@ class UserController extends Controller implements HasMiddleware
     public function store(Request $request)
     {
          // validate request
-         $request->validate([
+        $request->validate([
             'name' => 'required|min:3|max:255',
-            'email' => 'required|email|unique:users',
+            'nis' => ['nullable', 'string', 'max:32', Rule::unique('users', 'nis')],
+            'nip' => ['nullable', 'string', 'max:32', Rule::unique('users', 'nip')],
+            'email' => ['nullable', 'string', 'lowercase', 'email', 'max:255', Rule::unique('users', 'email')],
             'password' => 'required|confirmed|min:4',
             'selectedRoles' => 'required|array|min:1',
         ]);
 
+        $this->validateRoleIdentifiers($request);
+
         // create user
         $user = User::create([
             'name' => $request->name,
-            'email' => $request->email,
+            'nis' => $request->filled('nis') ? trim((string) $request->nis) : null,
+            'nip' => $request->filled('nip') ? trim((string) $request->nip) : null,
+            'email' => $request->filled('email') ? strtolower(trim((string) $request->email)) : null,
             'password' => bcrypt($request->password),
         ]);
 
@@ -103,14 +119,20 @@ class UserController extends Controller implements HasMiddleware
         // validate request
         $request->validate([
             'name' => 'required|min:3|max:255',
-            'email' => 'required|email|unique:users,email,'.$user->id,
+            'nis' => ['nullable', 'string', 'max:32', Rule::unique('users', 'nis')->ignore($user->id)],
+            'nip' => ['nullable', 'string', 'max:32', Rule::unique('users', 'nip')->ignore($user->id)],
+            'email' => ['nullable', 'string', 'lowercase', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'selectedRoles' => 'required|array|min:1',
         ]);
+
+        $this->validateRoleIdentifiers($request);
 
         // update user data
         $user->update([
             'name' => $request->name,
-            'email' => $request->email,
+            'nis' => $request->filled('nis') ? trim((string) $request->nis) : null,
+            'nip' => $request->filled('nip') ? trim((string) $request->nip) : null,
+            'email' => $request->filled('email') ? strtolower(trim((string) $request->email)) : null,
         ]);
 
         // attach roles
@@ -130,5 +152,25 @@ class UserController extends Controller implements HasMiddleware
 
         // render view
         return back();
+    }
+
+    /**
+     * Pastikan NIS / NIP sesuai role yang dipilih.
+     */
+    private function validateRoleIdentifiers(Request $request): void
+    {
+        $roles = collect($request->selectedRoles ?? []);
+
+        if ($roles->contains('siswa') && ! filled(trim((string) $request->nis))) {
+            throw ValidationException::withMessages([
+                'nis' => 'NIS wajib diisi untuk peran Siswa.',
+            ]);
+        }
+
+        if ($roles->intersect(['guru', 'admin', 'super-admin'])->isNotEmpty() && ! filled(trim((string) $request->nip))) {
+            throw ValidationException::withMessages([
+                'nip' => 'NIP wajib diisi untuk peran Guru atau Admin.',
+            ]);
+        }
     }
 }

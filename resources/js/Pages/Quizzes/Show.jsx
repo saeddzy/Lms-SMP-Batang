@@ -1,21 +1,19 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
-import StudentShell, { formatStudentDateTime } from "@/Components/Student/StudentShell";
+import { formatStudentDateTime } from "@/Components/Student/StudentShell";
 import StudentStatCard from "@/Components/Student/StudentStatCard";
 import Table from "@/Components/Table";
 import Button from "@/Components/Button";
-import { Head, Link, router, usePage } from "@inertiajs/react";
+import { Head, Link, usePage } from "@inertiajs/react";
 import hasAnyPermission from "@/Utils/Permissions";
-import { hasRole } from "@/Utils/Permissions";
 import {
-    IconBrain,
     IconUsers,
     IconCircleCheck,
     IconClock,
     IconPercentage,
-    IconCalendarTime,
-    IconSettings,
-    IconListCheck,
+    IconFileText,
+    IconInfoCircle,
+    IconAlertTriangle,
 } from "@tabler/icons-react";
 import QuestionBank from "@/Components/Lms/QuestionBank";
 
@@ -54,10 +52,42 @@ function quizWindowLabel(quiz) {
     return "buka";
 }
 
+const TAB_HASH = {
+    ringkasan: "ringkasan-kuis",
+    percobaan: "percobaan-kuis",
+    soal: "kelola-soal",
+};
+
+const HASH_TO_TAB = Object.fromEntries(
+    Object.entries(TAB_HASH).map(([tab, id]) => [id, tab])
+);
+
 export default function Show() {
     const { quiz, attempts = [], canManageQuiz = false } = usePage().props;
-    const isStudent = hasRole("siswa");
     const sc = quiz.school_class ?? quiz.schoolClass;
+
+    const [activeNav, setActiveNav] = useState("ringkasan");
+
+    const selectTab = useCallback((key) => {
+        if (!TAB_HASH[key]) return;
+        setActiveNav(key);
+        try {
+            window.history.replaceState(
+                null,
+                "",
+                `#${TAB_HASH[key]}`
+            );
+        } catch {
+            /* ignore */
+        }
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }, []);
+
+    useEffect(() => {
+        const hash = window.location.hash?.replace(/^#/, "");
+        const tab = HASH_TO_TAB[hash];
+        if (tab) setActiveNav(tab);
+    }, []);
 
     const quizHasEssay = useMemo(
         () =>
@@ -67,18 +97,7 @@ export default function Show() {
         [quiz.questions]
     );
 
-    const window = quizWindowLabel(quiz);
-    const canStart =
-        quiz.is_active &&
-        window === "buka" &&
-        (attempts.filter((a) => !a.finished_at).length === 0
-            ? true
-            : false);
-
-    const unfinished = useMemo(
-        () => attempts.find((a) => !a.finished_at),
-        [attempts]
-    );
+    const scheduleWindow = quizWindowLabel(quiz);
 
     const completedAttempts = attempts.filter((a) => a.finished_at);
     const avgScore =
@@ -95,143 +114,144 @@ export default function Show() {
 
     const students = sc?.students ?? [];
 
-    const startOrContinue = () => {
-        if (unfinished) {
-            router.visit(
-                route("quizzes.attempt", {
-                    quiz: quiz.id,
-                    attempt: unfinished.id,
-                })
-            );
-            return;
-        }
-        router.post(route("quizzes.start-attempt", quiz.id));
-    };
-
-    const metaBlock = (
+    const MetaGrid = () => (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
-                <p className="text-xs font-semibold uppercase text-slate-500">
-                    Mapel
+            <div className="rounded-md border border-slate-200 bg-slate-50/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Mata pelajaran
                 </p>
                 <p className="mt-1 font-medium text-slate-900">
                     {quiz.subject?.name ?? "—"}
                 </p>
             </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
-                <p className="text-xs font-semibold uppercase text-slate-500">
+            <div className="rounded-md border border-slate-200 bg-slate-50/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Kelas
                 </p>
-                <p className="mt-1 font-medium text-slate-900">
-                    {sc?.name ?? "—"}
-                </p>
+                <p className="mt-1 font-medium text-slate-900">{sc?.name ?? "—"}</p>
             </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
-                <p className="text-xs font-semibold uppercase text-slate-500">
+            <div className="rounded-md border border-slate-200 bg-slate-50/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Waktu pengerjaan
                 </p>
                 <p className="mt-1 font-medium text-slate-900">
-                    {quiz.time_limit ? `${quiz.time_limit} menit` : "—"}
+                    {quiz.time_limit ? `${quiz.time_limit} menit` : "Belum diatur"}
                 </p>
             </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
-                <p className="text-xs font-semibold uppercase text-slate-500">
-                    Soal / lulus
-                </p>
-                <p className="mt-1 font-medium text-slate-900">
-                    {quiz.questions?.length ?? quiz.total_questions ?? 0} soal ·
-                    lulus ≥ {quiz.passing_score ?? "—"}%
-                </p>
-            </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 sm:col-span-2">
-                <p className="text-xs font-semibold uppercase text-slate-500">
-                    Jendela kuis
-                </p>
-                <p className="mt-1 text-sm text-slate-800">
-                    {quiz.start_time
-                        ? formatStudentDateTime(quiz.start_time)
-                        : "—"}{" "}
-                    —{" "}
-                    {quiz.end_time
-                        ? formatStudentDateTime(quiz.end_time)
-                        : "—"}
-                </p>
-            </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
-                <p className="text-xs font-semibold uppercase text-slate-500">
+            <div className="rounded-md border border-slate-200 bg-slate-50/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Percobaan maks.
                 </p>
                 <p className="mt-1 font-medium text-slate-900">
-                    {quiz.max_attempts ?? "—"}
+                    {quiz.max_attempts ?? "Belum diatur"}
                 </p>
             </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
-                <p className="text-xs font-semibold uppercase text-slate-500">
-                    Acak soal
+            <div className="rounded-md border border-slate-200 bg-slate-50/80 p-4 sm:col-span-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Periode pengerjaan
+                </p>
+                <p className="mt-1 font-semibold text-slate-900">
+                    {quiz.start_time
+                        ? formatStudentDateTime(quiz.start_time)
+                        : "Belum diatur"}{" "}
+                    —{" "}
+                    {quiz.end_time
+                        ? formatStudentDateTime(quiz.end_time)
+                        : "Belum diatur"}
+                </p>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-slate-50/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Soal / target lulus
                 </p>
                 <p className="mt-1 font-medium text-slate-900">
-                    {quiz.is_randomized ? "Ya" : "Tidak"}
+                    {quiz.questions?.length ?? quiz.total_questions ?? 0} soal ·{" "}
+                    {quiz.passing_score ?? 0}%
                 </p>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-slate-50/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Status kuis
+                </p>
+                <span
+                    className={`mt-1 inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${
+                        quiz.is_active
+                            ? "bg-emerald-50 text-emerald-900 ring-emerald-200/80"
+                            : "bg-slate-100 text-slate-700 ring-slate-200/80"
+                    }`}
+                >
+                    {quiz.is_active ? "Aktif" : "Tidak aktif"}
+                </span>
             </div>
         </div>
     );
 
     const attemptsTable = (
-        <Table.Card title={`Percobaan (${attempts.length})`}>
-            <Table>
-                <Table.Thead>
+        <section
+            id="percobaan-kuis"
+            role="tabpanel"
+            aria-labelledby="tab-percobaan"
+        >
+            <Table.Card
+                title={`Percobaan (${attempts.length})`}
+                className="rounded-md border-slate-200 shadow-none"
+            >
+                <div className="max-h-[380px] overflow-auto">
+                    <Table>
+                        <Table.Thead className="sticky top-0 z-10 bg-slate-50/95">
                     <tr>
                         <Table.Th>#</Table.Th>
-                        {!isStudent && <Table.Th>Siswa</Table.Th>}
+                        <Table.Th>Siswa</Table.Th>
                         <Table.Th>Status</Table.Th>
                         <Table.Th>Mulai</Table.Th>
                         <Table.Th>Selesai</Table.Th>
                         <Table.Th>Nilai</Table.Th>
                         <Table.Th>Lulus</Table.Th>
-                        {!isStudent && hasAnyPermission(["quizzes grade"]) && (
+                        {hasAnyPermission(["quizzes grade"]) && (
                             <Table.Th>Aksi</Table.Th>
                         )}
                     </tr>
-                </Table.Thead>
-                <Table.Tbody>
+                    </Table.Thead>
+                    <Table.Tbody>
                     {attempts.length > 0 ? (
                         attempts.map((att, i) => {
                             const st = attemptProgressBadge(att);
                             return (
                                 <tr key={att.id}>
-                                    <Table.Td>{i + 1}</Table.Td>
-                                    {!isStudent && (
-                                        <Table.Td>
-                                            {att.student?.name ?? "—"}
-                                        </Table.Td>
-                                    )}
-                                    <Table.Td>
+                                    <Table.Td className="px-4 py-2.5">{i + 1}</Table.Td>
+                                    <Table.Td className="px-4 py-2.5">
+                                        {att.student?.name ?? "—"}
+                                    </Table.Td>
+                                    <Table.Td className="px-4 py-2.5">
                                         <span
                                             className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${st.className}`}
                                         >
                                             {st.text}
                                         </span>
                                     </Table.Td>
-                                    <Table.Td className="text-sm">
+                                    <Table.Td className="px-4 py-2.5 text-sm">
                                         {att.started_at
                                             ? formatStudentDateTime(
                                                   att.started_at
                                               )
                                             : "—"}
                                     </Table.Td>
-                                    <Table.Td className="text-sm">
+                                    <Table.Td className="px-4 py-2.5 text-sm">
                                         {att.finished_at
                                             ? formatStudentDateTime(
                                                   att.finished_at
                                               )
                                             : "—"}
                                     </Table.Td>
-                                    <Table.Td>
-                                        {att.score != null
-                                            ? `${att.score}%`
-                                            : "—"}
+                                    <Table.Td className="px-4 py-2.5">
+                                        {att.attempt_status ===
+                                        "menunggu_penilaian"
+                                            ? "Menunggu"
+                                            : att.score != null
+                                              ? `${att.score}%`
+                                              : "—"}
                                     </Table.Td>
-                                    <Table.Td>
+                                    <Table.Td className="px-4 py-2.5">
                                         {att.passed === true ? (
                                             <span className="text-emerald-700">
                                                 Ya
@@ -244,11 +264,8 @@ export default function Show() {
                                             "—"
                                         )}
                                     </Table.Td>
-                                    {!isStudent &&
-                                        hasAnyPermission([
-                                            "quizzes grade",
-                                        ]) && (
-                                            <Table.Td>
+                                    {hasAnyPermission(["quizzes grade"]) && (
+                                            <Table.Td className="px-4 py-2.5">
                                                 {att.finished_at ? (
                                                     <div className="flex flex-wrap gap-2">
                                                         <Button
@@ -293,10 +310,7 @@ export default function Show() {
                         <tr>
                             <Table.Td
                                 colSpan={
-                                    !isStudent &&
-                                    hasAnyPermission(["quizzes grade"])
-                                        ? 8
-                                        : 7
+                                    hasAnyPermission(["quizzes grade"]) ? 8 : 7
                                 }
                                 className="py-10 text-center text-slate-500"
                             >
@@ -304,14 +318,15 @@ export default function Show() {
                             </Table.Td>
                         </tr>
                     )}
-                </Table.Tbody>
-            </Table>
-        </Table.Card>
+                        </Table.Tbody>
+                    </Table>
+                </div>
+            </Table.Card>
+        </section>
     );
 
-    const statsRow =
-        !isStudent && hasAnyPermission(["quizzes view_results"]) ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+    const statsRow = hasAnyPermission(["quizzes view_results"]) ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <StudentStatCard
                     icon={IconUsers}
                     label="Siswa kelas"
@@ -347,259 +362,193 @@ export default function Show() {
             </div>
         ) : null;
 
-    const teacherActionPanel =
-        !isStudent ? (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-4">
-                    <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase text-indigo-700">
-                        <IconSettings size={15} />
-                        Pengaturan
-                    </p>
-                    <p className="mt-1 text-sm text-indigo-950">
-                        Edit jadwal, durasi, passing score, dan konfigurasi kuis.
-                    </p>
-                </div>
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
-                    <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase text-emerald-700">
-                        <IconListCheck size={15} />
-                        Penilaian
-                    </p>
-                    <p className="mt-1 text-sm text-emerald-950">
-                        Pantau hasil percobaan dan lakukan penilaian esai bila perlu.
-                    </p>
-                </div>
-                <div className="rounded-xl border border-sky-100 bg-sky-50/70 p-4">
-                    <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase text-sky-700">
-                        <IconCalendarTime size={15} />
-                        Jadwal aktif
-                    </p>
-                    <p className="mt-1 text-sm text-sky-950">
-                        Pastikan jendela mulai-selesai sesuai waktu kelas berlangsung.
-                    </p>
-                </div>
-            </div>
-        ) : null;
-
-    const inner = (
-        <>
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm">
+    const ringkasanPanel = (
+        <div
+            className="space-y-6"
+            role="tabpanel"
+            aria-labelledby="tab-ringkasan"
+        >
+            <section
+                id="ringkasan-kuis"
+                className="rounded-lg border border-slate-200 bg-white p-6"
+            >
                 <div
-                    className={`rounded-xl border p-4 text-sm ${
-                        window === "buka"
+                    className={`rounded-md border p-4 text-sm ${
+                        scheduleWindow === "buka"
                             ? "border-emerald-200 bg-emerald-50/80 text-emerald-950"
-                            : window === "belum_mulai"
-                              ? "border-sky-200 bg-sky-50/80 text-sky-950"
-                              : window === "jadwal_tidak_lengkap"
+                            : scheduleWindow === "belum_mulai"
+                              ? "border-amber-200 bg-amber-50/85 text-amber-950"
+                              : scheduleWindow === "jadwal_tidak_lengkap"
                                 ? "border-amber-200 bg-amber-50/85 text-amber-950"
-                                : "border-slate-200 bg-slate-50 text-slate-800"
+                              : "border-rose-200 bg-rose-50 text-rose-900"
                     }`}
                 >
-                    <p className="font-semibold">
-                        {window === "buka" && "Jadwal pengerjaan sedang berlangsung"}
-                        {window === "belum_mulai" &&
-                            "Belum waktu pengerjaan (mengikuti jadwal)"}
-                        {window === "berakhir" &&
-                            "Waktu pengerjaan sudah berakhir"}
-                        {window === "jadwal_tidak_lengkap" &&
+                    <p className="inline-flex items-center gap-2 font-semibold">
+                        <IconAlertTriangle className="h-4 w-4" />
+                        {scheduleWindow === "buka" && "Jadwal pengerjaan sedang berlangsung"}
+                        {scheduleWindow === "belum_mulai" &&
+                            "Kuis belum dimulai sesuai jadwal"}
+                        {scheduleWindow === "berakhir" &&
+                            "Waktu pengerjaan kuis sudah berakhir"}
+                        {scheduleWindow === "jadwal_tidak_lengkap" &&
                             "Jadwal mulai/selesai belum lengkap"}
                     </p>
                     <p className="mt-1 opacity-90">
                         Status kuis:{" "}
                         {quiz.is_active ? "aktif" : "nonaktif"}
                         {" · "}
-                        {window === "buka" &&
+                        {scheduleWindow === "buka" &&
                             "Siswa bisa mengerjakan pada rentang waktu ini"}
-                        {window === "belum_mulai" &&
+                        {scheduleWindow === "belum_mulai" &&
                             "Menunggu tanggal/jam mulai yang ditetapkan"}
-                        {window === "berakhir" &&
+                        {scheduleWindow === "berakhir" &&
                             "Tanggal/jam selesai sudah lewat"}
-                        {window === "jadwal_tidak_lengkap" &&
+                        {scheduleWindow === "jadwal_tidak_lengkap" &&
                             "Atur tanggal mulai dan selesai di pengaturan kuis"}
                     </p>
-                    {isStudent &&
-                        window === "belum_mulai" &&
-                        quiz.start_time &&
-                        quiz.end_time && (
-                            <p className="mt-3 border-t border-sky-200/80 pt-3 text-sm leading-relaxed text-sky-950/95">
-                                <span className="font-semibold text-sky-950">
-                                    Catatan:{" "}
-                                </span>
-                                Pesan ini soal{" "}
-                                <strong>jadwal</strong>, bukan karena soal belum
-                                disiapkan guru. Soal bisa disusun lebih dulu;
-                                Anda baru bisa mulai mengerjakan setelah{" "}
-                                <strong>
-                                    {formatStudentDateTime(quiz.start_time)}
-                                </strong>
-                                {" "}
-                                (sampai{" "}
-                                <strong>
-                                    {formatStudentDateTime(quiz.end_time)}
-                                </strong>
-                                ).
-                            </p>
-                        )}
                 </div>
-                {metaBlock}
-                {quiz.description ? (
-                    <div className="mt-6">
-                        <h3 className="text-sm font-semibold text-slate-900">
+                <div className="mt-6">
+                    <MetaGrid />
+                </div>
+
+                <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <section className="rounded-lg border border-slate-200 bg-white p-4">
+                        <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+                            <IconInfoCircle className="h-4 w-4" />
                             Deskripsi
                         </h3>
                         <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
-                            {quiz.description}
+                            {quiz.description?.trim()
+                                ? quiz.description
+                                : "Belum ada deskripsi kuis dari guru."}
                         </p>
-                    </div>
-                ) : null}
-                {quiz.instructions ? (
-                    <div className="mt-6 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
-                        <h3 className="text-sm font-semibold text-indigo-950">
+                    </section>
+
+                    <section className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-4">
+                        <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-950">
+                            <IconFileText className="h-4 w-4" />
                             Instruksi
                         </h3>
                         <p className="mt-2 whitespace-pre-wrap text-sm text-indigo-950/90">
-                            {quiz.instructions}
+                            {quiz.instructions?.trim()
+                                ? quiz.instructions
+                                : "Belum ada instruksi tambahan untuk kuis ini."}
                         </p>
-                    </div>
-                ) : null}
-            </div>
+                    </section>
+                </div>
+            </section>
 
             {statsRow}
+        </div>
+    );
 
-            {teacherActionPanel}
-
-            {isStudent && quiz.is_active && (
-                <div className="flex flex-wrap gap-3">
-                    {(window === "buka" || unfinished) && (
-                        <button
-                            type="button"
-                            onClick={startOrContinue}
-                            className="inline-flex items-center rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25"
-                        >
-                            {unfinished
-                                ? "Lanjutkan pengerjaan"
-                                : "Mulai / kerjakan kuis"}
-                        </button>
-                    )}
-                    <button
-                        type="button"
-                        onClick={() => router.visit(route("student.quizzes"))}
-                        className="inline-flex rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                    >
-                        Kembali ke daftar kuis
-                    </button>
-                </div>
-            )}
-
-            {!isStudent && (
-                <div className="space-y-4">
-                    <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm">
-                        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Aksi guru
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                            {canManageQuiz &&
-                                hasAnyPermission(["quizzes edit"]) && (
-                                    <Button
-                                        type="edit"
-                                        url={route("quizzes.edit", quiz.id)}
-                                    />
-                                )}
-                            {canManageQuiz &&
-                                hasAnyPermission(["quizzes delete"]) && (
-                                    <Button
-                                        type="delete"
-                                        url={route(
-                                            "quizzes.destroy",
-                                            quiz.id
-                                        )}
-                                    />
-                                )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {attemptsTable}
-
-            {!isStudent && (
-                <QuestionBank
-                    mode="quiz"
-                    entityId={quiz.id}
-                    questions={quiz.questions ?? []}
-                    canManage={canManageQuiz && hasAnyPermission(["quizzes edit"])}
-                    entityLabel="kuis"
-                />
-            )}
-        </>
+    const kelolaSoalPanel = (
+        <section
+            id="kelola-soal"
+            role="tabpanel"
+            aria-labelledby="tab-kelola-soal"
+        >
+            <QuestionBank
+                mode="quiz"
+                entityId={quiz.id}
+                questions={quiz.questions ?? []}
+                canManage={canManageQuiz && hasAnyPermission(["quizzes edit"])}
+                entityLabel="kuis"
+            />
+        </section>
     );
 
     return (
         <DashboardLayout title={`Detail Kuis: ${quiz.title}`}>
             <Head title={`Detail Kuis: ${quiz.title}`} />
 
-            {isStudent ? (
-                <StudentShell
-                    eyebrow="Kuis"
-                    title={quiz.title}
-                    subtitle={`${quiz.subject?.name ?? "Mapel"} · ${sc?.name ?? "Kelas"}`}
-                >
-                    <div className="flex items-start gap-3 rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm">
-                        <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
-                            <IconBrain className="h-7 w-7" stroke={1.25} />
-                        </span>
-                        <div>
-                            <p className="text-sm text-slate-600">
-                                Dibuat untuk kelas Anda. Ketersediaan tombol
-                                kerjakan mengikuti{" "}
-                                <strong>jadwal buka–tutup</strong>, terpisah
-                                dari kapan guru menyusun soal.
-                            </p>
-                        </div>
-                    </div>
-                    {inner}
-                </StudentShell>
-            ) : (
-                <div className="space-y-6">
-                    <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm">
-                        <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-6 py-5">
-                            <h1 className="text-2xl font-bold text-slate-900">
-                                {quiz.title}
-                            </h1>
-                            <p className="mt-1 text-sm text-slate-600">
-                                {sc?.name ?? "—"} ·{" "}
-                                {quiz.subject?.name ?? "—"}
-                            </p>
-                        </div>
-                        <div className="grid grid-cols-1 gap-3 px-6 py-4 sm:grid-cols-3">
-                            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
-                                <p className="text-xs font-semibold uppercase text-slate-500">
-                                    Total soal
+            <div className="space-y-6">
+                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <div className="h-1 w-full bg-gradient-to-r from-[#163d8f] via-[#2453b8] to-[#5b84d9]" />
+                    <div className="border-b border-slate-200 bg-slate-50/70 px-6 py-5">
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Detail kuis
                                 </p>
-                                <p className="mt-1 text-lg font-bold text-slate-900">
-                                    {quiz.questions?.length ?? quiz.total_questions ?? 0}
+                                <h1 className="mt-1 text-2xl font-semibold text-slate-900">
+                                    {quiz.title}
+                                </h1>
+                                <p className="mt-1 text-sm text-slate-600">
+                                    {sc?.name ?? "—"} · {quiz.subject?.name ?? "—"}
                                 </p>
                             </div>
-                            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
-                                <p className="text-xs font-semibold uppercase text-slate-500">
-                                    Attempt selesai
-                                </p>
-                                <p className="mt-1 text-lg font-bold text-slate-900">
-                                    {attempts.filter((a) => a.finished_at).length}
-                                </p>
-                            </div>
-                            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
-                                <p className="text-xs font-semibold uppercase text-slate-500">
-                                    Rata-rata saat ini
-                                </p>
-                                <p className="mt-1 text-lg font-bold text-indigo-700">
-                                    {avgScore != null ? `${avgScore}%` : "—"}
-                                </p>
+                            <div className="flex w-full flex-col gap-4 sm:w-auto sm:min-w-[280px]">
+                                <div className="flex flex-wrap gap-2">
+                                <Link
+                                    href={route("quizzes.index")}
+                                    className="inline-flex items-center rounded-md bg-[#163d8f] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0f2e6f]"
+                                >
+                                    Kembali ke daftar kuis
+                                </Link>
+                                    {canManageQuiz &&
+                                        hasAnyPermission(["quizzes edit"]) && (
+                                            <Button
+                                                type="edit"
+                                                url={route("quizzes.edit", quiz.id)}
+                                            />
+                                        )}
+                                    {canManageQuiz &&
+                                        hasAnyPermission(["quizzes delete"]) && (
+                                            <Button
+                                                type="delete"
+                                                url={route("quizzes.destroy", quiz.id)}
+                                            />
+                                        )}
+                                </div>
                             </div>
                         </div>
                     </div>
-                    {inner}
                 </div>
-            )}
+                <div className="rounded-md border border-slate-200 bg-white px-4 py-2.5">
+                    <nav
+                        className="flex flex-wrap gap-2"
+                        aria-label="Bagian detail kuis"
+                        role="tablist"
+                    >
+                        {(
+                            [
+                                ["ringkasan", "Ringkasan", "tab-ringkasan"],
+                                ["percobaan", "Percobaan", "tab-percobaan"],
+                                ["soal", "Kelola Soal", "tab-kelola-soal"],
+                            ]
+                        ).map(([key, label, tabId]) => (
+                            <button
+                                key={key}
+                                id={tabId}
+                                type="button"
+                                role="tab"
+                                aria-selected={activeNav === key}
+                                aria-controls={
+                                    key === "ringkasan"
+                                        ? "ringkasan-kuis"
+                                        : key === "percobaan"
+                                          ? "percobaan-kuis"
+                                          : "kelola-soal"
+                                }
+                                onClick={() => selectTab(key)}
+                                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#163d8f]/40 ${
+                                    activeNav === key
+                                        ? "bg-[#163d8f] text-white shadow-sm"
+                                        : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                                }`}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </nav>
+                </div>
+                <div className="space-y-6">
+                    {activeNav === "ringkasan" && ringkasanPanel}
+                    {activeNav === "percobaan" && attemptsTable}
+                    {activeNav === "soal" && kelolaSoalPanel}
+                </div>
+            </div>
         </DashboardLayout>
     );
 }

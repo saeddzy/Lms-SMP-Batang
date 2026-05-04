@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import StudentShell from "@/Components/Student/StudentShell";
-import Button from "@/Components/Button";
 import Card from "@/Components/Card";
 import Input from "@/Components/Input";
-import { Head, useForm, usePage } from "@inertiajs/react";
+import { Head, Link, useForm, usePage } from "@inertiajs/react";
 import {
     IconClock,
     IconFile,
@@ -125,52 +124,106 @@ export default function TaskSubmit() {
                 ) : null}
 
                 <div className="mx-auto max-w-3xl">
-                    <Card>
-                        <Card.Header>
-                            <div className="flex flex-wrap items-start justify-between gap-4">
-                                <div>
-                                    <Card.Title>Pengumpulan</Card.Title>
-                                    <Card.Description>
-                                        Minimal salah satu: teks jawaban,
-                                        lampiran (PDF, PPT, gambar, Excel, maks.
-                                        20 MB), atau tautan video YouTube.
-                                    </Card.Description>
-                                </div>
-                                {due ? (
-                                    <div className="flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-950 ring-1 ring-amber-200/80">
-                                        <IconClock
-                                            className="h-5 w-5 shrink-0"
-                                            stroke={1.5}
-                                        />
-                                        <div>
-                                            <p className="text-xs font-semibold uppercase tracking-wide text-amber-800/90">
-                                                Deadline
-                                            </p>
-                                            <p className="font-medium">
-                                                {due.toLocaleString("id-ID", {
+                    <section
+                        id="ringkasan-tugas"
+                        className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-5"
+                    >
+                        <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <h2 className="line-clamp-1 text-2xl font-bold tracking-tight text-slate-900">
+                                        {task.title}
+                                    </h2>
+                                    <p className="mt-1 text-sm text-slate-600">
+                                        {task.subject?.name ?? "Mapel belum diatur"} ·{" "}
+                                        {task.school_class?.name ?? "Kelas belum diatur"}
+                                    </p>
+                                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
+                                        {due && (
+                                            <span className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 ring-1 ring-slate-200">
+                                                <IconClock className="h-3.5 w-3.5" />
+                                                Deadline {due.toLocaleString("id-ID", {
                                                     dateStyle: "medium",
                                                     timeStyle: "short",
                                                 })}
-                                            </p>
-                                        </div>
+                                            </span>
+                                        )}
+                                        <span className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 ring-1 ring-slate-200">
+                                            <IconFile className="h-3.5 w-3.5" />
+                                            {submission ? "Edit Pengumpulan" : "Pengumpulan Baru"}
+                                        </span>
                                     </div>
-                                ) : null}
+                                </div>
+                                <span
+                                    className={`inline-flex rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ${
+                                        due && new Date() > due
+                                            ? "bg-rose-50 text-rose-900 ring-rose-200/80"
+                                            : due && new Date() <= due
+                                                ? "bg-emerald-50 text-emerald-900 ring-emerald-200/80"
+                                                : "bg-slate-50 text-slate-900 ring-slate-200/80"
+                                    }`}
+                                >
+                                    {due && new Date() > due
+                                        ? "Terlewat"
+                                        : due && new Date() <= due
+                                            ? "Aktif"
+                                            : "Tanpa Deadline"}
+                                </span>
                             </div>
-                        </Card.Header>
+                        </div>
+
+                        <div
+                            className={`rounded-xl border p-4 text-sm shadow-sm ${
+                                due && new Date() > due
+                                    ? "border-rose-200 bg-rose-50 text-rose-950"
+                                    : due && new Date() <= due
+                                        ? "border-emerald-200 bg-emerald-50/80 text-emerald-950"
+                                        : "border-slate-200 bg-slate-50 text-slate-800"
+                            }`}
+                        >
+                            <p className="inline-flex items-center gap-2 font-semibold">
+                                <IconClock className="h-4 w-4" />
+                                {due && new Date() > due
+                                    ? "Deadline sudah terlewat"
+                                    : due && new Date() <= due
+                                        ? "Pengumpulan masih dibuka"
+                                        : "Tugas tanpa deadline"}
+                            </p>
+                            <p className="mt-1 opacity-90">
+                                {due && new Date() > due
+                                    ? "Waktu pengumpulan sudah berakhir"
+                                    : due && new Date() <= due
+                                        ? "Anda masih bisa mengumpulkan tugas"
+                                        : "Tugas dapat dikumpulkan kapan saja"}
+                                {due && ` · Deadline: ${due.toLocaleString("id-ID", {
+                                    dateStyle: "medium",
+                                    timeStyle: "short",
+                                })}`}
+                            </p>
+                        </div>
+
+                        {task.description ? (
+                            <div className="mt-6">
+                                <h3 className="text-sm font-semibold text-slate-900">
+                                    Deskripsi Tugas
+                                </h3>
+                                <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
+                                    {task.description}
+                                </p>
+                            </div>
+                        ) : null}
+                    </section>
+
+                    <section className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+                        <div className="mb-4">
+                            <h3 className="text-lg font-semibold text-slate-900">Pengumpulan Tugas</h3>
+                            <p className="mt-1 text-sm text-slate-600">
+                                Minimal salah satu: teks jawaban, lampiran (PDF, PPT, gambar, Excel, maks. 20 MB), atau tautan video YouTube.
+                            </p>
+                        </div>
 
                         <form onSubmit={handleSubmit}>
-                            <Card.Content className="space-y-5">
-                                {task.description ? (
-                                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-800">
-                                        <p className="font-semibold text-slate-900">
-                                            Instruksi tugas
-                                        </p>
-                                        <p className="mt-2 whitespace-pre-wrap leading-relaxed">
-                                            {task.description}
-                                        </p>
-                                    </div>
-                                ) : null}
-
+                            <div className="space-y-5">
                                 <div>
                                     <Input.Label
                                         htmlFor="content"
@@ -388,29 +441,29 @@ export default function TaskSubmit() {
                                         %
                                     </p>
                                 ) : null}
-                            </Card.Content>
+                            </div>
 
-                            <Card.Footer>
-                                <div className="flex flex-wrap justify-end gap-3">
-                                    <Button
-                                        type="cancel"
-                                        url={route("student.tasks")}
-                                    />
-                                    <button
-                                        type="submit"
-                                        disabled={processing}
-                                        className="inline-flex items-center rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition hover:from-indigo-500 hover:to-violet-500 disabled:opacity-50"
-                                    >
-                                        {processing
-                                            ? "Mengirim…"
-                                            : submission
-                                              ? "Perbarui pengumpulan"
-                                              : "Kumpulkan tugas"}
-                                    </button>
-                                </div>
-                            </Card.Footer>
+                            <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-slate-200 pt-6">
+                                <Link
+                                    href={route("student.tasks")}
+                                    className="inline-flex items-center rounded-md border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                                >
+                                    Kembali
+                                </Link>
+                                <button
+                                    type="submit"
+                                    disabled={processing}
+                                    className="inline-flex items-center rounded-md bg-[#1E429F] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1A3A8C] disabled:opacity-50"
+                                >
+                                    {processing
+                                        ? "Mengirim…"
+                                        : submission
+                                          ? "Perbarui pengumpulan"
+                                          : "Kumpulkan tugas"}
+                                </button>
+                            </div>
                         </form>
-                    </Card>
+                    </section>
                 </div>
             </StudentShell>
         </DashboardLayout>

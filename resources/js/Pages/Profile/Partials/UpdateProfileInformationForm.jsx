@@ -4,6 +4,7 @@ import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import { Transition } from '@headlessui/react';
 import { Link, useForm, usePage } from '@inertiajs/react';
+import { userSecondaryLabel } from '@/Utils/userDisplay';
 
 export default function UpdateProfileInformation({
     mustVerifyEmail,
@@ -32,7 +33,7 @@ export default function UpdateProfileInformation({
                 </h2>
 
                 <p className="mt-1 text-sm text-gray-600">
-                    Update your account's profile information and email address.
+                    Perbarui nama dan email (opsional). NIS/NIP untuk login diatur oleh admin.
                 </p>
             </header>
 
@@ -53,16 +54,22 @@ export default function UpdateProfileInformation({
                     <InputError className="mt-2" message={errors.name} />
                 </div>
 
+                {(user.nis || user.nip) && (
+                    <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                        <span className="font-medium text-gray-900">Nomor induk: </span>
+                        {userSecondaryLabel(user)}
+                    </div>
+                )}
+
                 <div>
-                    <InputLabel htmlFor="email" value="Email" />
+                    <InputLabel htmlFor="email" value="Email (opsional)" />
 
                     <TextInput
                         id="email"
                         type="email"
                         className="mt-1 block w-full"
-                        value={data.email}
+                        value={data.email ?? ''}
                         onChange={(e) => setData('email', e.target.value)}
-                        required
                         autoComplete="username"
                     />
 

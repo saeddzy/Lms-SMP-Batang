@@ -39,12 +39,11 @@ export default function Search({
         search: filter?.search ?? "",
     });
 
-    const handleSearchData = (e) => {
-        e.preventDefault();
+    const performSearch = (keyword) => {
         if (!url) {
             return;
         }
-        const query = { search: data.search ?? "" };
+        const query = { search: keyword ?? "" };
         if (filter && typeof filter === "object") {
             Object.entries(filter).forEach(([k, v]) => {
                 if (k === "search") {
@@ -55,7 +54,15 @@ export default function Search({
                 }
             });
         }
-        router.get(url, query, { preserveScroll: true });
+        router.get(url, query, {
+            preserveScroll: true,
+            replace: true,
+        });
+    };
+
+    const handleSearchData = (e) => {
+        e.preventDefault();
+        performSearch(data.search ?? "");
     };
 
     return (
@@ -69,9 +76,13 @@ export default function Search({
                     placeholder={placeholder}
                     aria-label={placeholder ?? "Cari"}
                 />
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-stone-400">
+                <button
+                    type="submit"
+                    className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-stone-400 transition-colors hover:text-stone-600"
+                    aria-label="Cari"
+                >
                     <IconSearch className="h-4 w-4" strokeWidth={1.5} />
-                </div>
+                </button>
             </div>
         </form>
     );

@@ -46,6 +46,12 @@ class ClassController extends Controller
             $query->where('teacher_id', $request->teacher_id);
         }
 
+        // Search by class name
+        if ($request->filled('search')) {
+            $search = trim((string) $request->search);
+            $query->where('name', 'like', "%{$search}%");
+        }
+
         // Siswa: hanya kelas yang diikuti
         if (auth()->user()->hasRole('siswa')) {
             $query->whereHas('enrollments', function ($q) {
@@ -61,6 +67,12 @@ class ClassController extends Controller
             });
         }
 
+        // Urutkan natural: angka kelas dulu, lalu paralel (contoh: 7 A, 7 B, ... 8 A, ... 10 A)
+        $query
+            ->orderByRaw("CAST(SUBSTRING_INDEX(name, ' ', 1) AS UNSIGNED) ASC")
+            ->orderByRaw("TRIM(SUBSTRING(name, LENGTH(SUBSTRING_INDEX(name, ' ', 1)) + 1)) ASC")
+            ->orderBy('name');
+
         $classes = $query->paginate(10)->withQueryString();
 
         $teachers = auth()->user()->hasRole('admin')
@@ -75,7 +87,7 @@ class ClassController extends Controller
             'classes' => $classes,
             'teachers' => $teachers,
             'academicYears' => $academicYears,
-            'filters' => $request->only(['academic_year', 'teacher_id']),
+            'filters' => $request->only(['academic_year', 'teacher_id', 'search']),
         ]);
     }
 
@@ -87,9 +99,9 @@ class ClassController extends Controller
         Gate::authorize('create', SchoolClass::class);
 
         $subjects = Subject::where('is_active', true)->get();
-        $students = User::role('siswa')->select('id', 'name', 'email')->get();
+        $students = User::role('siswa')->select('id', 'name', 'email', 'nis', 'nip')->get();
         $teachers = auth()->user()->hasRole('admin')
-            ? User::role('guru')->select('id', 'name', 'email')->orderBy('name')->get()
+            ? User::role('guru')->select('id', 'name', 'email', 'nis', 'nip')->orderBy('name')->get()
             : collect();
 
         return Inertia::render('Classes/Create', [
@@ -140,7 +152,7 @@ class ClassController extends Controller
             ClassSubject::create([
                 'class_id' => $schoolClass->id,
                 'subject_id' => $subjectId,
-                'teacher_id' => $subject?->teacher_id,
+                'teacher_id' => $subject?->teacher_id ?? $homeroomTeacherId,
                 'is_active' => true,
             ]);
         }
@@ -171,6 +183,10 @@ class ClassController extends Controller
             'teacher',
             'classSubjects.subject.teacher',
             'classSubjects.teacher',
+            'classSubjects.materials',
+            'classSubjects.tasks',
+            'classSubjects.quizzes',
+            'classSubjects.exams',
             'students',
             'enrollments' => function ($q) {
                 $q->where('status', 'active')->with('student');
@@ -203,6 +219,19 @@ class ClassController extends Controller
             $class->setRelation('classSubjects', $filteredSubjects);
             $showTeacherOnlySubjects = true;
         }
+
+        $currentUser = auth()->user();
+        $class->setRelation(
+            'classSubjects',
+            $class->classSubjects->map(function ($classSubject) use ($currentUser) {
+                $classSubject->setAttribute(
+                    'can_manage_learning',
+                    $currentUser->hasRole('admin') || $classSubject->isAssignedSlotTeacher($currentUser)
+                );
+
+                return $classSubject;
+            })->values()
+        );
 
         $gradesAvg = FinalGrade::where('class_id', $class->id)->avg('score');
 
@@ -274,8 +303,8 @@ class ClassController extends Controller
         $class->load(['subjects', 'students', 'classSubjects.subject', 'classSubjects.teacher']);
 
         $subjects = Subject::where('is_active', true)->get();
-        $students = User::role('siswa')->select('id', 'name', 'email')->get();
-        $teachers = User::role('guru')->select('id', 'name', 'email')->get();
+        $students = User::role('siswa')->select('id', 'name', 'email', 'nis', 'nip')->get();
+        $teachers = User::role('guru')->select('id', 'name', 'email', 'nis', 'nip')->get();
 
         return Inertia::render('Classes/Edit', [
             'schoolClass' => $class,
@@ -327,7 +356,7 @@ class ClassController extends Controller
             ClassSubject::create([
                 'class_id' => $class->id,
                 'subject_id' => $subjectId,
-                'teacher_id' => $subject?->teacher_id,
+                'teacher_id' => $subject?->teacher_id ?? $class->teacher_id,
                 'is_active' => true,
             ]);
         }
@@ -354,6 +383,18 @@ class ClassController extends Controller
         $studentsToRemove = array_diff($currentStudentIds, $newStudentIds);
 
         foreach ($studentsToAdd as $studentId) {
+            $existingEnrollment = StudentEnrollment::where('class_id', $class->id)
+                ->where('student_id', $studentId)
+                ->first();
+
+            if ($existingEnrollment) {
+                $existingEnrollment->update([
+                    'status' => 'active',
+                    'enrolled_at' => $existingEnrollment->enrolled_at ?? now(),
+                ]);
+                continue;
+            }
+
             StudentEnrollment::create([
                 'student_id' => $studentId,
                 'class_id' => $class->id,

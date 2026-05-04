@@ -14,6 +14,7 @@ use App\Models\TaskSubmission;
 use App\Models\QuizAttempt;
 use App\Models\ExamAttempt;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Carbon\Carbon;
 
@@ -84,7 +85,9 @@ class AdminDashboardController extends Controller
         $recentRegistrations = User::where('created_at', '>=', now()->subDays(30))->count();
 
         // Active users (users who logged in within last 7 days)
-        $activeUsers = User::where('last_login_at', '>=', now()->subDays(7))->count();
+        $activeUsers = Schema::hasColumn('users', 'last_login_at')
+            ? User::where('last_login_at', '>=', now()->subDays(7))->count()
+            : 0;
 
         return [
             'total' => $totalUsers,
@@ -113,22 +116,52 @@ class AdminDashboardController extends Controller
         $recentExams = Exam::where('created_at', '>=', now()->subDays(30))->count();
 
         // Most active teachers (by content creation)
-        $mostActiveTeachers = User::role('guru')
-            ->withCount(['materials', 'tasks', 'quizzes', 'exams'])
-            ->orderByRaw('materials_count + tasks_count + quizzes_count + exams_count DESC')
-            ->take(5)
-            ->get()
-            ->map(function ($teacher) {
+        $teachers = User::role('guru')->select('id', 'name')->get();
+
+        $materialCounts = Material::query()
+            ->selectRaw('uploaded_by as user_id, COUNT(*) as aggregate')
+            ->whereNotNull('uploaded_by')
+            ->groupBy('uploaded_by')
+            ->pluck('aggregate', 'user_id');
+
+        $taskCounts = Task::query()
+            ->selectRaw('created_by as user_id, COUNT(*) as aggregate')
+            ->whereNotNull('created_by')
+            ->groupBy('created_by')
+            ->pluck('aggregate', 'user_id');
+
+        $quizCounts = Quiz::query()
+            ->selectRaw('created_by as user_id, COUNT(*) as aggregate')
+            ->whereNotNull('created_by')
+            ->groupBy('created_by')
+            ->pluck('aggregate', 'user_id');
+
+        $examCounts = Exam::query()
+            ->selectRaw('created_by as user_id, COUNT(*) as aggregate')
+            ->whereNotNull('created_by')
+            ->groupBy('created_by')
+            ->pluck('aggregate', 'user_id');
+
+        $mostActiveTeachers = $teachers
+            ->map(function ($teacher) use ($materialCounts, $taskCounts, $quizCounts, $examCounts) {
+                $materialsCount = (int) ($materialCounts[$teacher->id] ?? 0);
+                $tasksCount = (int) ($taskCounts[$teacher->id] ?? 0);
+                $quizzesCount = (int) ($quizCounts[$teacher->id] ?? 0);
+                $examsCount = (int) ($examCounts[$teacher->id] ?? 0);
+
                 return [
                     'id' => $teacher->id,
                     'name' => $teacher->name,
-                    'materials_count' => $teacher->materials_count,
-                    'tasks_count' => $teacher->tasks_count,
-                    'quizzes_count' => $teacher->quizzes_count,
-                    'exams_count' => $teacher->exams_count,
-                    'total_content' => $teacher->materials_count + $teacher->tasks_count + $teacher->quizzes_count + $teacher->exams_count,
+                    'materials_count' => $materialsCount,
+                    'tasks_count' => $tasksCount,
+                    'quizzes_count' => $quizzesCount,
+                    'exams_count' => $examsCount,
+                    'total_content' => $materialsCount + $tasksCount + $quizzesCount + $examsCount,
                 ];
-            });
+            })
+            ->sortByDesc('total_content')
+            ->take(5)
+            ->values();
 
         return [
             'recent_content' => [
@@ -182,14 +215,19 @@ class AdminDashboardController extends Controller
         $examPassRate = $totalExamAttempts > 0 ? round(($passedExamAttempts / $totalExamAttempts) * 100, 1) : 0;
 
         // Top performing classes
-        $topClasses = SchoolClass::with('teacher')
-            ->select('school_classes.*')
-            ->selectRaw('AVG(final_grades.score) as avg_grade')
+        $topClasses = SchoolClass::query()
+            ->select([
+                'school_classes.id',
+                'school_classes.name',
+                'school_classes.teacher_id',
+            ])
+            ->selectRaw('COALESCE(AVG(final_grades.score), 0) as avg_grade')
             ->leftJoin('final_grades', 'school_classes.id', '=', 'final_grades.class_id')
-            ->groupBy('school_classes.id')
-            ->orderByRaw('AVG(final_grades.score) DESC')
+            ->groupBy('school_classes.id', 'school_classes.name', 'school_classes.teacher_id')
+            ->orderByDesc('avg_grade')
             ->take(5)
             ->get()
+            ->load('teacher')
             ->map(function ($class) {
                 return [
                     'id' => $class->id,
@@ -295,7 +333,7 @@ class AdminDashboardController extends Controller
                 'type' => 'info',
                 'title' => 'Pengumpulan Tugas Belum Dinilai',
                 'message' => "Ada {$ungradedSubmissions} pengumpulan tugas yang belum dinilai.",
-                'action_url' => route('admin.ungraded-submissions'),
+                'action_url' => route('grades.index'),
             ];
         }
 
@@ -314,18 +352,23 @@ class AdminDashboardController extends Controller
         }
 
         // Check for low-performing classes
-        $lowPerformingClasses = SchoolClass::select('school_classes.*')
-            ->selectRaw('AVG(final_grades.score) as avg_grade')
+        $lowPerformingClasses = SchoolClass::query()
+            ->select([
+                'school_classes.id',
+                'school_classes.name',
+                'school_classes.teacher_id',
+            ])
+            ->selectRaw('COALESCE(AVG(final_grades.score), 0) as avg_grade')
             ->leftJoin('final_grades', 'school_classes.id', '=', 'final_grades.class_id')
-            ->groupBy('school_classes.id')
-            ->havingRaw('AVG(final_grades.score) < 60')
+            ->groupBy('school_classes.id', 'school_classes.name', 'school_classes.teacher_id')
+            ->havingRaw('COALESCE(AVG(final_grades.score), 0) < 60')
             ->count();
         if ($lowPerformingClasses > 0) {
             $alerts[] = [
                 'type' => 'warning',
                 'title' => 'Kelas dengan Performa Rendah',
                 'message' => "Ada {$lowPerformingClasses} kelas dengan rata-rata nilai di bawah 60.",
-                'action_url' => route('admin.class-performance'),
+                'action_url' => route('classes.index'),
             ];
         }
 
@@ -390,12 +433,16 @@ class AdminDashboardController extends Controller
      */
     private function getUserActivityReport($startDate, $endDate)
     {
-        return [
-            'daily_active_users' => User::whereBetween('last_login_at', [$startDate, $endDate])
+        $dailyActiveUsers = Schema::hasColumn('users', 'last_login_at')
+            ? User::whereBetween('last_login_at', [$startDate, $endDate])
                 ->selectRaw('DATE(last_login_at) as date, COUNT(*) as count')
                 ->groupBy('date')
                 ->orderBy('date')
-                ->get(),
+                ->get()
+            : collect();
+
+        return [
+            'daily_active_users' => $dailyActiveUsers,
             'new_registrations' => User::whereBetween('created_at', [$startDate, $endDate])
                 ->selectRaw('DATE(created_at) as date, COUNT(*) as count')
                 ->groupBy('date')

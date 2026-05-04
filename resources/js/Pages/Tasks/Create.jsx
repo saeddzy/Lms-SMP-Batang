@@ -2,7 +2,6 @@ import React from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import Input from "@/Components/Input";
 import Button from "@/Components/Button";
-import Card from "@/Components/Card";
 import Select2 from "@/Components/Select2";
 import { Head, useForm, usePage } from "@inertiajs/react";
 
@@ -18,6 +17,7 @@ export default function Create() {
         subjects = [],
         selectedClassId = null,
         selectedSubjectId = null,
+        classSubjectsMap = {},
     } = usePage().props;
 
     const { data, setData, post, processing, errors, transform } = useForm({
@@ -77,10 +77,52 @@ export default function Create() {
         label: cls.name,
     }));
 
-    const subjectOptions = subjects.map((subject) => ({
+    const allSubjectOptions = subjects.map((subject) => ({
         value: subject.id,
         label: subject.name,
     }));
+
+    const selectedClassIdValue =
+        selectedClassId != null && selectedClassId !== ""
+            ? selectedClassId
+            : data.class_id;
+
+    const allowedSubjectIdsForClass = selectedClassIdValue
+        ? (classSubjectsMap?.[selectedClassIdValue] ?? []).map((s) => s.id)
+        : [];
+
+    const subjectOptions = selectedClassIdValue
+        ? allSubjectOptions.filter((subject) =>
+              allowedSubjectIdsForClass.includes(subject.value)
+          )
+        : [];
+
+    const isClassLocked = selectedClassId != null && selectedClassId !== "";
+    const isSubjectLocked = selectedSubjectId != null && selectedSubjectId !== "";
+    const isSubjectDisabled = !isSubjectLocked && !selectedClassIdValue;
+
+    React.useEffect(() => {
+        if (isSubjectLocked) return;
+        if (!selectedClassIdValue) {
+            if (data.subject_id) {
+                setData("subject_id", "");
+            }
+            return;
+        }
+
+        if (
+            data.subject_id &&
+            !allowedSubjectIdsForClass.includes(data.subject_id)
+        ) {
+            setData("subject_id", "");
+        }
+    }, [
+        isSubjectLocked,
+        selectedClassIdValue,
+        data.subject_id,
+        allowedSubjectIdsForClass,
+        setData,
+    ]);
 
     const priorityOptions = [
         { value: "low", label: "Rendah" },
@@ -104,31 +146,41 @@ export default function Create() {
         <DashboardLayout title="Buat Tugas Baru">
             <Head title="Buat Tugas Baru" />
 
-            <div className="mx-auto max-w-4xl">
-                <Card>
-                    <Card.Header>
-                        <Card.Title>Buat Tugas Baru</Card.Title>
-                        <Card.Description>
-                            Buat tugas baru untuk siswa dengan deadline dan kriteria
-                            penilaian
-                        </Card.Description>
-                    </Card.Header>
+            <div className="mx-auto max-w-5xl">
+                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <div className="h-1 w-full bg-gradient-to-r from-[#163d8f] via-[#2453b8] to-[#5b84d9]" />
+                    <div className="border-b border-slate-200 bg-slate-50/70 px-6 py-5">
+                        <h2 className="text-xl font-semibold text-slate-900">Buat Tugas Baru</h2>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Buat tugas baru untuk siswa dengan deadline dan kriteria penilaian.
+                        </p>
+                    </div>
 
-                    <form onSubmit={handleSubmit}>
-                        <Card.Content>
-                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                                <div className="md:col-span-2">
-                                    <Input.Label htmlFor="title" value="Judul Tugas" />
-                                    <Input.Text
-                                        id="title"
-                                        value={data.title}
-                                        onChange={(e) => setData("title", e.target.value)}
-                                        placeholder="Masukkan judul tugas"
-                                        required
-                                    />
-                                    <Input.Error message={errors.title} />
+                    <form onSubmit={handleSubmit} className="space-y-6 p-6">
+                            <section className="space-y-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Informasi Utama
+                                </p>
+                                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                    <div className="md:col-span-2">
+                                        <Input.Label htmlFor="title" value="Judul Tugas" />
+                                        <Input.Text
+                                            id="title"
+                                            value={data.title}
+                                            onChange={(e) => setData("title", e.target.value)}
+                                            placeholder="Masukkan judul tugas"
+                                            required
+                                        />
+                                        <Input.Error message={errors.title} />
+                                    </div>
                                 </div>
+                            </section>
 
+                            <section className="space-y-4 border-t border-slate-100 pt-6">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Kelas dan Deadline
+                                </p>
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                 <div>
                                     <Input.Label htmlFor="class_id" value="Kelas" />
                                     {selectedClassId ? (
@@ -150,6 +202,8 @@ export default function Create() {
                                             }
                                             options={classOptions}
                                             placeholder="Pilih kelas"
+                                            isSearchable={true}
+                                            isDisabled={isClassLocked}
                                             required
                                         />
                                     )}
@@ -176,7 +230,16 @@ export default function Create() {
                                                 )
                                             }
                                             options={subjectOptions}
-                                            placeholder="Pilih mata pelajaran"
+                                            placeholder={
+                                                isSubjectDisabled
+                                                    ? "Pilih kelas dulu"
+                                                    : "Pilih mata pelajaran"
+                                            }
+                                            isSearchable={true}
+                                            isDisabled={isSubjectDisabled}
+                                            noOptionsMessage={() =>
+                                                "Tidak ada mapel aktif untuk kelas ini"
+                                            }
                                             required
                                         />
                                     )}
@@ -209,7 +272,14 @@ export default function Create() {
                                     />
                                     <Input.Error message={errors.due_time} />
                                 </div>
+                            </div>
+                            </section>
 
+                            <section className="space-y-4 border-t border-slate-100 pt-6">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Pengaturan Tugas
+                                </p>
+                                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                 <div>
                                     <Input.Label htmlFor="priority" value="Prioritas" />
                                     <Select2
@@ -246,7 +316,14 @@ export default function Create() {
                                     />
                                     <Input.Error message={errors.max_score} />
                                 </div>
+                                </div>
+                            </section>
 
+                            <section className="space-y-4 border-t border-slate-100 pt-6">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Konten dan Publikasi
+                                </p>
+                                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                 <div className="md:col-span-2">
                                     <Input.Label htmlFor="description" value="Deskripsi Tugas" />
                                     <textarea
@@ -256,7 +333,7 @@ export default function Create() {
                                             setData("description", e.target.value)
                                         }
                                         rows={4}
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-[#163d8f] focus:ring-[#163d8f]"
                                         placeholder="Jelaskan tugas yang harus dikerjakan siswa"
                                         required
                                     />
@@ -275,7 +352,7 @@ export default function Create() {
                                             setData("instructions", e.target.value)
                                         }
                                         rows={6}
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-[#163d8f] focus:ring-[#163d8f]"
                                         placeholder="Instruksi detail, langkah-langkah, atau panduan pengerjaan tugas"
                                     />
                                     <Input.Error message={errors.instructions} />
@@ -297,7 +374,7 @@ export default function Create() {
                                                         e.target.checked
                                                     )
                                                 }
-                                                className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                                                className="rounded border-slate-300 text-[#163d8f] shadow-sm focus:ring-[#163d8f]"
                                             />
                                             <span className="ml-2 text-sm text-gray-600">
                                                 Izinkan keterlambatan pengumpulan
@@ -331,24 +408,21 @@ export default function Create() {
                                     <Input.Error message={errors.status} />
                                 </div>
                             </div>
-                        </Card.Content>
-
-                        <Card.Footer>
-                            <div className="flex justify-end gap-3">
-                                <Button type="cancel" url={route("tasks.index")} />
-                                <Button
-                                    type="submit"
-                                    processing={processing}
-                                    disabled={processing}
-                                >
-                                    {data.status === "published"
-                                        ? "Publikasikan Tugas"
-                                        : "Simpan sebagai Draft"}
-                                </Button>
-                            </div>
-                        </Card.Footer>
+                            </section>
+                        <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
+                            <Button type="cancel" url={route("tasks.index")} />
+                            <Button
+                                type="submit"
+                                processing={processing}
+                                disabled={processing}
+                            >
+                                {data.status === "published"
+                                    ? "Publikasikan Tugas"
+                                    : "Simpan sebagai Draft"}
+                            </Button>
+                        </div>
                     </form>
-                </Card>
+                </div>
             </div>
         </DashboardLayout>
     );

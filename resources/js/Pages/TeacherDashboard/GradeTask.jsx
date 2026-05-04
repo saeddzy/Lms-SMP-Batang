@@ -4,7 +4,9 @@ import { Head, Link, useForm, usePage } from "@inertiajs/react";
 import { formatStudentDateTime } from "@/Components/Student/StudentShell";
 import {
     IconArrowLeft,
+    IconBrandYoutube,
     IconChevronDown,
+    IconPaperclip,
     IconSearch,
 } from "@tabler/icons-react";
 
@@ -27,9 +29,13 @@ function SubmissionGradePanel({ task, submission }) {
         );
     };
 
-    const fileHref =
+    const fileDownloadUrl =
         submission.file_path &&
-        `/storage/${String(submission.file_path).replace(/^\/+/, "")}`;
+        submission.id &&
+        route("tasks.submission.file", {
+            task: task.id,
+            submission: submission.id,
+        });
 
     return (
         <div className="space-y-4 text-sm">
@@ -43,15 +49,45 @@ function SubmissionGradePanel({ task, submission }) {
                     </p>
                 </div>
             ) : null}
-            {fileHref ? (
-                <a
-                    href={fileHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex text-sm font-medium text-indigo-600 hover:text-indigo-800"
-                >
-                    Buka lampiran
-                </a>
+            {fileDownloadUrl ? (
+                <div>
+                    <p className="text-xs font-semibold uppercase text-slate-500">
+                        Lampiran berkas
+                    </p>
+                    <a
+                        href={fileDownloadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-2 rounded-lg bg-[#163d8f] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0f2e6f] active:scale-[0.99]"
+                    >
+                        <IconPaperclip className="h-4 w-4" stroke={1.75} />
+                        Buka & unduh lampiran
+                    </a>
+                    {submission.file_name ? (
+                        <p className="mt-1.5 text-xs text-slate-500">
+                            {submission.file_name}
+                        </p>
+                    ) : null}
+                </div>
+            ) : null}
+            {submission.youtube_url ? (
+                <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-4">
+                    <p className="text-xs font-semibold uppercase text-rose-800">
+                        Tautan video YouTube
+                    </p>
+                    <a
+                        href={submission.youtube_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rose-700"
+                    >
+                        <IconBrandYoutube className="h-5 w-5" stroke={1.5} />
+                        Buka video siswa
+                    </a>
+                    <p className="mt-2 break-all text-xs text-rose-900/80">
+                        {submission.youtube_url}
+                    </p>
+                </div>
             ) : null}
 
             <form
@@ -73,7 +109,7 @@ function SubmissionGradePanel({ task, submission }) {
                             onChange={(e) =>
                                 setData("score", e.target.value)
                             }
-                            className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-[#163d8f] focus:outline-none focus:ring-1 focus:ring-[#163d8f]"
                         />
                         {errors.score ? (
                             <p className="mt-1 text-sm text-rose-600">
@@ -92,7 +128,7 @@ function SubmissionGradePanel({ task, submission }) {
                         onChange={(e) =>
                             setData("feedback", e.target.value)
                         }
-                        className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-[#163d8f] focus:outline-none focus:ring-1 focus:ring-[#163d8f]"
                     />
                     {errors.feedback ? (
                         <p className="mt-1 text-sm text-rose-600">
@@ -103,7 +139,7 @@ function SubmissionGradePanel({ task, submission }) {
                 <button
                     type="submit"
                     disabled={processing}
-                    className="inline-flex rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
+                    className="inline-flex rounded-md bg-[#163d8f] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f2e6f] disabled:opacity-50"
                 >
                     {processing ? "Menyimpan…" : "Simpan penilaian"}
                 </button>
@@ -155,16 +191,20 @@ export default function GradeTask() {
                 <div className="flex flex-wrap items-center gap-3">
                     <Link
                         href={route("tasks.show", task.id)}
-                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                        className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
                     >
                         <IconArrowLeft className="h-4 w-4" stroke={1.5} />
                         Kembali ke detail tugas
                     </Link>
                 </div>
 
-                <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm">
-                    <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-6 py-5">
-                        <h1 className="text-2xl font-bold text-slate-900">
+                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <div className="h-1 w-full bg-gradient-to-r from-[#163d8f] via-[#2453b8] to-[#5b84d9]" />
+                    <div className="border-b border-slate-200 bg-slate-50/70 px-6 py-5">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Penilaian tugas
+                        </p>
+                        <h1 className="mt-1 text-2xl font-semibold text-slate-900">
                             {task.title}
                         </h1>
                         <p className="mt-1 text-sm text-slate-600">
@@ -179,7 +219,7 @@ export default function GradeTask() {
                     </div>
                 ) : (
                     <>
-                        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm sm:p-5">
+                        <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
                             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                                 <div>
                                     <p className="text-sm font-semibold text-slate-900">
@@ -211,7 +251,7 @@ export default function GradeTask() {
                             </div>
                         </div>
 
-                        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm sm:p-5">
+                        <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
                             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                                 <div className="relative min-w-[200px] flex-1 sm:max-w-sm">
                                     <IconSearch
@@ -225,7 +265,7 @@ export default function GradeTask() {
                                             setSearch(e.target.value)
                                         }
                                         placeholder="Cari nama siswa…"
-                                        className="w-full rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                        className="w-full rounded-md border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-[#163d8f] focus:outline-none focus:ring-1 focus:ring-[#163d8f]"
                                     />
                                 </div>
                                 <div className="flex flex-wrap gap-2">
@@ -233,7 +273,7 @@ export default function GradeTask() {
                                         type="button"
                                         className={`${filterBtn} ${
                                             filter === "all"
-                                                ? "bg-slate-900 text-white"
+                                                ? "bg-[#163d8f] text-white"
                                                 : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                                         }`}
                                         onClick={() => setFilter("all")}
@@ -278,10 +318,10 @@ export default function GradeTask() {
                                 filtered.map((submission) => (
                                     <details
                                         key={`${submission.id}-${submission.updated_at ?? ""}`}
-                                        className="group rounded-xl border border-slate-200 bg-white shadow-sm open:border-indigo-200 open:ring-1 open:ring-indigo-100"
+                                        className="group rounded-lg border border-slate-200 bg-white open:border-[#b8c9ec] open:ring-1 open:ring-[#d9e5f8]"
                                     >
                                         <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 [&::-webkit-details-marker]:hidden">
-                                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 group-open:bg-indigo-100 group-open:text-indigo-700">
+                                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-500 group-open:bg-[#dfe9fb] group-open:text-[#163d8f]">
                                                 <IconChevronDown
                                                     className="h-5 w-5 transition-transform group-open:rotate-180"
                                                     stroke={1.5}

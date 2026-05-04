@@ -3,15 +3,13 @@ import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Head, useForm, usePage } from "@inertiajs/react";
 import Input from "@/Components/Input";
 import Button from "@/Components/Button";
-import Card from "@/Components/Card";
-import Checkbox from "@/Components/Checkbox";
+import RolePermissionsSection from "@/Components/RolePermissionsSection";
 import Swal from "sweetalert2";
-export default function Edit() {
-    // destruct permissions from usepage props
-    const { permissions, role } = usePage().props;
 
-    // define state with helper inertia
-    const { data, setData, post, errors } = useForm({
+export default function Edit() {
+    const { permissions = [], role } = usePage().props;
+
+    const { data, setData, post, errors, processing } = useForm({
         name: role.name,
         selectedPermissions: role.permissions.map(
             (permission) => permission.name
@@ -19,25 +17,14 @@ export default function Edit() {
         _method: "put",
     });
 
-    // define method handleSelectedPermissions
-    const handleSelectedPermissions = (e) => {
-        let items = data.selectedPermissions;
-
-        if (items.includes(e.target.value))
-            items.splice(items.indexOf(e.target.value), 1);
-        else items.push(e.target.value);
-        setData("selectedPermissions", items);
-    };
-
-    // define method handleUpdateData
     const handleUpdatedata = async (e) => {
         e.preventDefault();
 
         post(route("roles.update", role.id), {
             onSuccess: () => {
                 Swal.fire({
-                    title: "Success!",
-                    text: "Data created successfully!",
+                    title: "Berhasil!",
+                    text: "Data role berhasil diperbarui.",
                     icon: "success",
                     showConfirmButton: false,
                     timer: 1500,
@@ -47,69 +34,60 @@ export default function Edit() {
     };
     return (
         <DashboardLayout title="Edit Role">
-            <Head title={"Edit Roles"} />
-                <Card title={"Edit role"}>
-                    <form onSubmit={handleUpdatedata}>
-                        <div className="mb-4">
-                            <Input
-                                label={"Role Name"}
-                                type={"text"}
-                                value={data.name}
-                                onChange={(e) =>
-                                    setData("name", e.target.value)
-                                }
-                                errors={errors.name}
-                                placeholder="Input role name.."
-                            />
-                        </div>
-                        <div className="mb-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                {Object.entries(permissions).map(
-                                    ([group, permissionItems], i) => (
-                                        <div
-                                            key={i}
-                                            className="p-4 bg-white rounded-lg shadow-md"
-                                        >
-                                            <h3 className="font-bold text-lg mb-2">
-                                                {group}
-                                            </h3>
-                                            <div className="flex flex-wrap gap-2">
-                                                {permissionItems.map(
-                                                    (permission) => (
-                                                        <Checkbox
-                                                            label={permission}
-                                                            value={permission}
-                                                            onChange={
-                                                                handleSelectedPermissions
-                                                            }
-                                                            defaultChecked={data.selectedPermissions.includes(
-                                                                permission
-                                                            )}
-                                                            key={permission}
-                                                        />
-                                                    )
-                                                )}
-                                            </div>
-                                            {errors?.selectedPermissions && (
-                                                <div className="text-xs text-red-500 mt-4">
-                                                    {errors.selectedPermissions}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )
-                                )}
-                            </div>
-                        </div>
+            <Head title="Edit Role" />
 
-                        <div className="flex items-center gap-2">
-                            <Button type={"submit"}  />
+            <div className="mx-auto max-w-5xl">
+                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <div className="h-1 w-full bg-gradient-to-r from-[#163d8f] via-[#2453b8] to-[#5b84d9]" />
+                    <div className="border-b border-slate-200 bg-slate-50/70 px-6 py-5">
+                        <h2 className="text-xl font-semibold text-slate-900">
+                            Edit Role
+                        </h2>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Perbarui nama role dan pengaturan permission akses.
+                        </p>
+                    </div>
+
+                    <form onSubmit={handleUpdatedata} className="space-y-6 p-6">
+                        <section className="space-y-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Informasi Role
+                            </p>
+                            <div className="max-w-xl">
+                                <Input.Label htmlFor="name" value="Nama Role" />
+                                <Input.Text
+                                    id="name"
+                                    value={data.name}
+                                    onChange={(e) => setData("name", e.target.value)}
+                                    placeholder="Contoh: wali-kelas"
+                                    required
+                                />
+                                <Input.Error message={errors.name} />
+                            </div>
+                        </section>
+
+                        <RolePermissionsSection
+                            permissions={permissions}
+                            selectedPermissions={data.selectedPermissions}
+                            onChange={(next) =>
+                                setData("selectedPermissions", next)
+                            }
+                            errorMessage={errors.selectedPermissions}
+                        />
+
+                        <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
+                            <Button type="cancel" url={route("roles.index")} />
                             <Button
-                                type={"cancel"}
-                                url={route("roles.index")}
-                            />
+                                type="submit"
+                                processing={processing}
+                                disabled={processing}
+                            >
+                                Simpan Perubahan
+                            </Button>
                         </div>
                     </form>
-                </Card>
+                </div>
+            </div>
         </DashboardLayout>
     );
 }

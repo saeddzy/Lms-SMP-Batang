@@ -2,12 +2,11 @@ import React, { useState } from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import Input from "@/Components/Input";
 import Button from "@/Components/Button";
-import Card from "@/Components/Card";
 import Select2 from "@/Components/Select2";
 import { Head, useForm, usePage } from "@inertiajs/react";
 
 export default function Edit() {
-    const { material, subjects = [], classes = [] } = usePage().props;
+    const { material, subjects = [], classes = [], maxUploadBytes = 0 } = usePage().props;
 
     const initialVideoUrl =
         material.material_type === "video" &&
@@ -31,15 +30,26 @@ export default function Edit() {
     });
 
     const [filePreview, setFilePreview] = useState(null);
+    const [localFileError, setLocalFileError] = useState("");
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        post(route("materials.update", material.id));
+        post(route("materials.update", material.id), { forceFormData: true });
     };
 
     const handleFileChange = (e) => {
         const file = e.target.files?.[0];
         if (file) {
+            if (maxUploadBytes > 0 && file.size > maxUploadBytes) {
+                const limitMb = (maxUploadBytes / (1024 * 1024)).toFixed(1);
+                setLocalFileError(`Ukuran file melebihi batas server (${limitMb} MB). Kompres file dulu.`);
+                setData("file", null);
+                setFilePreview(null);
+                e.target.value = "";
+                return;
+            }
+
+            setLocalFileError("");
             setData("file", file);
             setFilePreview(file.name);
         }
@@ -56,7 +66,7 @@ export default function Edit() {
     }));
 
     const materialTypeOptions = [
-        { value: "pdf", label: "File PDF" },
+        { value: "pdf", label: "Dokumen (PDF/PPT/DOC/XLS)" },
         { value: "video", label: "Video" },
     ];
 
@@ -74,25 +84,29 @@ export default function Edit() {
         <DashboardLayout title="Edit Materi Pembelajaran">
             <Head title="Edit Materi Pembelajaran" />
 
-            <div className="mx-auto max-w-4xl">
-                <Card>
-                    <Card.Header>
-                        <Card.Title>Edit Materi: {material.title}</Card.Title>
-                        <Card.Description>
-                            Perbarui informasi materi pembelajaran
-                        </Card.Description>
-                    </Card.Header>
+            <div className="mx-auto max-w-5xl">
+                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <div className="h-1 w-full bg-gradient-to-r from-[#163d8f] via-[#2453b8] to-[#5b84d9]" />
+                    <div className="border-b border-slate-200 bg-slate-50/70 px-6 py-5">
+                        <h2 className="text-xl font-semibold text-slate-900">Edit Materi Pembelajaran</h2>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Perbarui detail materi agar konten tetap relevan dan mudah dipahami siswa.
+                        </p>
+                    </div>
 
-                    <form onSubmit={handleSubmit}>
-                        <Card.Content>
-                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    <form onSubmit={handleSubmit} className="space-y-6 p-6">
+                        <section className="space-y-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Informasi Dasar
+                            </p>
+                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                                 <div className="md:col-span-2">
                                     <Input.Label htmlFor="title" value="Judul Materi" />
                                     <Input.Text
                                         id="title"
                                         value={data.title}
                                         onChange={(e) => setData("title", e.target.value)}
-                                        placeholder="Masukkan judul materi"
+                                        placeholder="Contoh: Sistem Pernapasan Manusia"
                                         required
                                     />
                                     <Input.Error message={errors.title} />
@@ -119,183 +133,195 @@ export default function Edit() {
                                         options={subjectOptions}
                                         value={selectedSubject}
                                         onChange={(selected) =>
-                                            setData(
-                                                "subject_id",
-                                                selected ? selected.value : ""
-                                            )
+                                            setData("subject_id", selected ? selected.value : "")
                                         }
                                         placeholder="Pilih mata pelajaran"
                                     />
                                     <Input.Error message={errors.subject_id} />
                                 </div>
+                            </div>
+                        </section>
 
-                                <div className="md:col-span-2">
+                        <section className="space-y-4 border-t border-slate-100 pt-6">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Konten Materi
+                            </p>
+                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                <div>
                                     <Input.Label htmlFor="material_type" value="Tipe Materi" />
                                     <Select2
                                         id="material_type"
                                         options={materialTypeOptions}
                                         value={selectedMaterialType}
                                         onChange={(selected) =>
-                                            setData(
-                                                "material_type",
-                                                selected ? selected.value : "pdf"
-                                            )
+                                            {
+                                                const nextType = selected ? selected.value : "pdf";
+                                                setData("material_type", nextType);
+                                                setData("file", null);
+                                                setFilePreview(null);
+                                                setLocalFileError("");
+                                                if (nextType === "pdf") {
+                                                    setData("video_url", "");
+                                                }
+                                            }
                                         }
                                         placeholder="Pilih tipe materi"
                                     />
                                     <Input.Error message={errors.material_type} />
                                 </div>
+                            </div>
 
-                                <div className="md:col-span-2">
-                                    {data.material_type === "pdf" && (
-                                        <>
-                                            <Input.Label
-                                                htmlFor="file"
-                                                value="Ganti file PDF (opsional)"
-                                            />
+                            <div className="rounded-md border border-slate-200 bg-slate-50/50 p-4">
+                                {data.material_type === "pdf" && (
+                                    <div className="space-y-2">
+                                        <Input.Label htmlFor="file" value="Ganti Dokumen (Opsional)" />
+                                        <input
+                                            id="file"
+                                            type="file"
+                                            onChange={handleFileChange}
+                                            className="block w-full rounded-md border border-slate-300 bg-white text-sm text-slate-600 file:mr-4 file:border-0 file:bg-[#163d8f] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[#0f2e6f]"
+                                            accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv"
+                                        />
+                                        <p className="text-xs text-slate-500">
+                                            Biarkan kosong jika tidak mengganti file. Saat ini:{" "}
+                                            <span className="font-medium text-slate-700">
+                                                {material.file_name || "—"}
+                                            </span>
+                                        </p>
+                                        {filePreview && (
+                                            <p className="text-sm text-slate-600">
+                                                File baru: {filePreview}
+                                            </p>
+                                        )}
+                                        {maxUploadBytes > 0 && (
+                                            <p className="text-xs text-slate-500">
+                                                Maksimal ukuran file: {(maxUploadBytes / (1024 * 1024)).toFixed(1)} MB (PDF/PPT/DOC/XLS/CSV)
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {data.material_type === "video" && (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <Input.Label htmlFor="file" value="Ganti File Video (Opsional)" />
                                             <input
                                                 id="file"
                                                 type="file"
                                                 onChange={handleFileChange}
-                                                className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:rounded-full file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
-                                                accept=".pdf"
+                                                className="block w-full rounded-md border border-slate-300 bg-white text-sm text-slate-600 file:mr-4 file:border-0 file:bg-[#163d8f] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[#0f2e6f]"
+                                                accept=".mp4,.avi,.mov,.wmv"
                                             />
-                                            <p className="mt-1 text-xs text-stone-500">
-                                                Kosongkan jika tidak mengganti file. Berkas
-                                                saat ini:{" "}
-                                                <span className="font-medium">
-                                                    {material.file_name || "—"}
-                                                </span>
-                                            </p>
-                                        </>
-                                    )}
+                                            {filePreview && (
+                                                <p className="mt-2 text-sm text-slate-600">
+                                                    File baru: {filePreview}
+                                                </p>
+                                            )}
+                                            {maxUploadBytes > 0 && (
+                                                <p className="text-xs text-slate-500">
+                                                    Maksimal ukuran file: {(maxUploadBytes / (1024 * 1024)).toFixed(1)} MB
+                                                </p>
+                                            )}
+                                        </div>
 
-                                    {data.material_type === "video" && (
-                                        <>
-                                            <Input.Label
-                                                htmlFor="file"
-                                                value="Ganti file video atau URL"
-                                            />
-                                            <div className="space-y-3">
-                                                <div>
-                                                    <label className="text-sm text-gray-600">
-                                                        Unggah file video (MP4, AVI, MOV)
-                                                    </label>
-                                                    <input
-                                                        id="file"
-                                                        type="file"
-                                                        onChange={handleFileChange}
-                                                        className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:rounded-full file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
-                                                        accept=".mp4,.avi,.mov,.wmv"
-                                                    />
-                                                    {filePreview && (
-                                                        <p className="mt-2 text-sm text-gray-600">
-                                                            File baru: {filePreview}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div className="text-center text-sm text-gray-500">
-                                                    atau
-                                                </div>
-                                                <div>
-                                                    <Input.Label
-                                                        htmlFor="video_url"
-                                                        value="URL video (YouTube, dll.)"
-                                                    />
-                                                    <Input.Text
-                                                        id="video_url"
-                                                        type="url"
-                                                        value={data.video_url || ""}
-                                                        onChange={(e) =>
-                                                            setData("video_url", e.target.value)
-                                                        }
-                                                        placeholder="https://youtube.com/watch?v=..."
-                                                    />
-                                                    <p className="mt-1 text-xs text-stone-500">
-                                                        Isi URL jika materi berupa tautan (mengganti
-                                                        file lokal jika diisi).
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </>
-                                    )}
-                                    <Input.Error message={errors.file} />
-                                </div>
+                                        <div className="text-center text-xs font-medium uppercase tracking-wide text-slate-400">
+                                            atau
+                                        </div>
 
-                                <div className="md:col-span-2">
-                                    <Input.Label htmlFor="description" value="Deskripsi (opsional)" />
-                                    <textarea
-                                        id="description"
-                                        value={data.description}
-                                        onChange={(e) =>
-                                            setData("description", e.target.value)
-                                        }
-                                        rows={4}
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                        placeholder="Masukkan deskripsi materi"
-                                    />
-                                    <Input.Error message={errors.description} />
-                                </div>
-
-                                <div>
-                                    <Input.Label htmlFor="is_active" value="Status" />
-                                    <div className="mt-2">
-                                        <label className="inline-flex items-center">
-                                            <input
-                                                type="checkbox"
-                                                checked={data.is_active}
+                                        <div>
+                                            <Input.Label htmlFor="video_url" value="URL Video (YouTube, Vimeo, dll)" />
+                                            <Input.Text
+                                                id="video_url"
+                                                type="url"
+                                                value={data.video_url || ""}
                                                 onChange={(e) =>
-                                                    setData("is_active", e.target.checked)
+                                                    setData("video_url", e.target.value)
                                                 }
-                                                className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                                                placeholder="https://youtube.com/watch?v=..."
                                             />
-                                            <span className="ml-2 text-sm text-gray-600">
-                                                Aktif (dapat diakses siswa sesuai aturan)
-                                            </span>
-                                        </label>
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                Isi URL jika materi berupa tautan video.
+                                            </p>
+                                        </div>
                                     </div>
-                                    <Input.Error message={errors.is_active} />
-                                </div>
+                                )}
+                                {localFileError && <p className="text-sm text-red-600">{localFileError}</p>}
+                                <Input.Error message={errors.file} />
                             </div>
 
-                            {progress && (
-                                <div className="mt-6">
-                                    <div className="h-2 rounded-full bg-gray-200">
-                                        <div
-                                            className="h-2 rounded-full bg-blue-600 transition-all duration-300"
-                                            style={{
-                                                width: `${typeof progress === "number" ? progress : progress.percentage ?? 0}%`,
-                                            }}
-                                        />
-                                    </div>
-                                    <p className="mt-1 text-sm text-gray-600">
-                                        Mengunggah…{" "}
-                                        {typeof progress === "number"
-                                            ? progress
-                                            : progress.percentage ?? 0}
-                                        %
-                                    </p>
-                                </div>
-                            )}
-                        </Card.Content>
-
-                        <Card.Footer>
-                            <div className="flex justify-end gap-3">
-                                <Button
-                                    type="cancel"
-                                    url={route("materials.show", material.id)}
+                            <div>
+                                <Input.Label htmlFor="description" value="Deskripsi (Opsional)" />
+                                <textarea
+                                    id="description"
+                                    value={data.description}
+                                    onChange={(e) =>
+                                        setData("description", e.target.value)
+                                    }
+                                    rows={4}
+                                    className="mt-1 block w-full rounded-md border border-slate-300 shadow-sm focus:border-[#163d8f] focus:ring-[#163d8f]"
+                                    placeholder="Tambahkan ringkasan materi untuk memudahkan siswa."
                                 />
-                                <Button
-                                    type="submit"
-                                    processing={processing}
-                                    disabled={processing}
-                                >
-                                    Simpan Perubahan
-                                </Button>
+                                <Input.Error message={errors.description} />
                             </div>
-                        </Card.Footer>
+                        </section>
+
+                        <section className="space-y-4 border-t border-slate-100 pt-6">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Pengaturan
+                            </p>
+                            <div>
+                                <label className="inline-flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={data.is_active}
+                                        onChange={(e) =>
+                                            setData("is_active", e.target.checked)
+                                        }
+                                        className="rounded border-slate-300 text-[#163d8f] shadow-sm focus:ring-[#163d8f]"
+                                    />
+                                    <span className="ml-2 text-sm text-slate-700">
+                                        Aktif (dapat diakses siswa sesuai aturan)
+                                    </span>
+                                </label>
+                                <Input.Error message={errors.is_active} />
+                            </div>
+                        </section>
+
+                        {progress && (
+                            <div className="rounded-md border border-blue-100 bg-blue-50/70 p-3">
+                                <div className="h-2 overflow-hidden rounded-full bg-blue-100">
+                                    <div
+                                        className="h-2 rounded-full bg-[#163d8f] transition-all duration-300"
+                                        style={{
+                                            width: `${typeof progress === "number" ? progress : progress.percentage ?? 0}%`,
+                                        }}
+                                    />
+                                </div>
+                                <p className="mt-2 text-sm text-slate-600">
+                                    Mengunggah…{" "}
+                                    {typeof progress === "number"
+                                        ? progress
+                                        : progress.percentage ?? 0}
+                                    %
+                                </p>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
+                            <Button
+                                type="cancel"
+                                url={route("materials.show", material.id)}
+                            />
+                            <Button
+                                type="submit"
+                                processing={processing}
+                                disabled={processing}
+                            >
+                                Simpan Perubahan
+                            </Button>
+                        </div>
                     </form>
-                </Card>
+                </div>
             </div>
         </DashboardLayout>
     );

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import StudentShell from "@/Components/Student/StudentShell";
 import StudentStatCard from "@/Components/Student/StudentStatCard";
@@ -15,7 +15,6 @@ import {
 
 export default function StudentGrades() {
     const { grades, filters, stats } = usePage().props;
-    const [search, setSearch] = useState(filters.search || "");
 
     const getGradeColor = (score) => {
         if (score >= 90) return "bg-emerald-100 text-emerald-800 ring-emerald-200/80";
@@ -118,11 +117,9 @@ export default function StudentGrades() {
 
                 <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm sm:p-6">
                     <Search
-                        value={search}
-                        onChange={(value) => setSearch(value)}
+                        url={route("student.grades")}
                         placeholder="Cari mapel, komponen, atau catatan…"
-                        routeName="student.grades"
-                        filters={filters}
+                        filter={{ search: filters?.search ?? "" }}
                     />
                 </div>
 

@@ -2,7 +2,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 
 export default function Login({ status, canResetPassword }) {
     const { data, setData, post, processing, errors, reset } = useForm({
-        email: '',
+        login: '',
         password: '',
         remember: false,
     });
@@ -19,7 +19,7 @@ export default function Login({ status, canResetPassword }) {
         <>
             <Head>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-                <title>Login | The Sanctuary</title>
+                <title>Login | SMP N 3 Batang</title>
                 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet" />
                 <link href="https://fonts.googleapis.com" rel="preconnect" />
                 <link crossOrigin="" href="https://fonts.gstatic.com" rel="preconnect" />
@@ -40,6 +40,18 @@ export default function Login({ status, canResetPassword }) {
                             backdrop-filter: blur(24px);
                             border: 1px solid rgba(255, 255, 255, 0.15);
                         }
+                        .login-motto-card {
+                            background: linear-gradient(
+                                165deg,
+                                rgba(255, 255, 255, 0.18) 0%,
+                                rgba(255, 255, 255, 0.06) 100%
+                            );
+                            backdrop-filter: blur(28px);
+                            border: 1px solid rgba(255, 255, 255, 0.22);
+                            box-shadow:
+                                0 28px 56px -12px rgba(0, 12, 48, 0.55),
+                                inset 0 1px 0 rgba(255, 255, 255, 0.28);
+                        }
                         .deep-shadow {
                             box-shadow: 0 20px 40px rgba(0, 7, 103, 0.06);
                         }
@@ -51,19 +63,30 @@ export default function Login({ status, canResetPassword }) {
                 <section className="hidden min-w-0 lg:flex relative w-1/2 h-screen overflow-hidden">
                     <img alt="Gambar" className="absolute inset-0 w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAQMkScZFnx8Td0-2u3Zb2vN-XGQ7qGAvgO7KNdklUGaWo3vORH5M4cf2hmwpR_-8h9JhfKql8kkIcVTyurBTRFSq78yBBhwG6uOl2JuSDvl2Z8hKTm-pIXMe_Y5Aow6oRRFi-bB9jIoQY9O5rZip9gmpP-bDyv8mF2FKO9v-YQ3ZR4rLhTJ_-G9djUhc671EBXv20RXp8GDFpzW_Hzeti3sJ8cZfsBglupgzFueyeKEDfDS_tDXYSEF0SEg_HIY6Fa3NdSTHDdIYvY" />
                     {/* Glassmorphic Text Overlay */}
-                    <div className="absolute inset-0 flex items-center justify-center p-12">
-                        <div className="glass-overlay p-10 rounded-3xl max-w-lg text-center shadow-xl">
-                            <h2 className="text-gradient-secondary font-serif text-4xl italic tracking-tight mb-4">
-                                The Sanctuary of Scholarly Excellence
-                            </h2>
-                            <p className="text-primary/70 font-body text-xs tracking-[0.3em] uppercase opacity-70">
-                                EST. MMXXIV
+                    <div className="absolute inset-0 flex items-center justify-center p-6 sm:p-12">
+                        <div className="login-motto-card relative max-w-md rounded-[1.75rem] px-8 py-10 text-center sm:max-w-lg sm:rounded-3xl sm:px-12 sm:py-12">
+                            <p className="font-body text-[0.9375rem] font-medium leading-[1.7] text-white/95 [text-shadow:0_2px_20px_rgba(0,8,40,0.45)] sm:text-base">
+                                "Spirit for Marvelous, Aspiring, Responsive,{' '}
+                                <span className="sm:whitespace-nowrap">and Trusted School."</span>
                             </p>
+                            <div
+                                className="mx-auto my-8 h-px max-w-[10rem] bg-gradient-to-r from-transparent via-white/45 to-transparent sm:my-9 sm:max-w-[14rem]"
+                                aria-hidden
+                            />
+                            <h2 className="font-serif text-3xl font-bold italic tracking-tight text-white/95 [text-shadow:0_3px_28px_rgba(0,10,50,0.5)] sm:text-4xl md:text-[2.65rem] md:leading-tight">
+                                SMART SCHOOL
+                            </h2>
                         </div>
                     </div>
-                    {/* Branding subtle anchor */}
+                    {/* Branding — klik kembali ke landing */}
                     <div className="absolute bottom-12 left-12">
-                        <span className="text-white font-serif italic text-2xl font-bold">SMP 7 Batang</span>
+                        <Link
+                            href="/"
+                            className="text-white font-serif italic text-2xl font-bold transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent rounded-sm"
+                            aria-label="Kembali ke beranda"
+                        >
+                            SMP N 3 Batang
+                        </Link>
                     </div>
                 </section>
                 {/* Right Side: Login Area */}
@@ -75,7 +98,13 @@ export default function Login({ status, canResetPassword }) {
                     <div className="w-full max-w-md relative z-10">
                         {/* Branding for Mobile */}
                         <div className="lg:hidden mb-6 text-center">
-                            <span className="text-primary font-serif italic text-3xl font-bold">SMP 7 Batang</span>
+                            <Link
+                                href="/"
+                                className="inline-block text-primary font-serif italic text-3xl font-bold transition-opacity hover:opacity-85 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 rounded-sm"
+                                aria-label="Kembali ke beranda"
+                            >
+                                SMP N 3 Batang
+                            </Link>
                         </div>
                         <div className="mb-8">
                             <h1 className="font-serif text-3xl md:text-5xl text-on-surface font-light tracking-tight mb-2">Welcome Back</h1>
@@ -89,22 +118,23 @@ export default function Login({ status, canResetPassword }) {
                         <form onSubmit={submit} className="space-y-5">
                             {/* Input: Email */}
                             <div className="space-y-3">
-                                <label className="block font-body text-sm font-semibold tracking-widest uppercase text-on-surface-variant ml-1" htmlFor="email">Email</label>
+                                <label className="block font-body text-sm font-semibold tracking-widest uppercase text-on-surface-variant ml-1" htmlFor="login">NIS, NIP, atau Email</label>
                                 <div className="relative group">
                                     <input
-                                        id="email"
-                                        type="email"
-                                        name="email"
-                                        value={data.email}
+                                        id="login"
+                                        type="text"
+                                        name="login"
+                                        value={data.login}
                                         className="w-full h-10 md:h-14 px-6 bg-surface-container-low border-none rounded-3xl focus:ring-2 focus:ring-primary-container focus:bg-surface-container-lowest transition-all duration-300 font-body text-base md:text-lg placeholder:text-outline-variant"
                                         autoComplete="username"
-                                        onChange={(e) => setData('email', e.target.value)}
+                                        placeholder="Nomor NIS, NIP, atau email"
+                                        onChange={(e) => setData('login', e.target.value)}
                                     />
                                     <div className="absolute right-6 top-1/2 -translate-y-1/2 text-outline-variant group-focus-within:text-primary transition-colors">
-                                        <span className="material-symbols-outlined">mail</span>
+                                        <span className="material-symbols-outlined">badge</span>
                                     </div>
                                 </div>
-                                {errors.email && <div className="text-red-500 text-sm mt-2">{errors.email}</div>}
+                                {errors.login && <div className="text-red-500 text-sm mt-2">{errors.login}</div>}
                             </div>
                             {/* Input: Password */}
                             <div className="space-y-3">

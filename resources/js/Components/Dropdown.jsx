@@ -27,9 +27,10 @@ const Trigger = ({ children }) => {
 
             {open && (
                 <div
-                    className="fixed inset-0 z-40"
+                    className="fixed inset-0 z-20"
+                    aria-hidden
                     onClick={() => setOpen(false)}
-                ></div>
+                />
             )}
         </>
     );
@@ -70,7 +71,7 @@ const Content = ({
             >
                 <div
                     className={`absolute z-50 mt-2 rounded-md shadow-lg ${alignmentClasses} ${widthClasses}`}
-                    onClick={() => setOpen(false)}
+                    onClick={(e) => e.stopPropagation()}
                 >
                     <div
                         className={

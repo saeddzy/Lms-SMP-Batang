@@ -6,13 +6,16 @@ use App\Models\Exam;
 use App\Models\Subject;
 use App\Models\SchoolClass;
 use App\Models\ClassSubject;
+use App\Models\User;
 use App\Models\ExamAttempt;
 use App\Models\ExamAttemptAnswer;
 use App\Models\ExamQuestion;
 use App\Support\AttemptScoreCalculator;
 use App\Support\AttemptStatusHelper;
+use App\Helpers\ExamTimeHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Carbon\Carbon;
@@ -26,7 +29,13 @@ class ExamController extends Controller
     {
         Gate::authorize('exams index');
 
-        $query = Exam::with(['subject', 'schoolClass', 'teacher']);
+        $query = Exam::with(['subject', 'schoolClass', 'teacher'])
+            ->withCount([
+                'questions',
+                'attempts as participants_count' => function ($q) {
+                    $q->select(DB::raw('COUNT(DISTINCT student_id)'));
+                },
+            ]);
 
         if (auth()->user()->hasRole('siswa')) {
             $query->whereHas('schoolClass.enrollments', function ($q) {
@@ -44,6 +53,11 @@ class ExamController extends Controller
             $query->where('class_id', $request->class_id);
         }
 
+        // Filter by exam creator/teacher (admin use-case)
+        if ($request->filled('teacher_id')) {
+            $query->where('created_by', (int) $request->teacher_id);
+        }
+
         // Filter by teacher (for teachers, only show their exams)
         if (auth()->user()->hasRole('guru')) {
             $query->whereHas('classSubject', function($q) {
@@ -53,38 +67,71 @@ class ExamController extends Controller
 
         // Filter by type
         if ($request->filled('type')) {
-            $query->where('type', $request->type);
+            $query->where(function ($typeQuery) use ($request) {
+                $typeQuery->where('type', $request->type)
+                    ->orWhere('exam_type', $request->type);
+            });
         }
 
         // Filter by status
         if ($request->filled('status')) {
             switch ($request->status) {
-                case 'scheduled':
-                    $query->where('scheduled_date', '>', now());
+                case 'active':
+                    $query->where('is_active', true)
+                        ->where('is_cancelled', false)
+                        ->where('start_time', '<=', now())
+                        ->where('end_time', '>', now());
                     break;
-                case 'ongoing':
-                    $query->where('scheduled_date', '<=', now())
-                          ->whereRaw('DATE_ADD(scheduled_date, INTERVAL duration_minutes MINUTE) > ?', [now()]);
+                case 'upcoming':
+                    $query->where('start_time', '>', now());
                     break;
-                case 'completed':
-                    $query->whereRaw('DATE_ADD(scheduled_date, INTERVAL duration_minutes MINUTE) <= ?', [now()]);
+                case 'expired':
+                    $query->where('end_time', '<', now());
                     break;
-                case 'cancelled':
-                    $query->where('is_cancelled', true);
+                case 'inactive':
+                    $query->where(function ($inactiveQuery) {
+                        $inactiveQuery->where('is_active', false)
+                            ->orWhere('is_cancelled', true);
+                    });
                     break;
             }
         }
 
         // Search by title or description
         if ($request->filled('search')) {
-            $search = $request->search;
+            $search = trim((string) $request->search);
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                  ->orWhere('description', 'like', "%{$search}%")
+                  ->orWhereHas('subject', function ($subjectQuery) use ($search) {
+                      $subjectQuery->where('name', 'like', "%{$search}%")
+                          ->orWhere('code', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('schoolClass', function ($classQuery) use ($search) {
+                      $classQuery->where('name', 'like', "%{$search}%");
+                  });
             });
         }
 
-        $exams = $query->latest()->paginate(15);
+        $exams = $query->latest()->paginate(15)->withQueryString();
+        $exams->getCollection()->transform(function (Exam $exam) {
+            $status = 'inactive';
+
+            if (!$exam->is_active || $exam->is_cancelled) {
+                $status = 'inactive';
+            } elseif ($exam->start_time && now()->lt($exam->start_time)) {
+                $status = 'upcoming';
+            } elseif ($exam->end_time && now()->gte($exam->end_time)) {
+                $status = 'expired';
+            } elseif ($exam->start_time && $exam->end_time) {
+                $status = 'active';
+            }
+
+            return array_merge($exam->toArray(), [
+                'status' => $status,
+                'duration' => $exam->duration_minutes ?? $exam->duration,
+            ]);
+        });
 
         if (auth()->user()->hasRole('guru')) {
             $subjects = Subject::whereHas('classSubjects', function($q) {
@@ -105,11 +152,17 @@ class ExamController extends Controller
             $classes = SchoolClass::where('is_active', true)->get();
         }
 
+        $teachers = User::role('guru')
+            ->select('id', 'name', 'email', 'nis', 'nip')
+            ->orderBy('name')
+            ->get();
+
         return Inertia::render('Exams/Index', [
             'exams' => $exams,
             'subjects' => $subjects,
             'classes' => $classes,
-            'filters' => $request->only(['subject_id', 'class_id', 'search', 'type', 'status'])
+            'teachers' => $teachers,
+            'filters' => $request->only(['subject_id', 'class_id', 'teacher_id', 'search', 'type', 'status'])
         ]);
     }
 
@@ -156,6 +209,7 @@ class ExamController extends Controller
             'classes' => $classes,
             'selectedClassId' => $selectedClassId,
             'selectedSubjectId' => $selectedSubjectId,
+            'classSubjectsMap' => $this->buildClassSubjectsMap($classes),
         ]);
     }
 
@@ -166,21 +220,38 @@ class ExamController extends Controller
     {
         Gate::authorize('exams create');
 
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'subject_id' => 'required|exists:subjects,id',
-            'class_id' => 'required|exists:school_classes,id',
-            'type' => 'required|in:midterm,final,quiz,practice',
-            'scheduled_date' => 'required|date|after:now',
-            'duration_minutes' => 'required|integer|min:30|max:240',
-            'total_questions' => 'required|integer|min:1|max:100',
-            'passing_score' => 'required|numeric|min:0|max:100',
-            'instructions' => 'nullable|string',
-            'rules' => 'nullable|string',
-            'requires_supervision' => 'boolean',
-            'allow_review' => 'boolean',
-            'max_attempts' => 'required|integer|min:1|max:3',
+        try {
+            // Log debugging
+            \Log::info('Exam store attempt', [
+                'user_id' => auth()->id(),
+                'user_role' => auth()->user()->role ?? 'unknown',
+                'user_permissions' => method_exists(auth()->user(), 'permissions') ? auth()->user()->permissions : [],
+                'request_data' => $request->all(),
+                'request_method' => $request->method(),
+            ]);
+
+            $validated = $request->validate([
+                'title' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'subject_id' => 'required|exists:subjects,id',
+                'class_id' => 'required|exists:school_classes,id',
+                'type' => 'required|in:midterm,final,quiz,practice',
+                'scheduled_date' => 'required|date',
+                'duration' => 'required|integer|min:1',
+                'max_attempts' => 'nullable|integer|min:1|max:10',
+                'passing_score' => 'nullable|numeric|min:0|max:100',
+                'instructions' => 'nullable|string',
+                'rules' => 'nullable|string',
+                'supervision_required' => 'boolean',
+                'allow_review' => 'boolean',
+                'start_time' => 'required',
+                'end_time' => 'required',
+                'status' => 'nullable|string',
+            ]);
+
+        \Log::info('Validation passed', [
+            'validated_data' => $validated,
+            'user_id' => auth()->id(),
         ]);
 
         // Find the class_subject based on class_id and subject_id
@@ -202,28 +273,61 @@ class ExamController extends Controller
             default => 'quiz',
         };
 
+        // Combine date and time using Carbon
+        $startDateTime = \Carbon\Carbon::parse($validated['scheduled_date'] . ' ' . $validated['start_time']);
+        $endDateTime = \Carbon\Carbon::parse($validated['scheduled_date'] . ' ' . $validated['end_time']);
+
+        // Debug log untuk memastikan data masuk DB dengan benar
+        \Log::info('Exam datetime debug', [
+            'scheduled_date' => $validated['scheduled_date'],
+            'start_time_input' => $validated['start_time'],
+            'end_time_input' => $validated['end_time'],
+            'start_datetime' => $startDateTime,
+            'end_datetime' => $endDateTime,
+            'duration' => $validated['duration'],
+        ]);
+
+        // Create exam record
         $exam = Exam::create([
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
             'instructions' => $validated['instructions'] ?? null,
-            'rules' => $validated['rules'] ?? null,
             'class_id' => $validated['class_id'],
             'class_subject_id' => $classSubject->id,
             'exam_type' => $examType,
-            'scheduled_date' => $validated['scheduled_date'],
-            'duration_minutes' => $validated['duration_minutes'],
-            'total_questions' => $validated['total_questions'],
-            'passing_marks' => $validated['passing_score'],
+            'scheduled_date' => $startDateTime,
+            'start_time' => $startDateTime,
+            'end_time' => $endDateTime,
+            'duration' => $validated['duration'],
+            'duration_minutes' => $validated['duration'],
+            'max_attempts' => $validated['max_attempts'] ?? 1,
+            'passing_marks' => $validated['passing_score'] ?? 0,
             'total_marks' => 100,
-            'max_attempts' => $validated['max_attempts'],
-            'requires_supervision' => $request->boolean('requires_supervision'),
+            'requires_supervision' => $request->boolean('supervision_required'),
             'allow_review' => $request->boolean('allow_review'),
             'created_by' => auth()->id(),
             'is_active' => true,
         ]);
 
+        \Log::info('Exam created successfully', [
+            'exam_id' => $exam->id,
+            'exam_title' => $exam->title,
+            'redirect_to' => 'exams.show',
+        ]);
+
         return redirect()->route('exams.show', $exam)
             ->with('success', 'Ujian berhasil dibuat. Sekarang tambahkan soal-soal.');
+
+        } catch (\Exception $e) {
+            \Log::error('Exam creation failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id(),
+                'request_data' => $request->all(),
+            ]);
+
+            return back()->withErrors(['error' => 'Terjadi kesalahan saat menyimpan data ujian: ' . $e->getMessage()]);
+        }
     }
 
     /**
@@ -238,8 +342,8 @@ class ExamController extends Controller
             'schoolClass',
             'teacher',
             'creator',
-            'questions' => fn ($q) => $q->orderBy('order'),
-        ];
+            'questions',
+                    ];
         if (auth()->user()->can('exams view') && !auth()->user()->hasRole('siswa')) {
             $load[] = 'schoolClass.students';
         }
@@ -260,6 +364,24 @@ class ExamController extends Controller
                 ->get();
             $attempts = AttemptStatusHelper::annotateExamAttempts($attempts);
         }
+
+        $attempts = $attempts->map(function ($att) {
+            $violations = is_array($att->attempt_data['violations'] ?? null)
+                ? $att->attempt_data['violations']
+                : [];
+
+            $att->setAttribute('violations_count', count($violations));
+            $att->setAttribute(
+                'violations_preview',
+                collect($violations)
+                    ->pluck('type')
+                    ->filter()
+                    ->take(-3)
+                    ->implode(', ')
+            );
+
+            return $att;
+        });
 
         $cs = $exam->classSubject;
         $canManageExam = auth()->user()->hasRole('admin')
@@ -293,10 +415,46 @@ class ExamController extends Controller
             $classes = SchoolClass::where('is_active', true)->get();
         }
 
+        // Format date and time for HTML inputs
+        $examData = $exam->toArray();
+        
+        // Handle scheduled_date formatting
+        if ($exam->scheduled_date) {
+            // Try different date formats
+            $date = \DateTime::createFromFormat('Y-m-d', $exam->scheduled_date);
+            if (!$date) {
+                $date = \DateTime::createFromFormat('Y-m-d H:i:s', $exam->scheduled_date);
+            }
+            if (!$date) {
+                $date = \DateTime::createFromFormat('Y-m-d\TH:i:s', $exam->scheduled_date);
+            }
+            if ($date) {
+                $examData['scheduled_date'] = $date->format('Y-m-d');
+            } else {
+                $examData['scheduled_date'] = null;
+            }
+        } else {
+            $examData['scheduled_date'] = null;
+        }
+        
+        // Handle time formatting
+        $examData['start_time'] = $exam->start_time ? date('H:i', strtotime($exam->start_time)) : null;
+        $examData['end_time'] = $exam->end_time ? date('H:i', strtotime($exam->end_time)) : null;
+        $examData['passing_score'] = $exam->passing_marks;
+        $examData['type'] = match ($exam->exam_type) {
+            'mid_term' => 'midterm',
+            'final' => 'final',
+            'quiz' => 'quiz',
+            'practice' => 'practice',
+            default => 'quiz',
+        };
+        $examData['supervision_required'] = (bool) $exam->requires_supervision;
+
         return Inertia::render('Exams/Edit', [
-            'exam' => $exam,
+            'exam' => $examData,
             'subjects' => $subjects,
             'classes' => $classes,
+            'classSubjectsMap' => $this->buildClassSubjectsMap($classes),
         ]);
     }
 
@@ -314,15 +472,16 @@ class ExamController extends Controller
             'class_id' => 'required|exists:school_classes,id',
             'type' => 'required|in:midterm,final,quiz,practice',
             'scheduled_date' => 'required|date',
-            'duration_minutes' => 'required|integer|min:30|max:240',
-            'total_questions' => 'required|integer|min:1|max:100',
-            'passing_score' => 'required|numeric|min:0|max:100',
+            'duration' => 'required|integer|min:1',
+            'max_attempts' => 'nullable|integer|min:1|max:10',
+            'passing_score' => 'nullable|numeric|min:0|max:100',
             'instructions' => 'nullable|string',
             'rules' => 'nullable|string',
-            'requires_supervision' => 'boolean',
+            'supervision_required' => 'boolean',
             'allow_review' => 'boolean',
-            'max_attempts' => 'required|integer|min:1|max:3',
-        ]);
+            'start_time' => 'required',
+            'end_time' => 'required',
+                    ]);
 
         $classSubject = ClassSubject::where('class_id', $validated['class_id'])
             ->where('subject_id', $validated['subject_id'])
@@ -342,6 +501,20 @@ class ExamController extends Controller
             default => 'quiz',
         };
 
+        // Combine date and time using Carbon (same as store method)
+        $startDateTime = \Carbon\Carbon::parse($validated['scheduled_date'] . ' ' . $validated['start_time']);
+        $endDateTime = \Carbon\Carbon::parse($validated['scheduled_date'] . ' ' . $validated['end_time']);
+
+        // Debug log untuk memastikan data masuk DB dengan benar
+        \Log::info('Exam update datetime debug', [
+            'scheduled_date' => $validated['scheduled_date'],
+            'start_time_input' => $validated['start_time'],
+            'end_time_input' => $validated['end_time'],
+            'start_datetime' => $startDateTime,
+            'end_datetime' => $endDateTime,
+            'duration' => $validated['duration'],
+        ]);
+
         $exam->update([
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
@@ -350,12 +523,14 @@ class ExamController extends Controller
             'class_id' => $validated['class_id'],
             'class_subject_id' => $classSubject->id,
             'exam_type' => $examType,
-            'scheduled_date' => $validated['scheduled_date'],
-            'duration_minutes' => $validated['duration_minutes'],
-            'total_questions' => $validated['total_questions'],
-            'passing_marks' => $validated['passing_score'],
-            'max_attempts' => $validated['max_attempts'],
-            'requires_supervision' => $request->boolean('requires_supervision'),
+            'scheduled_date' => $startDateTime,
+            'start_time' => $startDateTime,
+            'end_time' => $endDateTime,
+            'duration' => $validated['duration'],
+            'duration_minutes' => $validated['duration'],
+            'max_attempts' => $validated['max_attempts'] ?? $exam->max_attempts ?? 1,
+            'passing_marks' => $validated['passing_score'] ?? 0,
+            'requires_supervision' => $request->boolean('supervision_required'),
             'allow_review' => $request->boolean('allow_review'),
         ]);
 
@@ -399,15 +574,16 @@ class ExamController extends Controller
             return back()->with('error', 'Jadwal ujian belum lengkap.');
         }
 
-        // Check timing
-        $examEndTime = $exam->scheduled_date->copy()->addMinutes((int) $exam->duration_minutes);
+        // Check timing - use the actual start_time and end_time fields
+        $examStartTime = $exam->start_time;
+        $examEndTime = $exam->end_time;
 
-        if (now() < $exam->scheduled_date) {
-            return back()->with('error', 'Ujian belum dimulai.');
+        if (now() < $examStartTime) {
+            return back()->with('error', 'Ujian belum dimulai. Dimulai pada: ' . $examStartTime->format('d M Y H:i'));
         }
 
         if (now() > $examEndTime) {
-            return back()->with('error', 'Ujian sudah berakhir.');
+            return back()->with('error', 'Ujian sudah berakhir pada: ' . $examEndTime->format('d M Y H:i'));
         }
 
         // Check attempt limit
@@ -423,7 +599,7 @@ class ExamController extends Controller
             ->first();
 
         if ($unfinishedAttempt) {
-            return redirect()->route('exams.attempt', [$exam, $unfinishedAttempt]);
+            return redirect()->route('exams.attempt.take', [$exam, $unfinishedAttempt]);
         }
 
         // Create new attempt
@@ -432,7 +608,7 @@ class ExamController extends Controller
             'started_at' => now(),
         ]);
 
-        return redirect()->route('exams.attempt', [$exam, $attempt]);
+        return redirect()->route('exams.attempt.take', [$exam, $attempt]);
     }
 
     /**
@@ -451,15 +627,9 @@ class ExamController extends Controller
                 ->with('error', 'Percobaan ujian sudah selesai.');
         }
 
-        if (! $exam->scheduled_date || ! $exam->duration_minutes) {
-            return redirect()->route('exams.show', $exam)
-                ->with('error', 'Jadwal ujian belum lengkap.');
-        }
-
-        // Check time limit
-        $examEndTime = $exam->scheduled_date->copy()->addMinutes((int) $exam->duration_minutes);
-        if (now() > $examEndTime) {
-            $attempt->update(['finished_at' => now()]);
+        // Check if attempt is expired using ExamTimeHelper
+        if (ExamTimeHelper::isExpired($attempt)) {
+            ExamTimeHelper::updateExpiredAttempt($attempt);
             return redirect()->route('exams.show', $exam)
                 ->with('error', 'Waktu pengerjaan ujian sudah habis.');
         }
@@ -471,7 +641,7 @@ class ExamController extends Controller
         return Inertia::render('Exams/Attempt', [
             'exam' => $exam,
             'attempt' => $attempt,
-            'timeRemaining' => max(0, (int) now()->diffInSeconds($examEndTime)),
+            'timeRemaining' => \App\Helpers\ExamTimeHelper::getRemainingSeconds($attempt),
         ]);
     }
 
@@ -640,14 +810,23 @@ class ExamController extends Controller
             }
 
             $max = (float) $ans->question->points;
-            if ((float) $row['points_awarded'] > $max) {
+            $pointsAwarded = (float) $row['points_awarded'];
+            if (abs($max - $pointsAwarded) < 0.011) {
+                $pointsAwarded = $max;
+            }
+            if (abs($pointsAwarded) < 0.011) {
+                $pointsAwarded = 0.0;
+            }
+            $pointsAwarded = round($pointsAwarded, 2);
+
+            if ($pointsAwarded > $max) {
                 throw ValidationException::withMessages([
                     "grades.{$index}.points_awarded" => "Maksimal {$max} poin untuk soal ini.",
                 ]);
             }
 
             $ans->update([
-                'points_awarded' => $row['points_awarded'],
+                'points_awarded' => $pointsAwarded,
                 'teacher_feedback' => $row['teacher_feedback'] ?? null,
                 'graded_at' => now(),
                 'graded_by' => auth()->id(),
@@ -658,6 +837,7 @@ class ExamController extends Controller
         $totals = AttemptScoreCalculator::forExamAttempt($attempt->load('answers.question'));
         $threshold = (float) ($exam->passing_marks ?? 60);
         $attempt->update([
+            'attempt_status' => 'finished',
             'score' => $totals['percent'],
             'passed' => $totals['percent'] >= $threshold,
         ]);
@@ -699,8 +879,8 @@ class ExamController extends Controller
         Gate::authorize('update', $exam);
 
         $validated = $request->validate([
-            'scheduled_date' => 'required|date|after:now',
-            'duration_minutes' => 'required|integer|min:30|max:240',
+            'scheduled_date' => 'required|date',
+            'duration' => 'required|integer|min:1',
         ]);
 
         $exam->update($validated);
@@ -715,12 +895,48 @@ class ExamController extends Controller
     {
         Gate::authorize('update', $exam);
 
-        $data = $this->prepareExamQuestionData($request);
-        $order = (int) ($exam->questions()->max('order') ?? 0) + 1;
-        $exam->questions()->create(array_merge($data, ['order' => $order]));
-        $exam->update(['total_questions' => $exam->questions()->count()]);
+        try {
+            \Log::info('Store question attempt', [
+                'exam_id' => $exam->id,
+                'request_data' => $request->all(),
+                'user_id' => auth()->id(),
+            ]);
 
-        return back()->with('success', 'Soal berhasil ditambahkan.');
+            $data = $this->prepareExamQuestionData($request);
+            
+            \Log::info('Question data prepared', [
+                'data' => $data,
+                'exam_id' => $exam->id,
+            ]);
+
+            $order = (int) ($exam->questions()->max('order') ?? 0) + 1;
+            $question = $exam->questions()->create(array_merge($data, ['order' => $order]));
+            
+            \Log::info('Question created', [
+                'question_id' => $question->id,
+                'exam_id' => $exam->id,
+                'order' => $order,
+            ]);
+
+            $exam->update(['total_questions' => $exam->questions()->count()]);
+            
+            \Log::info('Exam total_questions updated', [
+                'exam_id' => $exam->id,
+                'total_questions' => $exam->questions()->count(),
+            ]);
+
+            return back()->with('success', 'Soal berhasil ditambahkan.');
+        } catch (\Exception $e) {
+            \Log::error('Store question failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'exam_id' => $exam->id,
+                'request_data' => $request->all(),
+                'user_id' => auth()->id(),
+            ]);
+
+            return back()->withErrors(['error' => 'Terjadi kesalahan saat menambahkan soal: ' . $e->getMessage()]);
+        }
     }
 
     /**
@@ -857,5 +1073,31 @@ class ExamController extends Controller
         if ($ca !== null && ! is_string($ca) && is_scalar($ca)) {
             $request->merge(['correct_answer' => (string) $ca]);
         }
+    }
+
+    private function buildClassSubjectsMap($classes): array
+    {
+        $classIds = collect($classes)->pluck('id')->filter()->values();
+        if ($classIds->isEmpty()) {
+            return [];
+        }
+
+        return ClassSubject::query()
+            ->with('subject:id,name,is_active')
+            ->whereIn('class_id', $classIds)
+            ->where('is_active', true)
+            ->get(['id', 'class_id', 'subject_id'])
+            ->groupBy('class_id')
+            ->map(function ($rows) {
+                return $rows
+                    ->map(fn ($row) => [
+                        'id' => $row->subject_id,
+                        'name' => $row->subject?->name,
+                    ])
+                    ->filter(fn ($subject) => !empty($subject['id']) && !empty($subject['name']))
+                    ->values()
+                    ->all();
+            })
+            ->toArray();
     }
 }

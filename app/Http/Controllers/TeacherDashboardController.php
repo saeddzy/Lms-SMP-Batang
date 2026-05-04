@@ -2,19 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Exam;
+use App\Models\ExamAttempt;
+use App\Models\FinalGrade;
+use App\Models\Material;
+use App\Models\Quiz;
+use App\Models\QuizAttempt;
 use App\Models\SchoolClass;
 use App\Models\Task;
-use App\Models\Quiz;
-use App\Models\Exam;
-use App\Models\Material;
-use App\Models\FinalGrade;
 use App\Models\TaskSubmission;
-use App\Models\QuizAttempt;
-use App\Models\ExamAttempt;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
-use Carbon\Carbon;
 
 class TeacherDashboardController extends Controller
 {
@@ -25,36 +24,199 @@ class TeacherDashboardController extends Controller
     {
         $user = auth()->user();
 
-        // Kelas di mana guru mengajar (class_subjects), bukan hanya sebagai wali
-        $taughtClasses = SchoolClass::whereHas('classSubjects', function ($q) use ($user) {
-            $q->forTeacher($user);
-        })
-            ->with(['teacher', 'classSubjects.subject', 'classSubjects.teacher', 'classSubjects.subject.teacher', 'students'])
-            ->distinct()
+        $taughtClasses = SchoolClass::query()
+            ->where('is_active', true)
+            ->where(function ($q) use ($user) {
+                $q->where('teacher_id', $user->id)
+                    ->orWhereHas('classSubjects', fn ($cs) => $cs->forTeacher($user));
+            })
+            ->withCount('students')
+            ->orderByRaw("CAST(SUBSTRING_INDEX(name, ' ', 1) AS UNSIGNED) ASC")
+            ->orderByRaw("TRIM(SUBSTRING(name, LENGTH(SUBSTRING_INDEX(name, ' ', 1)) + 1)) ASC")
+            ->orderBy('name')
             ->get();
 
-        // Get recent activities
-        $recentActivities = $this->getRecentActivities($user);
+        $classIds = $taughtClasses->pluck('id');
+        $totalStudents = $taughtClasses->sum('students_count');
 
-        // Get class statistics
-        $classStats = $this->getClassStats($user);
+        $totalTasks = Task::query()
+            ->whereHas('classSubject', fn ($q) => $q->forTeacher($user))
+            ->count();
+        $totalMaterials = Material::query()
+            ->whereHas('classSubject', fn ($q) => $q->forTeacher($user))
+            ->count();
 
-        // Get pending grading tasks
-        $pendingGradings = $this->getPendingGradings($user);
+        $pendingSubmissions = TaskSubmission::query()
+            ->whereNull('score')
+            ->whereHas('task.classSubject', fn ($q) => $q->forTeacher($user))
+            ->count();
 
-        // Get upcoming schedules
-        $upcomingSchedules = $this->getUpcomingSchedules($user);
+        $avgTaskScore = TaskSubmission::query()
+            ->whereNotNull('score')
+            ->whereHas('task.classSubject', fn ($q) => $q->forTeacher($user))
+            ->avg('score');
 
-        // Get teaching statistics
-        $teachingStats = $this->getTeachingStats($user);
+        $stats = [
+            'totalStudents' => (int) $totalStudents,
+            'totalClasses' => (int) $taughtClasses->count(),
+            'totalTasks' => (int) $totalTasks,
+            'totalMaterials' => (int) $totalMaterials,
+            'pendingSubmissions' => (int) $pendingSubmissions,
+            'averageClassGrade' => round((float) ($avgTaskScore ?? 0), 1),
+        ];
+
+        $classPerformance = $taughtClasses->map(function ($class) use ($user) {
+            $avgScore = TaskSubmission::query()
+                ->whereNotNull('score')
+                ->whereHas('task', function ($taskQuery) use ($class, $user) {
+                    $taskQuery
+                        ->where('class_id', $class->id)
+                        ->whereHas('classSubject', fn ($q) => $q->forTeacher($user));
+                })
+                ->avg('score');
+
+            $pendingCount = TaskSubmission::query()
+                ->whereNull('score')
+                ->whereHas('task', function ($taskQuery) use ($class, $user) {
+                    $taskQuery
+                        ->where('class_id', $class->id)
+                        ->whereHas('classSubject', fn ($q) => $q->forTeacher($user));
+                })
+                ->count();
+
+            return [
+                'id' => $class->id,
+                'name' => $class->name,
+                'averageGrade' => round((float) ($avgScore ?? 0), 1),
+                'totalStudents' => (int) ($class->students_count ?? 0),
+                'pendingSubmissions' => (int) $pendingCount,
+                'subject' => 'Kelas aktif',
+            ];
+        })->values();
+
+        $pendingTasks = Task::query()
+            ->whereHas('classSubject', fn ($q) => $q->forTeacher($user))
+            ->with(['subject', 'schoolClass'])
+            ->withCount([
+                'submissions as ungraded_count' => fn ($q) => $q->whereNull('score'),
+            ])
+            ->having('ungraded_count', '>', 0)
+            ->orderByDesc('due_date')
+            ->take(8)
+            ->get()
+            ->map(function ($task) {
+                return [
+                    'id' => $task->id,
+                    'title' => $task->title,
+                    'class' => $task->schoolClass?->name ?? '-',
+                    'subject' => $task->subject?->name ?? '-',
+                    'deadline' => optional($task->due_date)->translatedFormat('d M Y H:i'),
+                    'submissions' => (int) ($task->ungraded_count ?? 0),
+                    'action_url' => route('tasks.show', $task),
+                ];
+            })
+            ->values();
+
+        $recentActivities = TaskSubmission::query()
+            ->whereHas('task.classSubject', fn ($q) => $q->forTeacher($user))
+            ->with(['task.subject', 'task.schoolClass', 'student'])
+            ->latest('submitted_at')
+            ->take(8)
+            ->get()
+            ->map(function ($submission) {
+                return [
+                    'id' => $submission->id,
+                    'description' => $submission->student?->name
+                        .' mengumpulkan tugas "'
+                        .($submission->task?->title ?? '-')
+                        .'"',
+                    'time' => optional($submission->submitted_at)->diffForHumans(),
+                    'class' => $submission->task?->schoolClass?->name ?? '-',
+                    'subject' => $submission->task?->subject?->name ?? '-',
+                ];
+            })
+            ->values();
+
+        $upcomingSchedules = collect()
+            ->merge(
+                Quiz::query()
+                    ->whereHas('classSubject', fn ($q) => $q->forTeacher($user))
+                    ->where('is_active', true)
+                    ->where('start_time', '>=', now())
+                    ->where('start_time', '<=', now()->addDays(7))
+                    ->with(['subject', 'schoolClass'])
+                    ->orderBy('start_time')
+                    ->take(6)
+                    ->get()
+                    ->map(fn ($quiz) => [
+                        'id' => 'quiz-'.$quiz->id,
+                        'type' => 'Kuis',
+                        'title' => $quiz->title,
+                        'class' => $quiz->schoolClass?->name ?? '-',
+                        'subject' => $quiz->subject?->name ?? '-',
+                        'sort_at' => $quiz->start_time,
+                        'time' => optional($quiz->start_time)->translatedFormat('d M Y H:i'),
+                        'url' => route('quizzes.show', $quiz),
+                    ])
+            )
+            ->merge(
+                Exam::query()
+                    ->whereHas('classSubject', fn ($q) => $q->forTeacher($user))
+                    ->where('is_cancelled', false)
+                    ->where('scheduled_date', '>=', now())
+                    ->where('scheduled_date', '<=', now()->addDays(7))
+                    ->with(['subject', 'schoolClass'])
+                    ->orderBy('scheduled_date')
+                    ->take(6)
+                    ->get()
+                    ->map(fn ($exam) => [
+                        'id' => 'exam-'.$exam->id,
+                        'type' => 'Ujian',
+                        'title' => $exam->title,
+                        'class' => $exam->schoolClass?->name ?? '-',
+                        'subject' => $exam->subject?->name ?? '-',
+                        'sort_at' => $exam->scheduled_date,
+                        'time' => optional($exam->scheduled_date)->translatedFormat('d M Y H:i'),
+                        'url' => route('exams.show', $exam),
+                    ])
+            )
+            ->merge(
+                Task::query()
+                    ->whereHas('classSubject', fn ($q) => $q->forTeacher($user))
+                    ->whereNotNull('due_date')
+                    ->where('due_date', '>=', now())
+                    ->where('due_date', '<=', now()->addDays(7))
+                    ->with(['subject', 'schoolClass'])
+                    ->orderBy('due_date')
+                    ->take(6)
+                    ->get()
+                    ->map(fn ($task) => [
+                        'id' => 'task-'.$task->id,
+                        'type' => 'Deadline tugas',
+                        'title' => $task->title,
+                        'class' => $task->schoolClass?->name ?? '-',
+                        'subject' => $task->subject?->name ?? '-',
+                        'sort_at' => $task->due_date,
+                        'time' => optional($task->due_date)->translatedFormat('d M Y H:i'),
+                        'url' => route('tasks.show', $task),
+                    ])
+            )
+            ->sortBy('sort_at')
+            ->values()
+            ->take(10)
+            ->map(function ($item) {
+                unset($item['sort_at']);
+
+                return $item;
+            });
 
         return Inertia::render('Dashboard/TeacherDashboard', [
             'taughtClasses' => $taughtClasses,
+            'stats' => $stats,
             'recentActivities' => $recentActivities,
-            'classStats' => $classStats,
-            'pendingGradings' => $pendingGradings,
+            'classPerformance' => $classPerformance,
+            'pendingTasks' => $pendingTasks,
             'upcomingSchedules' => $upcomingSchedules,
-            'teachingStats' => $teachingStats,
         ]);
     }
 
@@ -67,8 +229,10 @@ class TeacherDashboardController extends Controller
 
         // Recent task submissions that need grading
         $taskSubmissions = TaskSubmission::whereHas('task', function ($query) use ($user) {
-                $query->where('teacher_id', $user->id);
-            })
+            $query->whereHas('classSubject', function ($q) use ($user) {
+                $q->forTeacher($user);
+            });
+        })
             ->with(['task.subject', 'task.schoolClass', 'student'])
             ->latest('submitted_at')
             ->take(5)
@@ -77,7 +241,7 @@ class TeacherDashboardController extends Controller
                 return [
                     'id' => $submission->id,
                     'type' => 'task_submission',
-                    'title' => 'Tugas dikumpulkan: ' . $submission->task->title,
+                    'title' => 'Tugas dikumpulkan: '.$submission->task->title,
                     'student' => $submission->student->name,
                     'subject' => $submission->task->subject->name,
                     'class' => $submission->task->schoolClass->name,
@@ -89,8 +253,10 @@ class TeacherDashboardController extends Controller
 
         // Recent quiz attempts
         $quizAttempts = QuizAttempt::whereHas('quiz', function ($query) use ($user) {
-                $query->where('teacher_id', $user->id);
-            })
+            $query->whereHas('classSubject', function ($q) use ($user) {
+                $q->forTeacher($user);
+            });
+        })
             ->with(['quiz.subject', 'quiz.schoolClass', 'student'])
             ->latest('finished_at')
             ->take(5)
@@ -99,7 +265,7 @@ class TeacherDashboardController extends Controller
                 return [
                     'id' => $attempt->id,
                     'type' => 'quiz_attempt',
-                    'title' => 'Kuis dikerjakan: ' . $attempt->quiz->title,
+                    'title' => 'Kuis dikerjakan: '.$attempt->quiz->title,
                     'student' => $attempt->student->name,
                     'subject' => $attempt->quiz->subject->name,
                     'class' => $attempt->quiz->schoolClass->name,
@@ -111,8 +277,10 @@ class TeacherDashboardController extends Controller
 
         // Recent exam attempts
         $examAttempts = ExamAttempt::whereHas('exam', function ($query) use ($user) {
-                $query->where('teacher_id', $user->id);
-            })
+            $query->whereHas('classSubject', function ($q) use ($user) {
+                $q->forTeacher($user);
+            });
+        })
             ->with(['exam.subject', 'exam.schoolClass', 'student'])
             ->latest('finished_at')
             ->take(5)
@@ -121,7 +289,7 @@ class TeacherDashboardController extends Controller
                 return [
                     'id' => $attempt->id,
                     'type' => 'exam_attempt',
-                    'title' => 'Ujian dikerjakan: ' . $attempt->exam->title,
+                    'title' => 'Ujian dikerjakan: '.$attempt->exam->title,
                     'student' => $attempt->student->name,
                     'subject' => $attempt->exam->subject->name,
                     'class' => $attempt->exam->schoolClass->name,
@@ -141,7 +309,7 @@ class TeacherDashboardController extends Controller
                 return [
                     'id' => $material->id,
                     'type' => 'material_created',
-                    'title' => 'Materi dibuat: ' . $material->title,
+                    'title' => 'Materi dibuat: '.$material->title,
                     'subject' => $material->subject->name,
                     'class' => $material->schoolClass->name,
                     'date' => $material->created_at,
@@ -199,8 +367,10 @@ class TeacherDashboardController extends Controller
     {
         // Ungraded task submissions
         $ungradedTasks = TaskSubmission::whereHas('task', function ($query) use ($user) {
-                $query->where('teacher_id', $user->id);
-            })
+            $query->whereHas('classSubject', function ($q) use ($user) {
+                $q->forTeacher($user);
+            });
+        })
             ->whereNull('score')
             ->with(['task.subject', 'task.schoolClass', 'student'])
             ->latest('submitted_at')
@@ -230,7 +400,9 @@ class TeacherDashboardController extends Controller
         $schedules = collect();
 
         // Upcoming quizzes
-        $upcomingQuizzes = Quiz::where('teacher_id', $user->id)
+        $upcomingQuizzes = Quiz::whereHas('classSubject', function ($q) use ($user) {
+            $q->forTeacher($user);
+        })
             ->where('is_active', true)
             ->where('start_time', '>', now())
             ->where('start_time', '<=', now()->addDays(7))
@@ -251,7 +423,9 @@ class TeacherDashboardController extends Controller
             });
 
         // Upcoming exams
-        $upcomingExams = Exam::where('teacher_id', $user->id)
+        $upcomingExams = Exam::whereHas('classSubject', function ($q) use ($user) {
+            $q->forTeacher($user);
+        })
             ->where('is_cancelled', false)
             ->where('scheduled_date', '>', now())
             ->where('scheduled_date', '<=', now()->addDays(7))
@@ -273,7 +447,9 @@ class TeacherDashboardController extends Controller
             });
 
         // Upcoming task deadlines
-        $upcomingDeadlines = Task::where('teacher_id', $user->id)
+        $upcomingDeadlines = Task::whereHas('classSubject', function ($q) use ($user) {
+            $q->forTeacher($user);
+        })
             ->where('is_active', true)
             ->where('due_date', '>', now())
             ->where('due_date', '<=', now()->addDays(7))
@@ -285,7 +461,7 @@ class TeacherDashboardController extends Controller
                 return [
                     'id' => $task->id,
                     'type' => 'task_deadline',
-                    'title' => 'Deadline tugas: ' . $task->title,
+                    'title' => 'Deadline tugas: '.$task->title,
                     'subject' => $task->subject->name,
                     'class' => $task->schoolClass->name,
                     'scheduled_time' => $task->due_date,
@@ -306,9 +482,15 @@ class TeacherDashboardController extends Controller
     {
         // Content creation stats
         $materialsCount = Material::where('teacher_id', $user->id)->count();
-        $tasksCount = Task::where('teacher_id', $user->id)->count();
-        $quizzesCount = Quiz::where('teacher_id', $user->id)->count();
-        $examsCount = Exam::where('teacher_id', $user->id)->count();
+        $tasksCount = Task::whereHas('classSubject', function ($q) use ($user) {
+            $q->forTeacher($user);
+        })->count();
+        $quizzesCount = Quiz::whereHas('classSubject', function ($q) use ($user) {
+            $q->forTeacher($user);
+        })->count();
+        $examsCount = Exam::whereHas('classSubject', function ($q) use ($user) {
+            $q->forTeacher($user);
+        })->count();
 
         // Student engagement stats
         $totalStudents = SchoolClass::whereHas('classSubjects', function ($q) use ($user) {
@@ -324,11 +506,15 @@ class TeacherDashboardController extends Controller
 
         // Grading stats
         $gradedTasks = TaskSubmission::whereHas('task', function ($query) use ($user) {
-            $query->where('teacher_id', $user->id);
+            $query->whereHas('classSubject', function ($q) use ($user) {
+                $q->forTeacher($user);
+            });
         })->whereNotNull('score')->count();
 
         $totalSubmissions = TaskSubmission::whereHas('task', function ($query) use ($user) {
-            $query->where('teacher_id', $user->id);
+            $query->whereHas('classSubject', function ($q) use ($user) {
+                $q->forTeacher($user);
+            });
         })->count();
 
         $gradingCompletionRate = $totalSubmissions > 0 ? round(($gradedTasks / $totalSubmissions) * 100, 1) : 0;
@@ -370,8 +556,8 @@ class TeacherDashboardController extends Controller
 
         // Get recent submissions
         $recentSubmissions = TaskSubmission::whereHas('task', function ($query) use ($class) {
-                $query->where('class_id', $class->id);
-            })
+            $query->where('class_id', $class->id);
+        })
             ->with(['task', 'student'])
             ->latest('submitted_at')
             ->take(10)
@@ -445,10 +631,7 @@ class TeacherDashboardController extends Controller
      */
     public function gradeTask(Task $task)
     {
-        $task->loadMissing('classSubject.subject');
-        if (!$task->classSubject || !$task->classSubject->isTaughtBy(auth()->user())) {
-            abort(403);
-        }
+        Gate::authorize('view', $task);
 
         $task->load(['schoolClass.students', 'subject', 'submissions.student']);
 

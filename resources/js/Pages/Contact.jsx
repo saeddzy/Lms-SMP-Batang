@@ -70,7 +70,11 @@ export default function Contact({ auth }) {
                 />
             </Head>
             <div className="bg-surface text-on-surface overflow-x-hidden">
-                <LandingNavbar auth={auth} current="contact" />
+                <LandingNavbar
+                    key={auth?.user?.id ?? "guest"}
+                    auth={auth}
+                    current="contact"
+                />
                 <main>
                     <section className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 pt-32">
                         <div className="bg-primary/5 absolute left-1/4 top-1/4 -z-10 h-96 w-96 rounded-full blur-[120px]" />
@@ -264,7 +268,7 @@ export default function Contact({ auth }) {
                                 </div>
                             </div>
 
-                            <div className="mt-20 grid gap-8 lg:grid-cols-2">
+                            <div className="mt-20">
                                 <div className="relative overflow-hidden rounded-xl">
                                     <img
                                         alt="Gedung SMP Negeri 3 Batang"
@@ -279,28 +283,6 @@ export default function Contact({ auth }) {
                                             kerja.
                                         </p>
                                     </div>
-                                </div>
-                                <div className="flex flex-col justify-center">
-                                    <p className="font-body mb-4 text-xs uppercase tracking-widest text-slate-500">
-                                        Peta lokasi
-                                    </p>
-                                    <div className="overflow-hidden rounded-xl border border-indigo-100 shadow-sm">
-                                        <iframe
-                                            title="Peta SMP Negeri 3 Batang"
-                                            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3960.7498867103236!2d109.72903811323248!3d-6.920475169654714!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x6b7184d9fc3822fd!2sSMP%20N%203%20BATANG!5e0!3m2!1sid!2sid!4v1569472653245!5m2!1sid!2sid"
-                                            className="h-[320px] w-full"
-                                            loading="lazy"
-                                            referrerPolicy="no-referrer-when-downgrade"
-                                        />
-                                    </div>
-                                    <a
-                                        href="https://www.google.com/maps/search/?api=1&query=SMP+N+3+Batang"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="font-body mt-4 inline-flex text-sm font-medium text-indigo-800 underline hover:text-indigo-600"
-                                    >
-                                        Buka di Google Maps
-                                    </a>
                                 </div>
                             </div>
                         </div>

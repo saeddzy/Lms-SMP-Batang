@@ -8,6 +8,14 @@ use Illuminate\Validation\Rule;
 
 class ProfileUpdateRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $email = $this->input('email');
+        if ($email !== null && trim((string) $email) === '') {
+            $this->merge(['email' => null]);
+        }
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -18,7 +26,7 @@ class ProfileUpdateRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => [
-                'required',
+                'nullable',
                 'string',
                 'lowercase',
                 'email',

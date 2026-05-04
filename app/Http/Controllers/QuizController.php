@@ -2,20 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Quiz;
-use App\Models\Subject;
-use App\Models\SchoolClass;
 use App\Models\ClassSubject;
+use App\Models\Quiz;
 use App\Models\QuizAttempt;
 use App\Models\QuizAttemptAnswer;
 use App\Models\QuizQuestion;
+use App\Models\SchoolClass;
+use App\Models\Subject;
+use App\Models\User;
 use App\Support\AttemptScoreCalculator;
 use App\Support\AttemptStatusHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
-use Carbon\Carbon;
 
 class QuizController extends Controller
 {
@@ -41,7 +41,7 @@ class QuizController extends Controller
 
         // Filter by subject
         if ($request->filled('subject_id')) {
-            $query->whereHas('classSubject', function($q) use ($request) {
+            $query->whereHas('classSubject', function ($q) use ($request) {
                 $q->where('subject_id', $request->subject_id);
             });
         }
@@ -51,9 +51,14 @@ class QuizController extends Controller
             $query->where('class_id', $request->class_id);
         }
 
+        // Filter by quiz creator/teacher (admin use-case)
+        if ($request->filled('teacher_id')) {
+            $query->where('created_by', (int) $request->teacher_id);
+        }
+
         // Filter by teacher (for teachers, only show their quizzes)
         if (auth()->user()->hasRole('guru')) {
-            $query->whereHas('classSubject', function($q) {
+            $query->whereHas('classSubject', function ($q) {
                 $q->forTeacher(auth()->user());
             });
         }
@@ -63,8 +68,8 @@ class QuizController extends Controller
             switch ($request->status) {
                 case 'active':
                     $query->where('is_active', true)
-                          ->where('start_time', '<=', now())
-                          ->where('end_time', '>', now());
+                        ->where('start_time', '<=', now())
+                        ->where('end_time', '>', now());
                     break;
                 case 'upcoming':
                     $query->where('start_time', '>', now());
@@ -80,10 +85,17 @@ class QuizController extends Controller
 
         // Search by title or description
         if ($request->filled('search')) {
-            $search = $request->search;
+            $search = trim((string) $request->search);
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhereHas('subject', function ($subjectQuery) use ($search) {
+                        $subjectQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('schoolClass', function ($classQuery) use ($search) {
+                        $classQuery->where('name', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -108,11 +120,11 @@ class QuizController extends Controller
         });
 
         if (auth()->user()->hasRole('guru')) {
-            $subjects = Subject::whereHas('classSubjects', function($q) {
+            $subjects = Subject::whereHas('classSubjects', function ($q) {
                 $q->forTeacher(auth()->user());
             })->where('is_active', true)->get();
 
-            $classes = SchoolClass::whereHas('classSubjects', function($q) {
+            $classes = SchoolClass::whereHas('classSubjects', function ($q) {
                 $q->forTeacher(auth()->user());
             })->where('is_active', true)->distinct()->get();
         } elseif (auth()->user()->hasRole('siswa')) {
@@ -126,11 +138,17 @@ class QuizController extends Controller
             $classes = SchoolClass::where('is_active', true)->get();
         }
 
+        $teachers = User::role('guru')
+            ->select('id', 'name', 'email', 'nis', 'nip')
+            ->orderBy('name')
+            ->get();
+
         return Inertia::render('Quizzes/Index', [
             'quizzes' => $quizzes,
             'subjects' => $subjects,
             'classes' => $classes,
-            'filters' => $request->only(['subject_id', 'class_id', 'search', 'status'])
+            'teachers' => $teachers,
+            'filters' => $request->only(['subject_id', 'class_id', 'teacher_id', 'search', 'status']),
         ]);
     }
 
@@ -144,12 +162,12 @@ class QuizController extends Controller
         // Teachers can only access subjects and classes they teach
         if (auth()->user()->hasRole('guru')) {
             // Get only subjects where the teacher is assigned
-            $subjects = Subject::whereHas('classSubjects', function($q) {
+            $subjects = Subject::whereHas('classSubjects', function ($q) {
                 $q->forTeacher(auth()->user());
             })->where('is_active', true)->get();
 
             // Get only classes where the teacher teaches
-            $classes = SchoolClass::whereHas('classSubjects', function($q) {
+            $classes = SchoolClass::whereHas('classSubjects', function ($q) {
                 $q->forTeacher(auth()->user());
             })->where('is_active', true)->distinct()->get();
         } else {
@@ -177,6 +195,7 @@ class QuizController extends Controller
             'classes' => $classes,
             'selectedClassId' => $selectedClassId,
             'selectedSubjectId' => $selectedSubjectId,
+            'classSubjectsMap' => $this->buildClassSubjectsMap($classes),
         ]);
     }
 
@@ -209,7 +228,7 @@ class QuizController extends Controller
             ->where('subject_id', $validated['subject_id'])
             ->first();
 
-        if (!$classSubject) {
+        if (! $classSubject) {
             return back()->withErrors(['subject_id' => 'Mata pelajaran tidak ditemukan untuk kelas ini.']);
         }
 
@@ -244,6 +263,7 @@ class QuizController extends Controller
     public function show(Quiz $quiz)
     {
         Gate::authorize('view', $quiz);
+        $isStudent = auth()->user()->hasRole('siswa');
 
         $load = [
             'subject',
@@ -252,14 +272,14 @@ class QuizController extends Controller
             'creator',
             'questions' => fn ($q) => $q->orderBy('order'),
         ];
-        if (auth()->user()->can('quizzes view_results') && !auth()->user()->hasRole('siswa')) {
+        if (auth()->user()->can('quizzes view_results') && ! $isStudent) {
             $load[] = 'schoolClass.students';
         }
         $quiz->load($load);
         $quiz->loadMissing('classSubject');
 
         // Load attempts for teachers and admins
-        if (auth()->user()->can('quizzes view_results') && !auth()->user()->hasRole('siswa')) {
+        if (auth()->user()->can('quizzes view_results') && ! $isStudent) {
             $attempts = $quiz->attempts()
                 ->with(['student', 'answers.question'])
                 ->orderBy('started_at', 'desc')
@@ -277,7 +297,7 @@ class QuizController extends Controller
         $canManageQuiz = auth()->user()->hasRole('admin')
             || ($cs && $cs->isAssignedSlotTeacher(auth()->user()));
 
-        return Inertia::render('Quizzes/Show', [
+        return Inertia::render($isStudent ? 'Student/QuizDetail' : 'Quizzes/Show', [
             'quiz' => $quiz,
             'attempts' => $attempts ?? [],
             'canManageQuiz' => $canManageQuiz,
@@ -293,11 +313,11 @@ class QuizController extends Controller
 
         // Teachers can only edit quizzes for subjects they teach
         if (auth()->user()->hasRole('guru')) {
-            $subjects = Subject::whereHas('classSubjects', function($q) {
+            $subjects = Subject::whereHas('classSubjects', function ($q) {
                 $q->forTeacher(auth()->user());
             })->where('is_active', true)->get();
 
-            $classes = SchoolClass::whereHas('classSubjects', function($q) {
+            $classes = SchoolClass::whereHas('classSubjects', function ($q) {
                 $q->forTeacher(auth()->user());
             })->where('is_active', true)->distinct()->get();
         } else {
@@ -315,7 +335,34 @@ class QuizController extends Controller
             'quiz' => $quizPayload,
             'subjects' => $subjects,
             'classes' => $classes,
+            'classSubjectsMap' => $this->buildClassSubjectsMap($classes),
         ]);
+    }
+
+    private function buildClassSubjectsMap($classes): array
+    {
+        $classIds = collect($classes)->pluck('id')->filter()->values();
+        if ($classIds->isEmpty()) {
+            return [];
+        }
+
+        return ClassSubject::query()
+            ->with('subject:id,name,is_active')
+            ->whereIn('class_id', $classIds)
+            ->where('is_active', true)
+            ->get(['id', 'class_id', 'subject_id'])
+            ->groupBy('class_id')
+            ->map(function ($rows) {
+                return $rows
+                    ->map(fn ($row) => [
+                        'id' => $row->subject_id,
+                        'name' => $row->subject?->name,
+                    ])
+                    ->filter(fn ($subject) => ! empty($subject['id']) && ! empty($subject['name']))
+                    ->values()
+                    ->all();
+            })
+            ->toArray();
     }
 
     /**
@@ -346,7 +393,7 @@ class QuizController extends Controller
             ->where('subject_id', $validated['subject_id'])
             ->first();
 
-        if (!$classSubject) {
+        if (! $classSubject) {
             return back()->withErrors(['subject_id' => 'Mata pelajaran tidak ditemukan untuk kelas ini.']);
         }
 
@@ -392,16 +439,16 @@ class QuizController extends Controller
     public function startAttempt(Quiz $quiz)
     {
         // Check if user is a student and enrolled in the class
-        if (!auth()->user()->hasRole('siswa')) {
+        if (! auth()->user()->hasRole('siswa')) {
             abort(403, 'Hanya siswa yang dapat mengerjakan kuis.');
         }
 
-        if (!$quiz->schoolClass->students()->where('users.id', auth()->id())->exists()) {
+        if (! $quiz->schoolClass->students()->where('users.id', auth()->id())->exists()) {
             abort(403, 'Anda tidak terdaftar di kelas ini.');
         }
 
         // Check if quiz is active and within time limits
-        if (!$quiz->is_active) {
+        if (! $quiz->is_active) {
             return back()->with('error', 'Kuis tidak aktif.');
         }
 
@@ -439,12 +486,43 @@ class QuizController extends Controller
     }
 
     /**
-     * Show quiz attempt page
+     * Show quiz attempt page (siswa mengerjakan) atau ringkasan review (guru/admin).
      */
     public function attempt(Quiz $quiz, QuizAttempt $attempt)
     {
-        // Verify ownership
-        if ($attempt->student_id !== auth()->id() || $attempt->quiz_id !== $quiz->id) {
+        if ((int) $attempt->quiz_id !== (int) $quiz->id) {
+            abort(404);
+        }
+
+        $user = auth()->user();
+        $isStudent = $user->hasRole('siswa');
+
+        // Guru / admin: lihat jawaban siswa (bukan halaman mengerjakan)
+        $canReviewAttempt = ! $isStudent && (
+            $user->can('quizzes view_results')
+            || ($user->hasRole('admin') && $user->can('quizzes view'))
+        );
+        if ($canReviewAttempt) {
+            Gate::authorize('view', $quiz);
+            if (! $attempt->finished_at) {
+                return redirect()->route('quizzes.show', $quiz)
+                    ->with('error', 'Percobaan belum selesai.');
+            }
+
+            $quiz->load(['questions' => fn ($q) => $q->orderBy('order')]);
+            $attempt->load([
+                'student',
+                'answers' => fn ($q) => $q->with('question')->orderBy('question_id'),
+            ]);
+
+            return Inertia::render('Quizzes/AttemptReview', [
+                'quiz' => $quiz,
+                'attempt' => $attempt,
+            ]);
+        }
+
+        // Siswa: hanya attempt milik sendiri
+        if ((int) $attempt->student_id !== (int) $user->id) {
             abort(403);
         }
 
@@ -458,6 +536,7 @@ class QuizController extends Controller
         $timeLimit = $attempt->started_at->copy()->addMinutes((int) ($quiz->time_limit ?? 60));
         if (now() > $timeLimit) {
             $attempt->update(['finished_at' => now()]);
+
             return redirect()->route('quizzes.show', $quiz)
                 ->with('error', 'Waktu pengerjaan kuis sudah habis.');
         }
@@ -563,13 +642,7 @@ class QuizController extends Controller
     public function manualGradeAttempt(Quiz $quiz, QuizAttempt $attempt)
     {
         Gate::authorize('quizzes grade');
-
-        $quiz->loadMissing('classSubject.subject');
-        if (! auth()->user()->hasRole('guru')
-            || ! $quiz->classSubject
-            || ! $quiz->classSubject->isTaughtBy(auth()->user())) {
-            abort(403);
-        }
+        Gate::authorize('view', $quiz);
 
         if ($attempt->quiz_id !== $quiz->id) {
             abort(404);
@@ -604,13 +677,7 @@ class QuizController extends Controller
     public function saveManualGradeAttempt(Request $request, Quiz $quiz, QuizAttempt $attempt)
     {
         Gate::authorize('quizzes grade');
-
-        $quiz->loadMissing('classSubject.subject');
-        if (! auth()->user()->hasRole('guru')
-            || ! $quiz->classSubject
-            || ! $quiz->classSubject->isTaughtBy(auth()->user())) {
-            abort(403);
-        }
+        Gate::authorize('view', $quiz);
 
         if ($attempt->quiz_id !== $quiz->id) {
             abort(404);
@@ -635,14 +702,23 @@ class QuizController extends Controller
             }
 
             $max = (float) $ans->question->points;
-            if ((float) $row['points_awarded'] > $max) {
+            $pointsAwarded = (float) $row['points_awarded'];
+            if (abs($max - $pointsAwarded) < 0.011) {
+                $pointsAwarded = $max;
+            }
+            if (abs($pointsAwarded) < 0.011) {
+                $pointsAwarded = 0.0;
+            }
+            $pointsAwarded = round($pointsAwarded, 2);
+
+            if ($pointsAwarded > $max) {
                 throw ValidationException::withMessages([
                     "grades.{$index}.points_awarded" => "Maksimal {$max} poin untuk soal ini.",
                 ]);
             }
 
             $ans->update([
-                'points_awarded' => $row['points_awarded'],
+                'points_awarded' => $pointsAwarded,
                 'teacher_feedback' => $row['teacher_feedback'] ?? null,
                 'graded_at' => now(),
                 'graded_by' => auth()->id(),
@@ -652,6 +728,7 @@ class QuizController extends Controller
         $attempt->refresh();
         $totals = AttemptScoreCalculator::forQuizAttempt($attempt->load('answers.question'));
         $attempt->update([
+            'attempt_status' => 'finished',
             'score' => $totals['percent'],
             'passed' => $totals['percent'] >= (float) $quiz->passing_score,
         ]);
@@ -666,7 +743,7 @@ class QuizController extends Controller
     {
         Gate::authorize('update', $quiz);
 
-        $quiz->update(['is_active' => !$quiz->is_active]);
+        $quiz->update(['is_active' => ! $quiz->is_active]);
 
         $status = $quiz->is_active ? 'diaktifkan' : 'dinonaktifkan';
 
@@ -684,9 +761,40 @@ class QuizController extends Controller
         $this->assertQuizPointsBudget($quiz, (float) $data['points']);
         $order = (int) ($quiz->questions()->max('order') ?? 0) + 1;
         $quiz->questions()->create(array_merge($data, ['order' => $order]));
-        $quiz->update(['total_questions' => $quiz->questions()->count()]);
 
         return back()->with('success', 'Soal berhasil ditambahkan.');
+    }
+
+    /**
+     * Tambah banyak soal kuis sekaligus (wizard berurutan).
+     */
+    public function storeQuestionsBatch(Request $request, Quiz $quiz)
+    {
+        Gate::authorize('update', $quiz);
+
+        $validated = $request->validate([
+            'questions' => ['required', 'array', 'min:1'],
+            'questions.*.question_text' => ['required', 'string'],
+            'questions.*.question_type' => ['required', 'in:multiple_choice,true_false,short_answer,essay'],
+            'questions.*.options' => ['nullable', 'array'],
+            'questions.*.options.*' => ['nullable', 'string'],
+            'questions.*.correct_answer' => ['nullable', 'string', 'max:10000'],
+            'questions.*.points' => ['nullable', 'numeric', 'min:0', 'max:1000'],
+            'questions.*.explanation' => ['nullable', 'string'],
+        ]);
+
+        $nextOrder = (int) ($quiz->questions()->max('order') ?? 0) + 1;
+
+        foreach ($validated['questions'] as $row) {
+            $itemRequest = new Request($row);
+            $data = $this->prepareQuizQuestionData($itemRequest);
+            $this->assertQuizPointsBudget($quiz, (float) $data['points']);
+            $quiz->questions()->create(array_merge($data, ['order' => $nextOrder]));
+            $nextOrder++;
+            $quiz->refresh();
+        }
+
+        return back()->with('success', 'Semua soal berhasil disimpan.');
     }
 
     /**
@@ -706,7 +814,6 @@ class QuizController extends Controller
             $data['order'] = (int) $request->input('order');
         }
         $question->update($data);
-        $quiz->update(['total_questions' => $quiz->questions()->count()]);
 
         return back()->with('success', 'Soal berhasil diperbarui.');
     }
@@ -723,7 +830,6 @@ class QuizController extends Controller
         }
 
         $question->delete();
-        $quiz->update(['total_questions' => $quiz->questions()->count()]);
 
         return back()->with('success', 'Soal berhasil dihapus.');
     }
@@ -764,7 +870,7 @@ class QuizController extends Controller
                 ]);
             }
             $ca = (string) $validated['correct_answer'];
-            if (!ctype_digit($ca) || (int) $ca < 0 || (int) $ca >= count($opts)) {
+            if (! ctype_digit($ca) || (int) $ca < 0 || (int) $ca >= count($opts)) {
                 throw ValidationException::withMessages([
                     'correct_answer' => 'Jawaban benar harus memilih salah satu opsi (indeks 0, 1, …).',
                 ]);
@@ -777,7 +883,7 @@ class QuizController extends Controller
                 ]);
             }
             $ca = strtolower(trim((string) $validated['correct_answer']));
-            if (!in_array($ca, ['true', 'false'], true)) {
+            if (! in_array($ca, ['true', 'false'], true)) {
                 throw ValidationException::withMessages([
                     'correct_answer' => 'Untuk benar/salah, isi jawaban benar dengan true atau false.',
                 ]);

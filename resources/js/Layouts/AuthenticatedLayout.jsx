@@ -5,6 +5,8 @@ import ResponsiveNavLink from "@/Components/ResponsiveNavLink";
 import { Link, usePage } from "@inertiajs/react";
 import { useState } from "react";
 import hasAnyPermission from "@/Utils/Permissions";
+import { userCompactLogin } from "@/Utils/userDisplay";
+
 export default function AuthenticatedLayout({ header, children }) {
     const user = usePage().props.auth.user;
 
@@ -189,7 +191,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                 {user.name}
                             </div>
                             <div className="text-sm font-medium text-gray-500">
-                                {user.email}
+                                {userCompactLogin(user) || "—"}
                             </div>
                         </div>
 

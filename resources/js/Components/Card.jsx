@@ -1,18 +1,20 @@
 import React from "react";
 import clsx from "clsx";
 
-function Card({ title, children, className }) {
+function Card({ title, children, className, darkTheme = true }) {
     return (
         <div
             className={clsx(
-                "overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-sm",
+                darkTheme 
+                    ? "overflow-hidden rounded-2xl border-[rgba(20,96,190,0.25)] bg-gradient-to-br from-[#154497] to-[#1460BE] shadow-[rgba(20,96,190,0.35)] transition-all duration-300 hover:border-[rgba(20,96,190,0.4)] hover:shadow-[rgba(20,96,190,0.5)] hover:-translate-y-1"
+                    : "overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-sm",
                 className
             )}
         >
             {title ? (
                 <>
-                    <div className="border-b border-stone-100 px-6 py-4">
-                        <div className="text-sm font-semibold tracking-tight text-stone-900 capitalize">
+                    <div className={darkTheme ? "border-b border-[rgba(20,96,190,0.3)] bg-gradient-to-r from-[rgba(15,47,107,0.8)] to-[rgba(21,68,151,0.6)] px-6 py-4" : "border-b border-stone-100 px-6 py-4"}>
+                        <div className={darkTheme ? "text-sm font-semibold tracking-tight text-white capitalize" : "text-sm font-semibold tracking-tight text-stone-900 capitalize"}>
                             {title}
                         </div>
                     </div>
@@ -25,11 +27,13 @@ function Card({ title, children, className }) {
     );
 }
 
-function CardHeader({ children, className }) {
+function CardHeader({ children, className, darkTheme = true }) {
     return (
         <div
             className={clsx(
-                "border-b border-stone-100 bg-white px-6 py-5",
+                darkTheme 
+                    ? "border-b border-[rgba(20,96,190,0.3)] bg-gradient-to-r from-[rgba(15,47,107,0.8)] to-[rgba(21,68,151,0.6)] px-6 py-5"
+                    : "border-b border-stone-100 bg-white px-6 py-5",
                 className
             )}
         >
@@ -38,11 +42,13 @@ function CardHeader({ children, className }) {
     );
 }
 
-function CardTitle({ children, className }) {
+function CardTitle({ children, className, darkTheme = true }) {
     return (
         <h3
             className={clsx(
-                "text-lg font-semibold tracking-tight text-stone-900",
+                darkTheme 
+                    ? "text-lg font-semibold tracking-tight text-white"
+                    : "text-lg font-semibold tracking-tight text-stone-900",
                 className
             )}
         >
@@ -51,9 +57,14 @@ function CardTitle({ children, className }) {
     );
 }
 
-function CardDescription({ children, className }) {
+function CardDescription({ children, className, darkTheme = true }) {
     return (
-        <p className={clsx("mt-1 text-sm text-stone-500", className)}>
+        <p className={clsx(
+            darkTheme 
+                ? "mt-1 text-sm text-[#B6D4FF]"
+                : "mt-1 text-sm text-stone-500",
+            className
+        )}>
             {children}
         </p>
     );

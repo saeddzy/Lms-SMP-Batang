@@ -1,285 +1,301 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
-import { Head, usePage } from "@inertiajs/react";
+import { Head, Link, usePage } from "@inertiajs/react";
+import {
+    IconArrowUpRight,
+    IconCalendarEvent,
+    IconChecklist,
+    IconClipboardText,
+    IconEditCircle,
+    IconFilePlus,
+    IconNotebook,
+    IconSchool,
+    IconUsers,
+} from "@tabler/icons-react";
 
-function StatBlock({ label, hint, value, suffix = "" }) {
+const THEME = {
+    primary: "#163d8f",
+    secondary: "#2563eb",
+    light: "#dbeafe",
+    bg: "#f8fafc",
+    text: "#0f172a",
+    border: "#e5e7eb",
+};
+
+function formatValue(value, suffix = "") {
+    if (typeof value === "number") return `${value.toLocaleString("id-ID")}${suffix}`;
+    return `${value ?? 0}${suffix}`;
+}
+
+function ProgressDonut({ value = 0 }) {
+    const normalized = Math.max(0, Math.min(100, Number(value) || 0));
+    const donutStyle = {
+        background: `conic-gradient(${THEME.primary} ${normalized * 3.6}deg, ${THEME.light} 0deg)`,
+    };
+
     return (
-        <div className="rounded-2xl border border-stone-200/80 bg-white p-6 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-wider text-stone-500">
-                {label}
-            </p>
-            <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-stone-900">
-                {value}
-                {suffix}
-            </p>
-            <p className="mt-1 text-sm text-stone-500">{hint}</p>
+        <div className="relative mx-auto h-36 w-36">
+            <div className="h-full w-full rounded-full shadow-sm" style={donutStyle} />
+            <div className="absolute inset-3 flex items-center justify-center rounded-full bg-white">
+                <span className="text-3xl font-semibold text-slate-900">{normalized}%</span>
+            </div>
         </div>
     );
 }
 
-function Panel({ title, children }) {
+function StatBlock({ label, hint, value, suffix = "", trend, icon: Icon }) {
+    const isPositive = trend >= 0;
+
     return (
-        <section className="overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-sm">
-            <div className="border-b border-stone-100 px-6 py-4">
-                <h2 className="text-sm font-semibold text-stone-900">{title}</h2>
+        <div className="rounded-[20px] border border-[#e5e7eb] bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(15,23,42,0.10)]">
+            <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+                <span
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full"
+                    style={{ backgroundColor: THEME.light, color: THEME.primary }}
+                >
+                    <Icon className="h-4 w-4" stroke={1.8} />
+                </span>
             </div>
-            <div className="p-6">{children}</div>
+
+            <p className="mt-3 text-3xl font-semibold tabular-nums tracking-tight text-slate-900">
+                {formatValue(value, suffix)}
+            </p>
+
+            <div className="mt-2 flex items-center justify-between">
+                <p className="text-sm text-slate-500">{hint}</p>
+                <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold ${
+                        isPositive ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+                    }`}
+                >
+                    <IconArrowUpRight className={`h-3 w-3 ${isPositive ? "" : "rotate-90"}`} stroke={1.8} />
+                    {Math.abs(trend)}%
+                </span>
+            </div>
+        </div>
+    );
+}
+
+function Panel({ title, children, icon: Icon, rightAction }) {
+    return (
+        <section className="overflow-hidden rounded-[20px] border border-[#e5e7eb] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-300 hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)]">
+            <div className="flex items-center justify-between border-b border-[#e5e7eb] bg-slate-50 px-5 py-4">
+                <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-[#0f172a]">
+                    {Icon ? <Icon className="h-4 w-4 text-[#163d8f]" stroke={1.8} /> : null}
+                    {title}
+                </h2>
+                {rightAction ? (
+                    <Link
+                        href={rightAction.href}
+                        className="text-xs font-semibold transition-colors hover:opacity-90"
+                        style={{ color: THEME.primary }}
+                    >
+                        {rightAction.label}
+                    </Link>
+                ) : null}
+            </div>
+            <div className="p-5">{children}</div>
         </section>
     );
 }
 
+function EmptyState({ text }) {
+    return <p className="py-8 text-center text-sm text-slate-500">{text}</p>;
+}
+
+function formatDeadlineLabel(rawDeadline = "") {
+    const text = String(rawDeadline).toLowerCase();
+    if (text.includes("lalu") || text.includes("ago")) return "deadline lewat";
+    if (text.includes("hari ini") || text.includes("today")) return "deadline hari ini";
+    return rawDeadline || "-";
+}
+
+function getClockParts(now) {
+    return {
+        day: now.toLocaleDateString("id-ID", { weekday: "long" }),
+        date: now.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
+        time: now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    };
+}
+
 export default function TeacherDashboard() {
     const {
-        stats,
-        recentActivities,
-        classPerformance,
-        pendingTasks,
+        stats = {},
+        classPerformance = [],
+        pendingTasks = [],
+        upcomingSchedules = [],
+        taughtClasses = [],
         auth = {},
     } = usePage().props;
+
     const canMutate = auth.canMutateTeachingContent ?? false;
+    const [now, setNow] = useState(() => new Date());
+
+    useEffect(() => {
+        const id = window.setInterval(() => setNow(new Date()), 1000);
+        return () => window.clearInterval(id);
+    }, []);
+
+    const clock = useMemo(() => getClockParts(now), [now]);
+
+    const statCards = useMemo(
+        () => [
+            { label: "Total Siswa", value: stats.totalStudents ?? 0, hint: "Siswa aktif yang diajar", trend: 12, icon: IconUsers },
+            { label: "Kelas Aktif", value: stats.totalClasses ?? 0, hint: "Rombel berjalan", trend: 5, icon: IconSchool },
+            { label: "Tugas Perlu Dinilai", value: stats.pendingSubmissions ?? 0, hint: "Perlu ditindak sekarang", trend: -8, icon: IconChecklist },
+            { label: "Rata-rata Nilai", value: stats.averageClassGrade ?? 0, hint: "Rerata tugas dinilai", suffix: "%", trend: 6, icon: IconClipboardText },
+        ],
+        [stats]
+    );
 
     return (
         <DashboardLayout title="Dashboard Guru">
             <Head title="Dashboard Guru" />
 
-            <div className="space-y-8">
-                <div className="rounded-2xl border border-stone-200/80 bg-white px-8 py-10 shadow-sm">
-                    <h1 className="text-2xl font-semibold tracking-tight text-stone-900">
-                        Dashboard guru
-                    </h1>
-                    <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-500">
-                        Kelola kelas, tugas, dan pantau perkembangan siswa Anda.
-                    </p>
-                </div>
-
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
-                    <StatBlock
-                        label="Siswa"
-                        hint="Yang Anda ajar"
-                        value={stats?.totalStudents ?? 0}
-                    />
-                    <StatBlock
-                        label="Kelas"
-                        hint="Kelas aktif"
-                        value={stats?.totalClasses ?? 0}
-                    />
-                    <StatBlock
-                        label="Tugas"
-                        hint="Total tugas dibuat"
-                        value={stats?.totalTasks ?? 0}
-                    />
-                    <StatBlock
-                        label="Rata nilai"
-                        hint="Rata-rata kelas"
-                        value={stats?.averageClassGrade ?? 0}
-                        suffix="%"
-                    />
-                </div>
-
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    <Panel title="Performa kelas">
-                        {classPerformance && classPerformance.length > 0 ? (
-                            <ul className="space-y-3">
-                                {classPerformance.map((classData, i) => (
-                                    <li
-                                        key={i}
-                                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-100 bg-stone-50/40 px-4 py-3"
-                                    >
-                                        <div>
-                                            <p className="text-sm font-medium text-stone-900">
-                                                {classData.name}
-                                            </p>
-                                            <p className="text-xs text-stone-500">
-                                                {classData.subject}
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                            <div className="text-right">
-                                                <p className="text-lg font-semibold tabular-nums text-stone-900">
-                                                    {classData.averageGrade}%
-                                                </p>
-                                                <p className="text-xs text-stone-500">
-                                                    {classData.totalStudents} siswa
-                                                </p>
-                                            </div>
-                                            <div
-                                                className="h-2 w-14 overflow-hidden rounded-full bg-stone-200"
-                                                title={`${classData.averageGrade}%`}
-                                            >
-                                                <div
-                                                    className="h-full rounded-full bg-stone-700"
-                                                    style={{
-                                                        width: `${Math.min(100, classData.averageGrade)}%`,
-                                                    }}
-                                                />
-                                            </div>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <p className="py-6 text-center text-sm text-stone-500">
-                                Belum ada data performa kelas
+            <div className="mx-auto max-w-7xl space-y-6 pb-6" style={{ backgroundColor: THEME.bg }}>
+                <section
+                    className="animate-[fadeIn_500ms_ease-out] rounded-[24px] border px-7 py-6 shadow-[0_16px_38px_rgba(22,61,143,0.22)]"
+                    style={{
+                        borderColor: "rgba(219,234,254,0.45)",
+                        background: "linear-gradient(120deg, #163d8f 0%, #1e4fb5 62%, #2563eb 100%)",
+                    }}
+                >
+                    <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-blue-100">Selamat datang kembali, Pak Gunawan</p>
+                            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-white">Dashboard Guru</h1>
+                            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-blue-100">
+                                Kelola kelas, tugas, dan aktivitas belajar hari ini dengan lebih mudah.
                             </p>
-                        )}
-                    </Panel>
-
-                    <Panel title="Tugas menunggu penilaian">
-                        {pendingTasks && pendingTasks.length > 0 ? (
-                            <ul className="space-y-3">
-                                {pendingTasks.map((task, i) => (
-                                    <li
-                                        key={i}
-                                        className="rounded-xl border border-stone-100 px-4 py-3"
-                                    >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <p className="text-sm font-medium text-stone-900">
-                                                    {task.title}
-                                                </p>
-                                                <p className="text-xs text-stone-500">
-                                                    {task.class} · {task.subject}
-                                                </p>
-                                                <p className="text-xs text-stone-500">
-                                                    Deadline: {task.deadline}
-                                                </p>
-                                            </div>
-                                            <span className="shrink-0 rounded-lg bg-stone-100 px-2 py-1 text-xs font-medium text-stone-700">
-                                                {task.submissions} belum dinilai
-                                            </span>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <p className="py-6 text-center text-sm text-stone-500">
-                                Tidak ada tugas yang menunggu penilaian
-                            </p>
-                        )}
-                    </Panel>
-                </div>
-
-                <Panel title="Aktivitas terbaru">
-                    {recentActivities && recentActivities.length > 0 ? (
-                        <ul className="space-y-4">
-                            {recentActivities.map((activity, i) => (
-                                <li key={i} className="flex gap-3">
-                                    <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-stone-300" />
-                                    <div className="min-w-0">
-                                        <p className="text-sm text-stone-800">
-                                            {activity.description}
-                                        </p>
-                                        <p className="text-xs text-stone-500">
-                                            {activity.time}
-                                        </p>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    ) : (
-                        <p className="py-6 text-center text-sm text-stone-500">
-                            Belum ada aktivitas terbaru
-                        </p>
-                    )}
-                </Panel>
-
-                <Panel title="Aksi cepat">
-                    {canMutate ? (
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                        <a
-                            href={route("tasks.create")}
-                            className="flex items-center gap-3 rounded-xl border border-stone-200/80 p-4 transition-colors hover:border-stone-300 hover:bg-stone-50"
-                        >
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-stone-600">
-                                <svg
-                                    className="h-5 w-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={1.5}
-                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                                    />
-                                </svg>
-                            </span>
-                            <div>
-                                <h4 className="text-sm font-medium text-stone-900">
-                                    Buat tugas
-                                </h4>
-                                <p className="text-xs text-stone-500">
-                                    Untuk siswa
-                                </p>
+                        </div>
+                        <div className="grid w-full max-w-sm grid-cols-3 gap-3">
+                            <div className="rounded-xl border border-white/25 bg-white/10 px-3 py-2 text-center backdrop-blur-sm">
+                                <p className="text-[11px] uppercase tracking-wide text-blue-100">Hari</p>
+                                <p className="mt-1 text-sm font-semibold text-white">{clock.day}</p>
                             </div>
-                        </a>
-                        <a
-                            href={route("quizzes.create")}
-                            className="flex items-center gap-3 rounded-xl border border-stone-200/80 p-4 transition-colors hover:border-stone-300 hover:bg-stone-50"
-                        >
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-stone-600">
-                                <svg
-                                    className="h-5 w-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={1.5}
-                                        d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                                    />
-                                </svg>
-                            </span>
-                            <div>
-                                <h4 className="text-sm font-medium text-stone-900">
-                                    Buat kuis
-                                </h4>
-                                <p className="text-xs text-stone-500">
-                                    Evaluasi singkat
-                                </p>
+                            <div className="rounded-xl border border-white/25 bg-white/10 px-3 py-2 text-center backdrop-blur-sm">
+                                <p className="text-[11px] uppercase tracking-wide text-blue-100">Tanggal</p>
+                                <p className="mt-1 text-sm font-semibold text-white">{clock.date}</p>
                             </div>
-                        </a>
-                        <a
-                            href={route("materials.create")}
-                            className="flex items-center gap-3 rounded-xl border border-stone-200/80 p-4 transition-colors hover:border-stone-300 hover:bg-stone-50"
-                        >
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-stone-600">
-                                <svg
-                                    className="h-5 w-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={1.5}
-                                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                                    />
-                                </svg>
-                            </span>
-                            <div>
-                                <h4 className="text-sm font-medium text-stone-900">
-                                    Unggah materi
-                                </h4>
-                                <p className="text-xs text-stone-500">
-                                    Berbagi ke siswa
-                                </p>
+                            <div className="rounded-xl border border-white/25 bg-white/10 px-3 py-2 text-center backdrop-blur-sm">
+                                <p className="text-[11px] uppercase tracking-wide text-blue-100">Jam</p>
+                                <p className="mt-1 text-sm font-semibold text-white">{clock.time}</p>
                             </div>
-                        </a>
+                        </div>
                     </div>
-                    ) : (
-                        <p className="text-sm text-stone-500">
-                            Anda terdaftar sebagai wali kelas tanpa slot mengajar di
-                            kelas–mapel manapun. Untuk menambah materi/tugas/kuis, admin
-                            harus menetapkan Anda sebagai guru pengampu pada mapel
-                            tersebut di halaman edit kelas.
-                        </p>
-                    )}
-                </Panel>
+                </section>
+
+                <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    {statCards.map((item) => (
+                        <StatBlock key={item.label} {...item} />
+                    ))}
+                </section>
+
+                <section className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+                    <Panel title="Aksi Cepat" icon={IconEditCircle}>
+                        {canMutate ? (
+                            <div className="grid grid-cols-1 gap-3">
+                                <Link href={route("materials.create")} className="rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-all duration-300 hover:-translate-y-0.5 hover:bg-blue-50 hover:text-blue-700">Upload Materi</Link>
+                                <Link href={route("tasks.create")} className="rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-all duration-300 hover:-translate-y-0.5 hover:bg-blue-50 hover:text-blue-700">Buat Tugas</Link>
+                                <Link href={route("quizzes.create")} className="rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-all duration-300 hover:-translate-y-0.5 hover:bg-blue-50 hover:text-blue-700">Buat Kuis</Link>
+                                <Link href={route("grades.index")} className="rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-all duration-300 hover:-translate-y-0.5 hover:bg-blue-50 hover:text-blue-700">Input Nilai</Link>
+                            </div>
+                        ) : (
+                            <EmptyState text="Aksi cepat tersedia setelah kelas/mapel aktif terhubung ke akun Anda." />
+                        )}
+                    </Panel>
+
+                    <Panel title="Kelas yang Anda Ajar" icon={IconSchool}>
+                        {taughtClasses.length > 0 ? (
+                            <ul className="space-y-3">
+                                {taughtClasses.map((cls) => (
+                                    <li key={cls.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm">
+                                        <span className="font-semibold text-slate-800">{cls.name}</span>
+                                        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">{cls.students_count ?? 0} siswa</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <EmptyState text="Belum ada kelas mengajar untuk akun guru ini." />
+                        )}
+                    </Panel>
+
+                    <Panel title="Insight Nilai" icon={IconNotebook}>
+                        <ProgressDonut value={stats.averageClassGrade ?? 0} />
+                        <p className="mt-4 text-center text-sm font-medium text-slate-700">Rata-rata nilai tugas minggu ini</p>
+                    </Panel>
+                </section>
+
+                <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                    <Panel title="Performa Kelas" icon={IconSchool}>
+                        {classPerformance.length > 0 ? (
+                            <ul className="space-y-4">
+                                {classPerformance.map((item) => (
+                                    <li key={item.id}>
+                                        <div className="mb-2 flex items-center justify-between">
+                                            <span className="text-sm font-semibold text-slate-800">{item.name}</span>
+                                            <span className="text-sm font-semibold text-slate-700">{item.averageGrade}%</span>
+                                        </div>
+                                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                            <div
+                                                className="h-full rounded-full"
+                                                style={{
+                                                    width: `${Math.max(0, Math.min(100, Number(item.averageGrade) || 0))}%`,
+                                                    backgroundImage: "linear-gradient(90deg, #163d8f 0%, #2563eb 100%)",
+                                                }}
+                                            />
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <EmptyState text="Belum ada data performa kelas." />
+                        )}
+                    </Panel>
+
+                    <Panel title="Tugas Menunggu Penilaian" icon={IconFilePlus} rightAction={{ href: route("grades.index"), label: "Lihat Semua" }}>
+                        {pendingTasks.length > 0 ? (
+                            <ul className="space-y-3">
+                                {pendingTasks.map((task) => (
+                                    <li key={task.id} className="rounded-lg border border-slate-200 bg-white px-4 py-3 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-sm">
+                                        <p className="text-sm font-semibold text-slate-800">{task.title}</p>
+                                        <p className="mt-1 text-xs text-slate-500">{task.class} · {task.subject}</p>
+                                        <div className="mt-2 flex items-center justify-between">
+                                            <span className="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">{task.submissions} siswa submit</span>
+                                            <span className="text-xs font-medium text-slate-500">{formatDeadlineLabel(task.deadline)}</span>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <EmptyState text="Tidak ada tugas yang menunggu penilaian." />
+                        )}
+                    </Panel>
+                </section>
+
+                <section>
+                    <Panel title="Agenda 7 Hari ke Depan" icon={IconCalendarEvent}>
+                        {upcomingSchedules.length > 0 ? (
+                            <ul className="space-y-3">
+                                {upcomingSchedules.map((item) => (
+                                    <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+                                        <div>
+                                            <p className="text-sm font-semibold text-slate-800">{item.title}</p>
+                                            <p className="text-xs text-slate-500">{item.type} · {item.subject} · {item.class}</p>
+                                            <p className="text-xs text-slate-500">{item.time}</p>
+                                        </div>
+                                        <Link href={item.url} className="text-xs font-semibold transition-colors hover:opacity-90" style={{ color: THEME.primary }}>
+                                            Buka Agenda
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <EmptyState text="Belum ada agenda minggu ini." />
+                        )}
+                    </Panel>
+                </section>
             </div>
         </DashboardLayout>
     );

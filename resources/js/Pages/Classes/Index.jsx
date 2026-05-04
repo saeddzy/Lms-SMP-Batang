@@ -46,7 +46,7 @@ export default function Index() {
                                     );
                                 }
                             }}
-                            className="flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-sm transition-colors hover:border-stone-300 hover:bg-stone-50/50"
+                            className="flex cursor-pointer flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
                         >
                             <ClassCardThumbnail classId={schoolClass.id} />
                             <div className="flex flex-col p-6">
@@ -55,15 +55,12 @@ export default function Index() {
                                     <h3 className="text-lg font-semibold tracking-tight text-stone-900">
                                         {schoolClass.name}
                                     </h3>
-                                    <p className="text-sm text-stone-500">
-                                        {schoolClass.academic_year}
-                                    </p>
                                 </div>
                                 <span
                                     className={
                                         schoolClass.is_active
-                                            ? "shrink-0 rounded-lg bg-stone-100 px-2 py-1 text-xs font-medium text-stone-700 ring-1 ring-stone-200/80"
-                                            : "shrink-0 rounded-lg bg-stone-100 px-2 py-1 text-xs font-medium text-stone-500 ring-1 ring-stone-200/60"
+                                            ? "shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200/80"
+                                            : "shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200/80"
                                     }
                                 >
                                     {schoolClass.is_active
@@ -71,22 +68,45 @@ export default function Index() {
                                         : "Tidak aktif"}
                                 </span>
                             </div>
-                            <div className="mb-4 space-y-2 text-sm">
-                                <div className="flex justify-between gap-2 text-stone-600">
-                                    <span>Siswa</span>
-                                    <span className="font-medium text-stone-900">
-                                        {schoolClass.student_count || 0}
-                                    </span>
+
+                            <div className="mb-4 grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border border-slate-200 bg-white p-3 text-sm">
+                                <div className="col-span-2 border-b border-slate-100 pb-2">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+                                        Tahun Ajaran
+                                    </p>
+                                    <p className="mt-1 font-medium text-stone-900">
+                                        {schoolClass.academic_year || "-"}
+                                    </p>
                                 </div>
-                                <div className="flex justify-between gap-2 text-stone-600">
-                                    <span>Mapel</span>
-                                    <span className="font-medium text-stone-900">
+                                <div>
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+                                        Jumlah Siswa
+                                    </p>
+                                    <p className="mt-1 font-medium text-stone-900">
+                                        {schoolClass.student_count || 0} siswa
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+                                        Jumlah Mapel
+                                    </p>
+                                    <p className="mt-1 font-medium text-stone-900">
                                         {schoolClass.class_subjects_count || 0}
-                                    </span>
+                                    </p>
                                 </div>
                             </div>
+
+                            <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
+                                <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+                                    Deskripsi
+                                </p>
+                                <p className="mt-1 line-clamp-2 text-sm text-stone-700">
+                                    {schoolClass.description || "Tidak ada deskripsi kelas."}
+                                </p>
+                            </div>
+
                             <div
-                                className="mt-auto flex flex-wrap items-center justify-end gap-1.5 border-t border-stone-100 pt-4"
+                                className="mt-auto flex flex-wrap items-center justify-end gap-1.5 border-t border-slate-100 pt-4"
                                 onClick={(e) => e.stopPropagation()}
                                 onKeyDown={(e) => e.stopPropagation()}
                             >
@@ -121,6 +141,8 @@ export default function Index() {
                                             "classes.show",
                                             schoolClass.id
                                         )}
+                                        text="Masuk Kelas"
+                                        className="h-auto w-auto rounded-md !border-[#163d8f] !bg-[#163d8f] px-3 py-1.5 !text-white hover:!bg-[#0f2e6f] hover:!text-white"
                                     />
                                 )}
                                 {hasAnyPermission(["classes edit"]) && (

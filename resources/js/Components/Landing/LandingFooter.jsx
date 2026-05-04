@@ -9,7 +9,7 @@ export default function LandingFooter() {
             <div className="grid w-full grid-cols-1 gap-12 lg:grid-cols-2">
                 <div className="space-y-10">
                     <div className="space-y-6">
-                        <span className="font-serif text-4xl italic text-indigo-900">SMP 3 Batang</span>
+                        <span className="font-serif text-4xl italic text-indigo-900">SMP N 3 Batang</span>
                         <p className="max-w-xs font-serif text-lg text-indigo-900">
                             Menjadi pusat pendidikan yang kuat dalam prestasi, karakter, dan kebanggaan daerah.
                         </p>

@@ -1,0 +1,231 @@
+/* Dark Blue Theme - Modern Gradient Cards */
+/* Primary Colors: #154497, #1460BE */
+
+:root {
+    /* Navy Blue Theme */
+    --navy-primary: #1E3A8A;
+    --navy-secondary: #1E40AF;
+    --navy-border: rgba(30, 58, 138, 0.25);
+    --navy-shadow: rgba(30, 58, 138, 0.35);
+    --navy-gradient: linear-gradient(135deg, #1E3A8A, #1E40AF);
+    
+    /* Ocean Blue Theme */
+    --ocean-primary: #0C4A6E;
+    --ocean-secondary: #075985;
+    --ocean-border: rgba(12, 74, 110, 0.25);
+    --ocean-shadow: rgba(12, 74, 110, 0.35);
+    --ocean-gradient: linear-gradient(135deg, #0C4A6E, #075985);
+    
+    /* Sky Blue Theme */
+    --sky-primary: #0284C7;
+    --sky-secondary: #0369A1;
+    --sky-border: rgba(2, 132, 199, 0.25);
+    --sky-shadow: rgba(2, 132, 199, 0.35);
+    --sky-gradient: linear-gradient(135deg, #0284C7, #0369A1);
+    
+    /* Azure Blue Theme */
+    --azure-primary: #0891B2;
+    --azure-secondary: #0E7490;
+    --azure-border: rgba(8, 145, 178, 0.25);
+    --azure-shadow: rgba(8, 145, 178, 0.35);
+    --azure-gradient: linear-gradient(135deg, #0891B2, #0E7490);
+    
+    /* Cyan Blue Theme */
+    --cyan-primary: #06B6D4;
+    --cyan-secondary: #0891B2;
+    --cyan-border: rgba(6, 182, 212, 0.25);
+    --cyan-shadow: rgba(6, 182, 212, 0.35);
+    --cyan-gradient: linear-gradient(135deg, #06B6D4, #0891B2);
+    
+    /* Teal Blue Theme */
+    --teal-primary: #0D9488;
+    --teal-secondary: #0F766E;
+    --teal-border: rgba(13, 148, 136, 0.25);
+    --teal-shadow: rgba(13, 148, 136, 0.35);
+    --teal-gradient: linear-gradient(135deg, #0D9488, #0F766E);
+    
+    /* Indigo Theme */
+    --indigo-primary: #4F46E5;
+    --indigo-secondary: #4338CA;
+    --indigo-border: rgba(79, 70, 229, 0.25);
+    --indigo-shadow: rgba(79, 70, 229, 0.35);
+    --indigo-gradient: linear-gradient(135deg, #4F46E5, #4338CA);
+    
+    /* Violet Theme */
+    --violet-primary: #7C3AED;
+    --violet-secondary: #6D28D9;
+    --violet-border: rgba(124, 58, 237, 0.25);
+    --violet-shadow: rgba(124, 58, 237, 0.35);
+    --violet-gradient: linear-gradient(135deg, #7C3AED, #6D28D9);
+    
+    /* Common Colors */
+    --light-blue: #B6D4FF;
+    --accent-blue: #60A5FA;
+    --white: #FFFFFF;
+}
+
+/* Card Base Styles */
+.card-dark-blue {
+    background: var(--gradient-primary);
+    border: 1px solid var(--border-blue);
+    border-radius: 1rem;
+    box-shadow: 0 4px 6px var(--shadow-blue);
+    transition: all 0.3s ease-in-out;
+}
+
+.card-dark-blue:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px var(--shadow-blue-hover);
+}
+
+/* Text Colors */
+.text-primary-dark {
+    color: var(--white);
+}
+
+.text-secondary-dark {
+    color: var(--light-blue);
+}
+
+.text-accent-dark {
+    color: var(--accent-blue);
+}
+
+/* Icon Styles */
+.icon-dark-blue {
+    color: var(--accent-blue);
+}
+
+.icon-white {
+    color: var(--white);
+    opacity: 0.9;
+}
+
+/* Utility Classes */
+.bg-gradient-primary {
+    background: var(--gradient-primary);
+}
+
+.bg-gradient-dark {
+    background: var(--gradient-dark);
+}
+
+.bg-gradient-light {
+    background: var(--gradient-light);
+}
+
+.border-blue-theme {
+    border-color: var(--border-blue);
+}
+
+.shadow-blue-theme {
+    box-shadow: 0 4px 6px var(--shadow-blue);
+}
+
+.shadow-blue-hover {
+    box-shadow: 0 8px 16px var(--shadow-blue-hover);
+}
+
+/* Hover Effects */
+.hover-lift {
+    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+.hover-lift:hover {
+    transform: translateY(-4px);
+}
+
+/* Glass Effect (Optional) */
+.glass-effect {
+    backdrop-filter: blur(10px);
+    background: linear-gradient(135deg, 
+        rgba(21, 68, 151, 0.9), 
+        rgba(20, 96, 190, 0.9)
+    );
+}
+
+/* Card Header Gradient */
+.card-header-gradient {
+    background: linear-gradient(135deg, 
+        rgba(15, 47, 107, 0.8), 
+        rgba(21, 68, 151, 0.6)
+    );
+    border-bottom: 1px solid rgba(20, 96, 190, 0.3);
+}
+
+/* Statistics Card Variations */
+.stat-card-primary {
+    background: var(--gradient-primary);
+}
+
+.stat-card-dark {
+    background: var(--gradient-dark);
+}
+
+.stat-card-light {
+    background: var(--gradient-light);
+}
+
+/* Icon Container Variations */
+.icon-container-primary {
+    background: linear-gradient(135deg, #1460BE, #1E6FDB);
+    box-shadow: 0 4px 8px rgba(20, 96, 190, 0.3);
+}
+
+.icon-container-accent {
+    background: linear-gradient(135deg, #60A5FA, #3B82F6);
+    box-shadow: 0 4px 8px rgba(96, 165, 250, 0.3);
+}
+
+/* Badge Styles */
+.badge-primary {
+    background: rgba(20, 96, 190, 0.2);
+    color: var(--light-blue);
+    border: 1px solid rgba(20, 96, 190, 0.3);
+}
+
+.badge-accent {
+    background: rgba(96, 165, 250, 0.2);
+    color: var(--accent-blue);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+}
+
+/* Button Styles */
+.btn-dark-blue {
+    background: var(--gradient-primary);
+    color: var(--white);
+    border: 1px solid var(--border-blue);
+    transition: all 0.3s ease-in-out;
+}
+
+.btn-dark-blue:hover {
+    background: var(--gradient-light);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px var(--shadow-blue);
+}
+
+/* Progress Bar */
+.progress-dark-blue {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.progress-dark-blue::-webkit-progress-bar {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 0.5rem;
+}
+
+.progress-dark-blue::-webkit-progress-value {
+    background: linear-gradient(90deg, #60A5FA, #3B82F6);
+    border-radius: 0.5rem;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .card-dark-blue {
+        border-radius: 0.75rem;
+    }
+    
+    .hover-lift:hover {
+        transform: translateY(-2px);
+    }
+}

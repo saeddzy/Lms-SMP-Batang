@@ -54,6 +54,9 @@ export default function Select2({
     placeholder = "Select...",
     isMulti = false,
     name = "",
+    isDisabled = false,
+    isSearchable = true,
+    noOptionsMessage,
 }) {
     return (
         <ReactSelect
@@ -66,6 +69,9 @@ export default function Select2({
             placeholder={placeholder}
             classNamePrefix="select"
             styles={minimalStyles}
+            isDisabled={isDisabled}
+            isSearchable={isSearchable}
+            noOptionsMessage={noOptionsMessage}
         />
     );
 }

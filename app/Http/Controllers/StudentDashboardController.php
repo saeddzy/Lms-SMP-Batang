@@ -98,7 +98,7 @@ class StudentDashboardController extends Controller
                 return [
                     'id' => $submission->id,
                     'type' => 'task_submission',
-                    'title' => 'Mengumpulkan tugas: ' . $submission->task->title,
+                    'title' => 'Kamu mengumpulkan tugas: ' . $submission->task->title,
                     'subject' => $submission->task->subject->name,
                     'class' => $submission->task->schoolClass->name,
                     'date' => $submission->submitted_at,
@@ -107,17 +107,19 @@ class StudentDashboardController extends Controller
                 ];
             });
 
-        // Recent quiz attempts
+        // Recent quiz attempts and results
         $quizAttempts = QuizAttempt::where('student_id', $user->id)
             ->with(['quiz.subject', 'quiz.schoolClass'])
             ->latest('finished_at')
             ->take(5)
             ->get()
             ->map(function ($attempt) {
+                $title = 'Kamu telah menyelesaikan kuis: ' . $attempt->quiz->title;
+
                 return [
                     'id' => $attempt->id,
                     'type' => 'quiz_attempt',
-                    'title' => 'Mengerjakan kuis: ' . $attempt->quiz->title,
+                    'title' => $title,
                     'subject' => $attempt->quiz->subject->name,
                     'class' => $attempt->quiz->schoolClass->name,
                     'date' => $attempt->finished_at,
@@ -126,17 +128,19 @@ class StudentDashboardController extends Controller
                 ];
             });
 
-        // Recent exam attempts
+        // Recent exam attempts and results
         $examAttempts = ExamAttempt::where('student_id', $user->id)
             ->with(['exam.subject', 'exam.schoolClass'])
             ->latest('finished_at')
             ->take(5)
             ->get()
             ->map(function ($attempt) {
+                $title = 'Kamu telah menyelesaikan ujian: ' . $attempt->exam->title;
+
                 return [
                     'id' => $attempt->id,
                     'type' => 'exam_attempt',
-                    'title' => 'Mengikuti ujian: ' . $attempt->exam->title,
+                    'title' => $title,
                     'subject' => $attempt->exam->subject->name,
                     'class' => $attempt->exam->schoolClass->name,
                     'date' => $attempt->finished_at,
@@ -145,10 +149,32 @@ class StudentDashboardController extends Controller
                 ];
             });
 
+        // Recent materials available for the student
+        $materials = Material::whereHas('schoolClass.students', function ($query) use ($user) {
+                $query->where('users.id', $user->id);
+            })
+            ->where('is_active', true)
+            ->with(['subject', 'schoolClass', 'teacher'])
+            ->latest()
+            ->take(5)
+            ->get()
+            ->map(function ($material) {
+                return [
+                    'id' => $material->id,
+                    'type' => 'material_available',
+                    'title' => 'Materi baru tersedia: ' . $material->title,
+                    'subject' => $material->subject?->name,
+                    'class' => $material->schoolClass?->name,
+                    'teacher' => $material->teacher?->name,
+                    'date' => $material->created_at,
+                ];
+            });
+
         // Combine and sort by date
-        $activities = $taskSubmissions->concat($quizAttempts)->concat($examAttempts)
+        $activities = $taskSubmissions->concat($quizAttempts)->concat($examAttempts)->concat($materials)
             ->sortByDesc('date')
-            ->take(10);
+            ->take(10)
+            ->values();
 
         return $activities;
     }
@@ -218,8 +244,8 @@ class StudentDashboardController extends Controller
                 return [
                     'id' => $quiz->id,
                     'title' => $quiz->title,
-                    'subject' => $quiz->subject?->name ?? '—',
-                    'class' => $quiz->schoolClass?->name ?? '—',
+                    'subject' => $quiz->subject?->name ?? 'ΓÇö',
+                    'class' => $quiz->schoolClass?->name ?? 'ΓÇö',
                     'start_time' => $quiz->start_time,
                     'end_time' => $quiz->end_time,
                     'duration_minutes' => $quiz->time_limit,
@@ -230,11 +256,11 @@ class StudentDashboardController extends Controller
     }
 
     /**
-     * Kuis aktif di kelas siswa — untuk halaman "Kuis Saya" (bukan hanya riwayat percobaan).
+     * Kuis aktif di kelas siswa ΓÇö untuk halaman "Kuis Saya" (bukan hanya riwayat percobaan).
      *
      * @return array<int, array<string, mixed>>
      */
-    private function availableQuizzesForStudent($user): array
+    private function availableQuizzesForStudent($user, ?string $search = null): array
     {
         $quizzes = Quiz::query()
             ->whereHas('schoolClass.enrollments', function ($q) use ($user) {
@@ -278,10 +304,12 @@ class StudentDashboardController extends Controller
                 'id' => $quiz->id,
                 'title' => $quiz->title,
                 'description' => $quiz->description,
-                'subject' => $quiz->subject?->name ?? '—',
-                'class' => $quiz->schoolClass?->name ?? '—',
+                'subject' => $quiz->subject?->name ?? 'ΓÇö',
+                'class' => $quiz->schoolClass?->name ?? 'ΓÇö',
                 'start_time' => $quiz->start_time,
                 'end_time' => $quiz->end_time,
+                'duration_minutes' => $quiz->time_limit,
+                'duration' => $quiz->time_limit,
                 'time_limit' => $quiz->time_limit,
                 'passing_score' => $quiz->passing_score,
                 'questions_count' => $quiz->questions_count,
@@ -298,7 +326,7 @@ class StudentDashboardController extends Controller
 
         $prio = ['buka' => 0, 'belum_mulai' => 1, 'berakhir' => 2, 'jadwal_tidak_lengkap' => 3];
 
-        return $items->sort(function ($a, $b) use ($prio) {
+        $items = $items->sort(function ($a, $b) use ($prio) {
             $da = $prio[$a['window']] ?? 99;
             $db = $prio[$b['window']] ?? 99;
             if ($da !== $db) {
@@ -309,7 +337,29 @@ class StudentDashboardController extends Controller
                 (string) ($a['start_time'] ?? ''),
                 (string) ($b['start_time'] ?? '')
             );
-        })->values()->all();
+        })->values();
+
+        if ($search !== null && trim($search) !== '') {
+            $needle = mb_strtolower(trim($search));
+            $items = $items->filter(function (array $item) use ($needle) {
+                $haystacks = [
+                    (string) ($item['title'] ?? ''),
+                    (string) ($item['description'] ?? ''),
+                    (string) ($item['subject'] ?? ''),
+                    (string) ($item['class'] ?? ''),
+                ];
+
+                foreach ($haystacks as $text) {
+                    if (str_contains(mb_strtolower($text), $needle)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            })->values();
+        }
+
+        return $items->all();
     }
 
     /**
@@ -341,6 +391,72 @@ class StudentDashboardController extends Controller
                         : null,
                 ];
             });
+    }
+
+    /**
+     * Display available exams for the student
+     */
+    public function examsAvailable(Request $request)
+    {
+        $user = auth()->user();
+        
+        // Get student's enrolled classes
+        $enrolledClasses = $user->enrolledClasses()->pluck('school_classes.id');
+        
+        // Get available exams for student's classes
+        $exams = Exam::whereIn('class_id', $enrolledClasses)
+            ->where('is_cancelled', false)
+            ->where('is_active', true)
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $search = trim((string) $request->input('search'));
+                $query->where(function ($inner) use ($search) {
+                    $inner->where('title', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%")
+                        ->orWhereHas('subject', function ($subjectQuery) use ($search) {
+                            $subjectQuery->where('name', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('schoolClass', function ($classQuery) use ($search) {
+                            $classQuery->where('name', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->with([
+                'subject',
+                'schoolClass',
+                'teacher',
+                'attempts' => function ($query) use ($user) {
+                    $query->where('student_id', $user->id)
+                        ->latest('created_at');
+                },
+            ])
+            ->orderBy('created_at', 'desc') // Order by creation date since scheduled_date might be null
+            ->paginate(10)
+            ->withQueryString();
+
+        $exams->setCollection(
+            $exams->getCollection()->map(function ($exam) {
+                $attempts = $exam->attempts ?? collect();
+                $annotatedAttempts = AttemptStatusHelper::annotateExamAttempts(
+                    $attempts->values()
+                );
+                $exam->setRelation('attempts', $annotatedAttempts);
+                return $exam;
+            })
+        );
+        $summary = [
+            'total_attempts' => ExamAttempt::where('student_id', $user->id)->count(),
+            'passed' => ExamAttempt::where('student_id', $user->id)->where('passed', true)->count(),
+            'avg_score' => round(
+                (float) (ExamAttempt::where('student_id', $user->id)->whereNotNull('score')->avg('score') ?? 0),
+                1
+            ),
+        ];
+
+        return Inertia::render('Student/ExamsAvailable', [
+            'exams' => $exams,
+            'summary' => $summary,
+            'filters' => $request->only(['search']),
+        ]);
     }
 
     /**
@@ -379,7 +495,8 @@ class StudentDashboardController extends Controller
 
         $completedTasks = TaskSubmission::where('student_id', $user->id)
             ->whereNotNull('submitted_at')
-            ->count();
+            ->distinct('task_id')
+            ->count('task_id');
 
         // Quiz stats
         $totalQuizzes = Quiz::whereHas('schoolClass.students', function ($query) use ($user) {
@@ -388,11 +505,13 @@ class StudentDashboardController extends Controller
 
         $completedQuizzes = QuizAttempt::where('student_id', $user->id)
             ->whereNotNull('finished_at')
-            ->count();
+            ->distinct('quiz_id')
+            ->count('quiz_id');
 
         $passedQuizzes = QuizAttempt::where('student_id', $user->id)
             ->where('passed', true)
-            ->count();
+            ->distinct('quiz_id')
+            ->count('quiz_id');
 
         // Exam stats
         $totalExams = Exam::whereHas('schoolClass.students', function ($query) use ($user) {
@@ -401,14 +520,18 @@ class StudentDashboardController extends Controller
 
         $completedExams = ExamAttempt::where('student_id', $user->id)
             ->whereNotNull('finished_at')
-            ->count();
+            ->distinct('exam_id')
+            ->count('exam_id');
 
         $passedExams = ExamAttempt::where('student_id', $user->id)
             ->where('passed', true)
-            ->count();
+            ->distinct('exam_id')
+            ->count('exam_id');
 
         // Average grades
-        $averageGrade = FinalGrade::where('student_id', $user->id)->avg('score') ?? 0;
+        $rows = $this->buildUnifiedStudentGradeRows($user);
+        $scores = $rows->pluck('score')->filter(fn ($s) => $s !== null && $s !== '');
+        $averageGrade = $scores->isEmpty() ? 0 : round((float) $scores->avg(), 1);
 
         return [
             'tasks' => [
@@ -697,7 +820,7 @@ class StudentDashboardController extends Controller
             });
         }
 
-        $tasks = $query->paginate(15)->withQueryString();
+        $tasks = $query->paginate(5)->withQueryString();
 
         return Inertia::render('Student/Tasks', [
             'tasks' => $tasks,
@@ -708,10 +831,11 @@ class StudentDashboardController extends Controller
     /**
      * Show student's quiz attempts
      */
-    public function quizzes()
+    public function quizzes(Request $request)
     {
         $user = auth()->user();
         $studentId = $user->id;
+        $search = trim((string) $request->input('search', ''));
 
         $summary = [
             'total_attempts' => QuizAttempt::where('student_id', $studentId)->count(),
@@ -723,6 +847,20 @@ class StudentDashboardController extends Controller
         ];
 
         $attempts = QuizAttempt::where('student_id', $studentId)
+            ->when($search !== '', function ($query) use ($search) {
+                $query->whereHas('quiz', function ($quizQuery) use ($search) {
+                    $quizQuery->where(function ($inner) use ($search) {
+                        $inner->where('title', 'like', "%{$search}%")
+                            ->orWhere('description', 'like', "%{$search}%")
+                            ->orWhereHas('subject', function ($subjectQuery) use ($search) {
+                                $subjectQuery->where('name', 'like', "%{$search}%");
+                            })
+                            ->orWhereHas('schoolClass', function ($classQuery) use ($search) {
+                                $classQuery->where('name', 'like', "%{$search}%");
+                            });
+                    });
+                });
+            })
             ->with(['quiz.subject', 'quiz.schoolClass', 'quiz.teacher'])
             ->latest('finished_at')
             ->paginate(15)
@@ -734,46 +872,128 @@ class StudentDashboardController extends Controller
         return Inertia::render('Student/Quizzes', [
             'attempts' => $attempts,
             'summary' => $summary,
-            'availableQuizzes' => $this->availableQuizzesForStudent($user),
-            'filters' => [],
+            'availableQuizzes' => $this->availableQuizzesForStudent(
+                $user,
+                $search
+            ),
+            'filters' => $request->only(['search']),
         ]);
     }
 
     /**
-     * Show student's exam attempts
+     * Show available exams for student
      */
-    public function exams()
+    public function exams(Request $request)
     {
         $user = auth()->user();
-        $studentId = $user->id;
+        $search = trim((string) $request->input('search', ''));
+        $baseQuery = $this->studentExamsBaseQuery($user, $search);
 
-        $summary = [
-            'total_attempts' => ExamAttempt::where('student_id', $studentId)->count(),
-            'passed' => ExamAttempt::where('student_id', $studentId)->where('passed', true)->count(),
-            'avg_score' => round(
-                (float) (ExamAttempt::where('student_id', $studentId)->whereNotNull('score')->avg('score') ?? 0),
-                1
-            ),
-        ];
+        $activeExams = $this->annotateStudentExamCollection(
+            (clone $baseQuery)
+                ->where('start_time', '<=', now())
+                ->where('end_time', '>=', now())
+                ->orderBy('start_time')
+                ->take(3)
+                ->get()
+        );
 
-        $attempts = ExamAttempt::where('student_id', $studentId)
+        $upcomingExams = $this->annotateStudentExamCollection(
+            (clone $baseQuery)
+                ->where('start_time', '>', now())
+                ->orderBy('start_time')
+                ->take(3)
+                ->get()
+        );
+
+        $finishedExams = $this->annotateStudentExamCollection(
+            (clone $baseQuery)
+                ->where('end_time', '<', now())
+                ->latest('end_time')
+                ->take(3)
+                ->get()
+        );
+
+        $attempts = ExamAttempt::where('student_id', $user->id)
             ->with(['exam.subject', 'exam.schoolClass', 'exam.teacher'])
             ->latest('finished_at')
             ->paginate(15)
             ->withQueryString();
+
         $attempts->setCollection(
             AttemptStatusHelper::annotateExamAttempts($attempts->getCollection())
         );
 
-        return Inertia::render('Student/Exams', [
+        $summary = [
+            'active' => (clone $baseQuery)
+                ->where('start_time', '<=', now())
+                ->where('end_time', '>=', now())
+                ->count(),
+            'waiting' => ExamAttempt::where('student_id', $user->id)
+                ->whereIn('attempt_status', ['submitted', 'menunggu_penilaian'])
+                ->count(),
+            'finished' => ExamAttempt::where('student_id', $user->id)
+                ->whereNotNull('finished_at')
+                ->count(),
+        ];
+
+        return Inertia::render('Student/ExamsAvailable', [
+            'activeExams' => $activeExams,
+            'upcomingExams' => $upcomingExams,
+            'finishedExams' => $finishedExams,
             'attempts' => $attempts,
             'summary' => $summary,
-            'filters' => [],
+            'filters' => $request->only(['search']),
         ]);
     }
 
+    private function studentExamsBaseQuery(User $user, ?string $search = null)
+    {
+        $enrolledClasses = $user->enrolledClasses()->pluck('school_classes.id');
+
+        return Exam::whereIn('class_id', $enrolledClasses)
+            ->where('is_cancelled', false)
+            ->where('is_active', true)
+            ->when($search !== null && $search !== '', function ($query) use ($search) {
+                $query->where(function ($inner) use ($search) {
+                    $inner->where('title', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%")
+                        ->orWhereHas('subject', function ($subjectQuery) use ($search) {
+                            $subjectQuery->where('name', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('schoolClass', function ($classQuery) use ($search) {
+                            $classQuery->where('name', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->withCount('questions')
+            ->with([
+                'subject',
+                'schoolClass',
+                'teacher',
+                'attempts' => function ($query) use ($user) {
+                    $query->where('student_id', $user->id)
+                        ->latest('created_at');
+                },
+            ]);
+    }
+
+    private function annotateStudentExamCollection($exams)
+    {
+        return $exams->map(function ($exam) {
+            $attempts = $exam->attempts ?? collect();
+            $annotatedAttempts = AttemptStatusHelper::annotateExamAttempts(
+                $attempts->values()
+            );
+
+            $exam->setRelation('attempts', $annotatedAttempts);
+
+            return $exam;
+        })->values();
+    }
+
     /**
-     * Riwayat kelas (setelah naik kelas / pindah — tidak bisa akses lagi ke kelas lama).
+     * Riwayat kelas (setelah naik kelas / pindah ΓÇö tidak bisa akses lagi ke kelas lama).
      * Sertakan nilai (FinalGrade) per kelas agar siswa melihat rekap di kelas tersebut.
      */
     public function enrollmentHistory()
@@ -807,7 +1027,7 @@ class StudentDashboardController extends Controller
                     'id' => 'task-'.$x->id,
                     'type' => 'Tugas',
                     'title' => $x->task?->title ?? 'Tugas',
-                    'subject' => $x->task?->subject?->name ?? '—',
+                    'subject' => $x->task?->subject?->name ?? 'ΓÇö',
                     'score' => $x->score,
                     'assessed_at' => $x->graded_at ?? $x->submitted_at,
                 ]);
@@ -823,7 +1043,7 @@ class StudentDashboardController extends Controller
                     'id' => 'quiz-'.$x->id,
                     'type' => 'Kuis',
                     'title' => $x->quiz?->title ?? 'Kuis',
-                    'subject' => $x->quiz?->subject?->name ?? '—',
+                    'subject' => $x->quiz?->subject?->name ?? 'ΓÇö',
                     'score' => $x->score,
                     'assessed_at' => $x->finished_at,
                 ]);
@@ -839,7 +1059,7 @@ class StudentDashboardController extends Controller
                     'id' => 'exam-'.$x->id,
                     'type' => 'Ujian',
                     'title' => $x->exam?->title ?? 'Ujian',
-                    'subject' => $x->exam?->subject?->name ?? '—',
+                    'subject' => $x->exam?->subject?->name ?? 'ΓÇö',
                     'score' => $x->score,
                     'assessed_at' => $x->finished_at,
                 ]);

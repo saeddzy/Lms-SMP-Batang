@@ -1,14 +1,18 @@
-import React from "react";
+import React, { useEffect, useMemo } from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import Input from "@/Components/Input";
 import Button from "@/Components/Button";
-import Card from "@/Components/Card";
 import Select2 from "@/Components/Select2";
 import { Head, useForm, usePage } from "@inertiajs/react";
-import hasAnyPermission from "@/Utils/Permissions";
 
 export default function Create() {
-    const { classes = [], subjects = [], selectedClassId = null, selectedSubjectId = null } = usePage().props;
+    const {
+        classes = [],
+        subjects = [],
+        classSubjectsMap = {},
+        selectedClassId = null,
+        selectedSubjectId = null,
+    } = usePage().props;
 
     const { data, setData, post, processing, errors } = useForm({
         title: '',
@@ -20,7 +24,7 @@ export default function Create() {
         start_time: '',
         end_time: '',
         duration: '',
-        total_questions: '',
+        max_attempts: 1,
         passing_score: '',
         instructions: '',
         supervision_required: true,
@@ -39,10 +43,32 @@ export default function Create() {
         label: cls.name
     }));
 
-    const subjectOptions = subjects.map(subject => ({
-        value: subject.id,
-        label: subject.name
-    }));
+    const subjectOptions = useMemo(() => {
+        const classId = Number(data.class_id);
+        if (!classId) {
+            return subjects.map((subject) => ({
+                value: subject.id,
+                label: subject.name,
+            }));
+        }
+
+        const classSubjects = classSubjectsMap?.[classId] ?? classSubjectsMap?.[String(classId)] ?? [];
+        return classSubjects.map((subject) => ({
+            value: subject.id,
+            label: subject.name,
+        }));
+    }, [data.class_id, subjects, classSubjectsMap]);
+
+    useEffect(() => {
+        if (!data.subject_id) return;
+
+        const selectedSubjectStillValid = subjectOptions.some(
+            (option) => String(option.value) === String(data.subject_id)
+        );
+        if (!selectedSubjectStillValid) {
+            setData("subject_id", "");
+        }
+    }, [data.subject_id, setData, subjectOptions]);
 
     const typeOptions = [
         { value: 'midterm', label: 'Ujian Tengah Semester (UTS)' },
@@ -60,18 +86,22 @@ export default function Create() {
         <DashboardLayout title="Buat Ujian Baru">
             <Head title="Buat Ujian Baru" />
 
-            <div className="max-w-4xl mx-auto">
-                <Card>
-                    <Card.Header>
-                        <Card.Title>Buat Ujian Baru</Card.Title>
-                        <Card.Description>
-                            Buat ujian dengan jadwal dan pengaturan pengawasan
-                        </Card.Description>
-                    </Card.Header>
+            <div className="mx-auto max-w-5xl">
+                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <div className="h-1 w-full bg-gradient-to-r from-[#163d8f] via-[#2453b8] to-[#5b84d9]" />
+                    <div className="border-b border-slate-200 bg-slate-50/70 px-6 py-5">
+                        <h2 className="text-xl font-semibold text-slate-900">Buat Ujian Baru</h2>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Buat ujian dengan jadwal pelaksanaan dan pengaturan penilaian.
+                        </p>
+                    </div>
 
-                    <form onSubmit={handleSubmit}>
-                        <Card.Content>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <form onSubmit={handleSubmit} className="space-y-6 p-6">
+                        <section className="space-y-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Informasi Utama
+                            </p>
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                 <div className="md:col-span-2">
                                     <Input.Label htmlFor="title" value="Judul Ujian" />
                                     <Input.Text
@@ -83,18 +113,31 @@ export default function Create() {
                                     />
                                     <Input.Error message={errors.title} />
                                 </div>
+                            </div>
+                        </section>
 
+                        <section className="space-y-4 border-t border-slate-100 pt-6">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Kelas dan Jadwal
+                            </p>
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                 <div>
                                     <Input.Label htmlFor="class_id" value="Kelas" />
                                     {selectedClassId ? (
-                                        <div className="px-3 py-2 bg-slate-50 rounded-md border border-slate-200">
-                                            {classes.find((schoolClass) => schoolClass.id === selectedClassId)?.name || 'Kelas terpilih'}
-                                        </div>
+                                        <>
+                                            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                                                {classes.find((schoolClass) => schoolClass.id === selectedClassId)?.name || 'Kelas terpilih'}
+                                            </div>
+                                            <input type="hidden" name="class_id" value={selectedClassId} />
+                                        </>
                                     ) : (
                                         <Select2
                                             id="class_id"
-                                            value={data.class_id}
-                                            onChange={(selected) => setData('class_id', selected)}
+                                            value={classOptions.find(option => option.value === data.class_id)}
+                                            onChange={(selected) => {
+                                                setData('class_id', selected ? selected.value : '');
+                                                setData('subject_id', '');
+                                            }}
                                             options={classOptions}
                                             placeholder="Pilih kelas"
                                             required
@@ -106,16 +149,24 @@ export default function Create() {
                                 <div>
                                     <Input.Label htmlFor="subject_id" value="Mata Pelajaran" />
                                     {selectedSubjectId ? (
-                                        <div className="px-3 py-2 bg-slate-50 rounded-md border border-slate-200">
-                                            {subjects.find((subject) => subject.id === selectedSubjectId)?.name || 'Mata pelajaran terpilih'}
-                                        </div>
+                                        <>
+                                            <div className="px-3 py-2 bg-slate-50 rounded-md border border-slate-200">
+                                                {subjects.find((subject) => subject.id === selectedSubjectId)?.name || 'Mata pelajaran terpilih'}
+                                            </div>
+                                            <input type="hidden" name="subject_id" value={selectedSubjectId} />
+                                        </>
                                     ) : (
                                         <Select2
                                             id="subject_id"
-                                            value={data.subject_id}
-                                            onChange={(selected) => setData('subject_id', selected)}
+                                            value={subjectOptions.find(option => option.value === data.subject_id)}
+                                            onChange={(selected) => setData('subject_id', selected ? selected.value : '')}
                                             options={subjectOptions}
-                                            placeholder="Pilih mata pelajaran"
+                                            placeholder={
+                                                data.class_id
+                                                    ? "Pilih mata pelajaran sesuai kelas"
+                                                    : "Pilih kelas terlebih dahulu"
+                                            }
+                                            isDisabled={!data.class_id}
                                             required
                                         />
                                     )}
@@ -126,8 +177,8 @@ export default function Create() {
                                     <Input.Label htmlFor="type" value="Tipe Ujian" />
                                     <Select2
                                         id="type"
-                                        value={data.type}
-                                        onChange={(selected) => setData('type', selected)}
+                                        value={typeOptions.find(option => option.value === data.type)}
+                                        onChange={(selected) => setData('type', selected ? selected.value : '')}
                                         options={typeOptions}
                                         placeholder="Pilih tipe ujian"
                                     />
@@ -167,7 +218,14 @@ export default function Create() {
                                     />
                                     <Input.Error message={errors.end_time} />
                                 </div>
+                            </div>
+                        </section>
 
+                        <section className="space-y-4 border-t border-slate-100 pt-6">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Struktur Penilaian
+                            </p>
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                 <div>
                                     <Input.Label htmlFor="duration" value="Durasi (Menit)" />
                                     <Input.Number
@@ -181,15 +239,15 @@ export default function Create() {
                                 </div>
 
                                 <div>
-                                    <Input.Label htmlFor="total_questions" value="Jumlah Soal" />
+                                    <Input.Label htmlFor="max_attempts" value="Percobaan Maksimal" />
                                     <Input.Number
-                                        id="total_questions"
-                                        value={data.total_questions}
-                                        onChange={(e) => setData('total_questions', e.target.value)}
-                                        placeholder="50"
+                                        id="max_attempts"
+                                        value={data.max_attempts}
+                                        onChange={(e) => setData('max_attempts', e.target.value)}
+                                        placeholder="1"
                                         min="1"
                                     />
-                                    <Input.Error message={errors.total_questions} />
+                                    <Input.Error message={errors.max_attempts} />
                                 </div>
 
                                 <div>
@@ -204,7 +262,14 @@ export default function Create() {
                                     />
                                     <Input.Error message={errors.passing_score} />
                                 </div>
+                            </div>
+                        </section>
 
+                        <section className="space-y-4 border-t border-slate-100 pt-6">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Konten dan Publikasi
+                            </p>
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                 <div className="md:col-span-2">
                                     <Input.Label htmlFor="description" value="Deskripsi Ujian" />
                                     <textarea
@@ -212,7 +277,7 @@ export default function Create() {
                                         value={data.description}
                                         onChange={(e) => setData('description', e.target.value)}
                                         rows={3}
-                                        className="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-[#163d8f] focus:ring-[#163d8f]"
                                         placeholder="Jelaskan tentang ujian ini"
                                     />
                                     <Input.Error message={errors.description} />
@@ -225,7 +290,7 @@ export default function Create() {
                                         value={data.instructions}
                                         onChange={(e) => setData('instructions', e.target.value)}
                                         rows={4}
-                                        className="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-[#163d8f] focus:ring-[#163d8f]"
                                         placeholder="Instruksi khusus untuk mengikuti ujian"
                                         required
                                     />
@@ -241,7 +306,7 @@ export default function Create() {
                                                     type="checkbox"
                                                     checked={data.supervision_required}
                                                     onChange={(e) => setData('supervision_required', e.target.checked)}
-                                                    className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                                                    className="rounded border-slate-300 text-[#163d8f] shadow-sm focus:ring-[#163d8f]"
                                                 />
                                                 <span className="ml-2 text-sm text-gray-600">Pengawasan diperlukan</span>
                                             </label>
@@ -251,7 +316,7 @@ export default function Create() {
                                                     type="checkbox"
                                                     checked={data.allow_review}
                                                     onChange={(e) => setData('allow_review', e.target.checked)}
-                                                    className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                                                    className="rounded border-slate-300 text-[#163d8f] shadow-sm focus:ring-[#163d8f]"
                                                 />
                                                 <span className="ml-2 text-sm text-gray-600">Izinkan review jawaban</span>
                                             </label>
@@ -261,7 +326,7 @@ export default function Create() {
                                                     type="checkbox"
                                                     checked={data.randomize_questions}
                                                     onChange={(e) => setData('randomize_questions', e.target.checked)}
-                                                    className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                                                    className="rounded border-slate-300 text-[#163d8f] shadow-sm focus:ring-[#163d8f]"
                                                 />
                                                 <span className="ml-2 text-sm text-gray-600">Acak urutan soal</span>
                                             </label>
@@ -271,38 +336,42 @@ export default function Create() {
 
                                 <div className="md:col-span-2">
                                     <Input.Label htmlFor="status" value="Status Ujian" />
-                                    <Select2
+                                    <select
                                         id="status"
                                         value={data.status}
-                                        onChange={(selected) => setData('status', selected)}
-                                        options={statusOptions}
-                                        placeholder="Pilih status"
-                                    />
+                                        onChange={(e) => setData('status', e.target.value)}
+                                        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#163d8f]"
+                                    >
+                                        <option value="">Pilih status</option>
+                                        {statusOptions.map(option => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
                                     <p className="text-xs text-gray-500 mt-1">
                                         {data.status === 'draft' ? 'Ujian akan disimpan sebagai draf dan belum dapat diakses siswa' : 'Ujian akan terjadwal dan dapat diakses siswa sesuai jadwal'}
                                     </p>
                                     <Input.Error message={errors.status} />
                                 </div>
                             </div>
-                        </Card.Content>
+                        </section>
 
-                        <Card.Footer>
-                            <div className="flex justify-end gap-3">
-                                <Button
-                                    type="cancel"
-                                    url={route('exams.index')}
-                                />
-                                <Button
-                                    type="submit"
-                                    processing={processing}
-                                    disabled={processing}
-                                >
-                                    {data.status === 'scheduled' ? 'Jadwalkan Ujian' : 'Simpan sebagai Draft'}
-                                </Button>
-                            </div>
-                        </Card.Footer>
+                        <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
+                            <Button
+                                type="cancel"
+                                url={route('exams.index')}
+                            />
+                            <Button
+                                type="submit"
+                                processing={processing}
+                                disabled={processing}
+                            >
+                                {data.status === 'scheduled' ? 'Jadwalkan Ujian' : 'Simpan sebagai Draft'}
+                            </Button>
+                        </div>
                     </form>
-                </Card>
+                </div>
             </div>
         </DashboardLayout>
     );

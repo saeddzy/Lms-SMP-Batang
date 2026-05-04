@@ -1,18 +1,24 @@
-import React, { useState } from "react";
+import React from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
+import { userSecondaryLabel } from "@/Utils/userDisplay";
 import Table from "@/Components/Table";
 import Button from "@/Components/Button";
 import Search from "@/Components/Search";
 import Pagination from "@/Components/Pagination";
-import { Head, usePage } from "@inertiajs/react";
+import { Head, router, usePage } from "@inertiajs/react";
 import hasAnyPermission, { hasRole } from "@/Utils/Permissions";
 
 export default function Index() {
-    const { subjects } = usePage().props;
-    const [search, setSearch] = useState('');
+    const { subjects, filters } = usePage().props;
+    const isGuru = hasRole("guru");
 
-    const handleSearch = (query) => {
-        setSearch(query);
+    const getSubjectSummaryUrl = (subject) => {
+        if (isGuru) {
+            const classSubjectId = subject.class_subjects?.[0]?.id;
+            if (!classSubjectId) return null;
+            return `${route("subjects.show", subject.id)}?class_subject_id=${classSubjectId}`;
+        }
+        return route("subjects.show", subject.id);
     };
 
     return (
@@ -24,7 +30,9 @@ export default function Index() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">Mata Pelajaran</h1>
-                        <p className="text-gray-600">Kelola mata pelajaran yang tersedia di sekolah</p>
+                        <p className="text-gray-600">
+                            Ringkasan mata pelajaran lintas kelas. Klik "Lihat Ringkasan" untuk melihat kelas yang diajar.
+                        </p>
                     </div>
                     {hasAnyPermission(["subjects create"]) && (
                         <Button
@@ -36,10 +44,13 @@ export default function Index() {
 
                 {/* Search */}
                 <Search
+                    url={route("subjects.index")}
                     placeholder="Cari mata pelajaran..."
-                    onSearch={handleSearch}
-                    value={search}
+                    filter={filters}
                 />
+                <p className="text-xs text-gray-500">
+                    Tip: klik baris mata pelajaran untuk membuka ringkasan kelas yang diajar.
+                </p>
 
                 {/* Table */}
                 <Table.Card>
@@ -53,15 +64,29 @@ export default function Index() {
                                 <Table.Th>Guru Pengajar</Table.Th>
                                 <Table.Th>Status</Table.Th>
                                 <Table.Th>Jumlah Kelas</Table.Th>
-                                {hasAnyPermission(["subjects edit", "subjects delete"]) && !hasRole("guru") && (
-                                    <Table.Th>Aksi</Table.Th>
-                                )}
+                                <Table.Th>Aksi</Table.Th>
                             </tr>
                         </Table.Thead>
                         <Table.Tbody>
                             {subjects.data && subjects.data.length > 0 ? (
                                 subjects.data.map((subject, i) => (
-                                    <tr key={subject.id}>
+                                    <tr
+                                        key={subject.id}
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => {
+                                            const url = getSubjectSummaryUrl(subject);
+                                            if (url) router.visit(url);
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter" || e.key === " ") {
+                                                e.preventDefault();
+                                                const url = getSubjectSummaryUrl(subject);
+                                                if (url) router.visit(url);
+                                            }
+                                        }}
+                                        className="cursor-pointer transition-colors hover:bg-slate-50/80 focus-within:bg-slate-50/80"
+                                    >
                                         <Table.Td>{subjects.from + i}</Table.Td>
                                         <Table.Td>
                                             <div>
@@ -88,9 +113,9 @@ export default function Index() {
                                                         <div className="font-medium text-gray-900">
                                                             {subject.teacher.name}
                                                         </div>
-                                                        {subject.teacher.email && (
+                                                        {userSecondaryLabel(subject.teacher) && (
                                                             <div className="text-gray-500">
-                                                                {subject.teacher.email}
+                                                                {userSecondaryLabel(subject.teacher)}
                                                             </div>
                                                         )}
                                                     </div>
@@ -109,33 +134,47 @@ export default function Index() {
                                             </span>
                                         </Table.Td>
                                         <Table.Td>{subject.classes_count || 0}</Table.Td>
-                                        {hasAnyPermission(["subjects edit", "subjects delete"]) && !hasRole("guru") && (
-                                            <Table.Td>
-                                                <div className="flex gap-2">
-                                                    {hasAnyPermission(["subjects edit"]) && (
-                                                        <Button
-                                                            type={"edit"}
-                                                            url={route("subjects.edit", subject.id)}
-                                                        />
-                                                    )}
-                                                    {hasAnyPermission(["subjects delete"]) && (
-                                                        <Button
-                                                            type={"delete"}
-                                                            url={route("subjects.destroy", subject.id)}
-                                                        />
-                                                    )}
-                                                </div>
-                                            </Table.Td>
-                                        )}
+                                        <Table.Td>
+                                            <div
+                                                className="flex flex-wrap gap-2"
+                                                onClick={(e) => e.stopPropagation()}
+                                                onKeyDown={(e) => e.stopPropagation()}
+                                            >
+                                                {hasAnyPermission(["subjects view"]) && (
+                                                    <Button
+                                                        type="view"
+                                                        url={getSubjectSummaryUrl(subject) || "#"}
+                                                        text="Lihat Ringkasan"
+                                                        className={`h-auto w-auto rounded-md px-3 py-1.5 ${
+                                                            !getSubjectSummaryUrl(subject)
+                                                                ? "pointer-events-none cursor-not-allowed opacity-50"
+                                                                : ""
+                                                        }`}
+                                                    />
+                                                )}
+                                                {hasAnyPermission(["subjects edit"]) && !hasRole("guru") && (
+                                                    <Button
+                                                        type={"edit"}
+                                                        url={route("subjects.edit", subject.id)}
+                                                    />
+                                                )}
+                                                {hasAnyPermission(["subjects delete"]) && !hasRole("guru") && (
+                                                    <Button
+                                                        type={"delete"}
+                                                        url={route("subjects.destroy", subject.id)}
+                                                    />
+                                                )}
+                                            </div>
+                                        </Table.Td>
                                     </tr>
                                 ))
                             ) : (
                                 <tr>
-                                    <Table.Td colSpan={hasAnyPermission(["subjects edit", "subjects delete"]) && !hasRole("guru") ? 7 : 6} className="text-center py-8">
+                                    <Table.Td colSpan={8} className="text-center py-8">
                                         <div className="text-gray-500">
-                                            {search ? 'Tidak ada mata pelajaran yang ditemukan' : 'Belum ada mata pelajaran yang terdaftar'}
+                                            {filters?.search ? 'Tidak ada mata pelajaran yang ditemukan' : 'Belum ada mata pelajaran yang terdaftar'}
                                         </div>
-                                        {hasAnyPermission(["subjects create"]) && !search && (
+                                        {hasAnyPermission(["subjects create"]) && !filters?.search && (
                                             <div className="mt-2">
                                                 <Button
                                                     type={"add"}

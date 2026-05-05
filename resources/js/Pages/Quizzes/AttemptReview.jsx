@@ -3,6 +3,12 @@ import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Head, Link, usePage } from "@inertiajs/react";
 import { IconArrowLeft } from "@tabler/icons-react";
 import { formatStudentDateTime } from "@/Components/Student/StudentShell";
+import { MatchingReviewTable, parseMatchingPairs } from "@/Components/Lms/MatchingQuestionBlock";
+import {
+    MultipleCheckboxReview,
+    parseMultipleCheckboxAnswer,
+    parseMultipleCheckboxOptions,
+} from "@/Components/Lms/MultipleCheckboxQuestionBlock";
 
 function optionLetter(idx) {
     if (!Number.isFinite(Number(idx))) return "";
@@ -35,8 +41,21 @@ function tfLabel(raw) {
     return raw || "—";
 }
 
+function renderMultipleCheckboxStudentAnswer(question, raw) {
+    const options = parseMultipleCheckboxOptions(question?.options);
+    const byNorm = new Map(
+        options.map((o) => [
+            String(o.text).trim().toLowerCase().replace(/\s+/g, " "),
+            o.text,
+        ])
+    );
+    const picked = parseMultipleCheckboxAnswer(raw);
+    if (picked.length === 0) return "—";
+    return picked.map((k) => byNorm.get(k) ?? k).join("; ");
+}
+
 export default function AttemptReview() {
-    const { quiz, attempt } = usePage().props;
+    const { quiz, attempt, isStudentView = false } = usePage().props;
 
     const answersByQuestionId = useMemo(() => {
         const m = new Map();
@@ -54,8 +73,10 @@ export default function AttemptReview() {
     const sc = quiz.school_class ?? quiz.schoolClass;
 
     return (
-        <DashboardLayout title={`Jawaban siswa — ${quiz.title}`}>
-            <Head title={`Review percobaan — ${quiz.title}`} />
+        <DashboardLayout
+            title={isStudentView ? `Pembahasan — ${quiz.title}` : `Jawaban siswa — ${quiz.title}`}
+        >
+            <Head title={isStudentView ? `Pembahasan — ${quiz.title}` : `Review percobaan — ${quiz.title}`} />
 
             <div className="mx-auto max-w-5xl space-y-6">
                 <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -64,14 +85,15 @@ export default function AttemptReview() {
                         <div className="flex flex-wrap items-start justify-between gap-4">
                             <div>
                                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                    Review percobaan kuis
+                                    {isStudentView ? "Pembahasan kuis" : "Review percobaan kuis"}
                                 </p>
                                 <h1 className="mt-1 text-2xl font-semibold text-slate-900">
                                     {quiz.title}
                                 </h1>
                                 <p className="mt-1 text-sm text-slate-600">
-                                    {attempt.student?.name ?? "Siswa"} · {sc?.name ?? "—"} · Attempt #
-                                    {attempt.id}
+                                    {isStudentView
+                                        ? `${sc?.name ?? "—"} · percobaan #${attempt.id}`
+                                        : `${attempt.student?.name ?? "Siswa"} · ${sc?.name ?? "—"} · Attempt #${attempt.id}`}
                                 </p>
                             </div>
                             <Link
@@ -152,13 +174,20 @@ export default function AttemptReview() {
                                                     ? "Jawaban singkat"
                                                     : type === "essay"
                                                       ? "Esai"
-                                                      : type}
+                                                      : type === "matching"
+                                                        ? "Menjodohkan"
+                                                        : type === "multiple_checkbox"
+                                                          ? "Pilihan ganda kompleks"
+                                                        : type}
                                         </p>
                                         <p className="mt-2 whitespace-pre-wrap text-slate-900">
                                             {q.question_text}
                                         </p>
                                     </div>
-                                    {ans && type !== "essay" && (
+                                    {ans &&
+                                        type !== "essay" &&
+                                        type !== "matching" &&
+                                        type !== "multiple_checkbox" && (
                                         <span
                                             className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${
                                                 ans.is_correct
@@ -169,6 +198,32 @@ export default function AttemptReview() {
                                             {ans.is_correct ? "Benar" : "Salah"}
                                         </span>
                                     )}
+                                    {type === "matching" && ans ? (
+                                        <span
+                                            className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${
+                                                ans.is_correct
+                                                    ? "bg-emerald-50 text-emerald-900 ring-emerald-200"
+                                                    : "bg-amber-50 text-amber-900 ring-amber-200"
+                                            }`}
+                                        >
+                                            {ans.is_correct
+                                                ? "Semua pasangan benar"
+                                                : `${ans.points_awarded ?? 0} / ${q.points ?? 0} poin`}
+                                        </span>
+                                    ) : null}
+                                    {type === "multiple_checkbox" && ans ? (
+                                        <span
+                                            className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${
+                                                ans.is_correct
+                                                    ? "bg-emerald-50 text-emerald-900 ring-emerald-200"
+                                                    : "bg-amber-50 text-amber-900 ring-amber-200"
+                                            }`}
+                                        >
+                                            {ans.is_correct
+                                                ? "Semua pilihan tepat"
+                                                : `${ans.points_awarded ?? 0} / ${q.points ?? 0} poin`}
+                                        </span>
+                                    ) : null}
                                     {type === "essay" && ans?.points_awarded != null && (
                                         <span className="inline-flex shrink-0 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-900 ring-1 ring-indigo-200">
                                             {ans.points_awarded} / {q.points ?? 0} poin
@@ -188,6 +243,12 @@ export default function AttemptReview() {
                                                 renderStudentMcqAnswer(q, ans.answer)
                                             ) : type === "true_false" ? (
                                                 tfLabel(ans.answer)
+                                            ) : type === "matching" ? (
+                                                <span className="text-xs text-slate-600">
+                                                    Lihat per pasangan di bawah.
+                                                </span>
+                                            ) : type === "multiple_checkbox" ? (
+                                                renderMultipleCheckboxStudentAnswer(q, ans.answer)
                                             ) : (
                                                 <span className="whitespace-pre-wrap">
                                                     {ans.answer || "—"}
@@ -195,6 +256,19 @@ export default function AttemptReview() {
                                             )}
                                         </div>
                                     </div>
+
+                                    {type === "matching" && ans ? (
+                                        <MatchingReviewTable
+                                            pairs={parseMatchingPairs(q.options)}
+                                            answerRaw={ans.answer}
+                                        />
+                                    ) : null}
+                                    {type === "multiple_checkbox" && ans ? (
+                                        <MultipleCheckboxReview
+                                            options={parseMultipleCheckboxOptions(q.options)}
+                                            answerRaw={ans.answer}
+                                        />
+                                    ) : null}
 
                                     {type === "multiple_choice" || type === "true_false" ? (
                                         <div>

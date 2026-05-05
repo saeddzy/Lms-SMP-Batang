@@ -25,6 +25,10 @@ final class AttemptScoreCalculator
             $max += (float) $q->points;
             if ($q->question_type === 'essay') {
                 $earned += (float) ($ans->points_awarded ?? 0);
+            } elseif ($q->question_type === 'matching') {
+                $earned += (float) ($ans->points_awarded ?? 0);
+            } elseif ($q->question_type === 'multiple_checkbox') {
+                $earned += (float) ($ans->points_awarded ?? 0);
             } elseif ($ans->is_correct) {
                 $earned += (float) $q->points;
             }
@@ -56,6 +60,10 @@ final class AttemptScoreCalculator
             }
             $max += (float) $q->points;
             if ($q->question_type === 'essay') {
+                $earned += (float) ($ans->points_awarded ?? 0);
+            } elseif ($q->question_type === 'matching') {
+                $earned += (float) ($ans->points_awarded ?? 0);
+            } elseif ($q->question_type === 'multiple_checkbox') {
                 $earned += (float) ($ans->points_awarded ?? 0);
             } elseif ($ans->is_correct) {
                 $earned += (float) $q->points;

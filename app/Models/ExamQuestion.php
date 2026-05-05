@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\GradesMatchingAnswers;
+use App\Models\Concerns\GradesMultipleCheckboxAnswers;
 use App\Models\Concerns\MatchesStudentQuizAnswers;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -9,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ExamQuestion extends Model
 {
+    use GradesMatchingAnswers;
+    use GradesMultipleCheckboxAnswers;
     use HasFactory;
     use MatchesStudentQuizAnswers;
 

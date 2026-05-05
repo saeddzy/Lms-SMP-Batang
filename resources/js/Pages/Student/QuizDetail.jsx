@@ -52,6 +52,12 @@ export default function QuizDetail() {
 
     const unfinished = useMemo(() => attempts.find((a) => !a.finished_at), [attempts]);
     const completedAttempts = attempts.filter((a) => a.finished_at);
+    const latestFinishedAttempt = useMemo(() => {
+        if (completedAttempts.length === 0) return null;
+        return [...completedAttempts].sort(
+            (a, b) => new Date(b.finished_at) - new Date(a.finished_at)
+        )[0];
+    }, [completedAttempts]);
 
     const startOrContinue = () => {
         if (unfinished) {
@@ -240,6 +246,23 @@ export default function QuizDetail() {
                             >
                                 <IconEye className="h-4 w-4" />
                                 Lihat Hasil
+                            </button>
+                        )}
+                        {quiz.show_results && latestFinishedAttempt && (
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    router.visit(
+                                        route("quizzes.attempt", {
+                                            quiz: quiz.id,
+                                            attempt: latestFinishedAttempt.id,
+                                        })
+                                    )
+                                }
+                                className="inline-flex items-center gap-1 rounded-lg border border-[#163d8f]/30 bg-white px-4 py-2.5 text-sm font-semibold text-[#163d8f] shadow-sm transition-colors hover:bg-[#163d8f]/5"
+                            >
+                                <IconFileText className="h-4 w-4" />
+                                Pembahasan
                             </button>
                         )}
                         <button

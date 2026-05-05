@@ -2,18 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\ExamTimeHelper;
 use App\Models\Exam;
 use App\Models\ExamAttempt;
 use App\Models\ExamAttemptAnswer;
 use App\Models\ExamQuestion;
-use App\Helpers\ExamTimeHelper;
 use App\Support\AttemptScoreCalculator;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
 
 class ExamAttemptController extends Controller
 {
@@ -22,23 +21,24 @@ class ExamAttemptController extends Controller
      */
     public function start(Request $request, Exam $exam)
     {
-        
+
         $user = Auth::user();
 
         // Check if user is enrolled in the exam class
-        if (!$user->enrolledClasses()->where('school_classes.id', $exam->class_id)->exists()) {
+        if (! $user->enrolledClasses()->where('school_classes.id', $exam->class_id)->exists()) {
             return redirect()->back()->with('error', 'Anda tidak terdaftar di kelas ujian ini.');
         }
 
         // Check if exam is active
-        if (!$exam->is_active || $exam->is_cancelled) {
+        if (! $exam->is_active || $exam->is_cancelled) {
             return redirect()->back()->with('error', 'Ujian tidak aktif atau telah dibatalkan.');
         }
 
         // Check if student can start the exam based on schedule
-        if (!ExamTimeHelper::canStart($exam)) {
+        if (! ExamTimeHelper::canStart($exam)) {
             $startTime = $exam->start_time->format('d M Y H:i');
             $endTime = $exam->end_time->format('d M Y H:i');
+
             return redirect()->back()->with('error', "Ujian tidak dalam waktu aktif. Waktu: $startTime - $endTime");
         }
 
@@ -88,7 +88,7 @@ class ExamAttemptController extends Controller
      */
     public function take(Exam $exam, ExamAttempt $attempt)
     {
-        
+
         $user = Auth::user();
 
         // Validate attempt ownership
@@ -105,6 +105,7 @@ class ExamAttemptController extends Controller
         // Check if attempt is expired using ExamTimeHelper
         if (ExamTimeHelper::isExpired($attempt)) {
             ExamTimeHelper::updateExpiredAttempt($attempt);
+
             return redirect()->route('exams.attempt.result', [$exam->id, $attempt->id])
                 ->with('info', 'Waktu ujian telah habis.');
         }
@@ -114,8 +115,6 @@ class ExamAttemptController extends Controller
             ->inRandomOrder()
             ->get();
 
-        
-        
         return inertia('Exams/Attempt', [
             'exam' => $exam,
             'attempt' => $attempt,
@@ -150,6 +149,7 @@ class ExamAttemptController extends Controller
         // Check if attempt is expired using ExamTimeHelper
         if (ExamTimeHelper::isExpired($attempt)) {
             ExamTimeHelper::updateExpiredAttempt($attempt);
+
             return response()->json(['error' => 'Time expired'], 400);
         }
 
@@ -174,6 +174,56 @@ class ExamAttemptController extends Controller
             } elseif (in_array($answer, ['salah', 's', 'false', 'f', '0'], true)) {
                 $normalizedAnswer = 'false';
             }
+        }
+
+        if ($question->question_type === 'matching') {
+            $graded = $question->gradeMatchingResponse($validated['answer']);
+            if ($graded === null) {
+                $graded = [
+                    'points_awarded' => 0.0,
+                    'correct_count' => 0,
+                    'pair_count' => 0,
+                    'all_correct' => false,
+                ];
+            }
+
+            $answer = ExamAttemptAnswer::updateOrCreate(
+                [
+                    'exam_attempt_id' => $attempt->id,
+                    'question_id' => $validated['question_id'],
+                ],
+                [
+                    'answer' => $validated['answer'],
+                    'is_correct' => $graded['all_correct'],
+                    'points_awarded' => $graded['points_awarded'],
+                ]
+            );
+
+            return response()->json(['success' => true, 'answer_id' => $answer->id]);
+        }
+
+        if ($question->question_type === 'multiple_checkbox') {
+            $graded = $question->gradeMultipleCheckboxResponse($validated['answer']);
+            if ($graded === null) {
+                $graded = [
+                    'points_awarded' => 0.0,
+                    'all_correct' => false,
+                ];
+            }
+
+            $answer = ExamAttemptAnswer::updateOrCreate(
+                [
+                    'exam_attempt_id' => $attempt->id,
+                    'question_id' => $validated['question_id'],
+                ],
+                [
+                    'answer' => $validated['answer'],
+                    'is_correct' => $graded['all_correct'],
+                    'points_awarded' => $graded['points_awarded'],
+                ]
+            );
+
+            return response()->json(['success' => true, 'answer_id' => $answer->id]);
         }
 
         $isCorrect = $question->isStudentAnswerCorrect($normalizedAnswer);
@@ -258,6 +308,7 @@ class ExamAttemptController extends Controller
                     'result_url' => route('exams.attempt.result', [$exam->id, $attempt->id]),
                 ]);
             }
+
             return redirect()->route('exams.attempt.result', [$exam->id, $attempt->id]);
         }
 

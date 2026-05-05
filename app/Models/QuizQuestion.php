@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\GradesMatchingAnswers;
+use App\Models\Concerns\GradesMultipleCheckboxAnswers;
 use App\Models\Concerns\MatchesStudentQuizAnswers;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,6 +12,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class QuizQuestion extends Model
 {
+    use GradesMatchingAnswers;
+    use GradesMultipleCheckboxAnswers;
     use HasFactory;
     use MatchesStudentQuizAnswers;
 
@@ -59,7 +63,23 @@ class QuizQuestion extends Model
      */
     public function getFormattedOptionsAttribute(): array
     {
-        if (!$this->options) {
+        if ($this->question_type === 'matching') {
+            return [];
+        }
+
+        if ($this->question_type === 'multiple_checkbox') {
+            return collect($this->multipleCheckboxOptions())
+                ->values()
+                ->map(fn ($opt, $idx) => [
+                    'id' => $idx,
+                    'text' => $opt['text'],
+                    'letter' => chr(65 + $idx),
+                    'is_correct' => (bool) ($opt['is_correct'] ?? false),
+                ])
+                ->all();
+        }
+
+        if (! $this->options) {
             return [];
         }
 

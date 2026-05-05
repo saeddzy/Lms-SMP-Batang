@@ -1,3 +1,14 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* SortableJS — soal menjodohkan */
+.matching-sortable-ghost {
+    @apply opacity-60 ring-2 ring-indigo-300 rounded-xl;
+}
+.matching-sortable-drag {
+    @apply shadow-lg;
+}
+.matching-sortable-chosen {
+    @apply ring-2 ring-indigo-400;
+}

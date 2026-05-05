@@ -101,18 +101,24 @@ export default function ExamsAvailable() {
     };
 
     const examWindow = (exam) => {
-        const duration = Number(exam.duration_minutes ?? exam.duration);
         const start = parseExamStart(exam);
-
-        if (!start || Number.isNaN(duration) || duration <= 0) {
+        const end = exam.end_time ? new Date(exam.end_time) : null;
+        if (!start || (end && Number.isNaN(end.getTime()))) {
             return "invalid";
         }
 
         const nowDate = new Date(now);
-        const end = new Date(start.getTime() + duration * 60 * 1000);
+        const fallbackDuration = Number(exam.duration_minutes ?? exam.duration);
+        const computedEnd =
+            end && !Number.isNaN(end.getTime())
+                ? end
+                : Number.isFinite(fallbackDuration) && fallbackDuration > 0
+                  ? new Date(start.getTime() + fallbackDuration * 60 * 1000)
+                  : null;
+        if (!computedEnd) return "invalid";
 
         if (nowDate < start) return "belum";
-        if (nowDate >= start && nowDate <= end) return "buka";
+        if (nowDate >= start && nowDate <= computedEnd) return "buka";
         return "berakhir";
     };
 
@@ -180,11 +186,14 @@ export default function ExamsAvailable() {
         const badge = windowBadge(status);
         const latestAttempt = exam.attempts?.[0];
         const start = parseExamStart(exam);
-        const duration = Number(exam.duration_minutes ?? exam.duration);
-        const end =
-            start && duration > 0
-                ? new Date(start.getTime() + duration * 60 * 1000)
-                : null;
+        const end = exam.end_time
+            ? new Date(exam.end_time)
+            : start && Number(exam.duration_minutes ?? exam.duration) > 0
+              ? new Date(
+                    start.getTime() +
+                        Number(exam.duration_minutes ?? exam.duration) * 60 * 1000
+                )
+              : null;
         const toStart = start ? Math.floor((start.getTime() - now) / 1000) : 0;
         const toEnd = end ? Math.floor((end.getTime() - now) / 1000) : 0;
 
@@ -203,14 +212,14 @@ export default function ExamsAvailable() {
                       attempt: latestAttempt.id,
                   }),
                   className:
-                      "bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-500",
+                      "bg-[#163d8f] text-white hover:bg-[#0f2e6f] focus-visible:ring-[#163d8f]",
               }
             : status === "buka"
               ? {
                     label: "Kerjakan",
                     href: route("exams.show", exam.id),
                     className:
-                        "bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-500",
+                        "bg-[#163d8f] text-white hover:bg-[#0f2e6f] focus-visible:ring-[#163d8f]",
                 }
               : {
                     label: status === "belum" ? "Belum Mulai" : "Lihat Detail",

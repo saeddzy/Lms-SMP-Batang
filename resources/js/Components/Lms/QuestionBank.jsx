@@ -5,9 +5,11 @@ const MAX_QUESTIONS = 100;
 
 const TYPE_OPTIONS = [
     { value: "multiple_choice", label: "Pilihan ganda", short: "PG" },
+    { value: "multiple_checkbox", label: "Pilihan Ganda Kompleks (Checkbox)", short: "PGK" },
     { value: "true_false", label: "Benar / salah", short: "BS" },
     { value: "short_answer", label: "Jawaban singkat", short: "JS" },
     { value: "essay", label: "Esai (manual)", short: "E" },
+    { value: "matching", label: "Menjodohkan (Matching)", short: "MJ" },
 ];
 
 const validationFieldLabels = {
@@ -18,7 +20,19 @@ const validationFieldLabels = {
     correct_answer: "Jawaban benar / kunci",
     points: "Poin",
     explanation: "Pembahasan / rubrik",
+    matching_pairs: "Pasangan menjodohkan",
+    multiple_checkbox_options: "Opsi checkbox",
 };
+
+const emptyMatchingRows = () => [
+    { leftText: "", rightText: "", leftImage: "", rightImage: "" },
+    { leftText: "", rightText: "", leftImage: "", rightImage: "" },
+];
+
+const emptyMultipleCheckboxRows = () => [
+    { text: "", is_correct: false },
+    { text: "", is_correct: false },
+];
 
 const emptyForm = () => ({
     question_text: "",
@@ -27,7 +41,26 @@ const emptyForm = () => ({
     correct_answer: "0",
     points: "1",
     explanation: "",
+    matchingMode: "text-text",
+    matchingPairs: emptyMatchingRows(),
+    multipleCheckboxOptions: emptyMultipleCheckboxRows(),
 });
+
+function normPairSide(s) {
+    return String(s ?? "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ");
+}
+
+function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
 
 function questionStoreUrl(mode, entityId) {
     if (mode === "quiz") {
@@ -155,6 +188,53 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
             };
         }
 
+        if (type === "matching") {
+            const mode = data.matchingMode || "text-text";
+            const pairs = (data.matchingPairs ?? [])
+                .map((row, idx) => {
+                    const leftType = mode.startsWith("image") ? "image" : "text";
+                    const rightType = mode.endsWith("image") ? "image" : "text";
+                    const leftValue =
+                        leftType === "image"
+                            ? String(row.leftImage ?? "").trim()
+                            : String(row.leftText ?? "").trim();
+                    const rightValue =
+                        rightType === "image"
+                            ? String(row.rightImage ?? "").trim()
+                            : String(row.rightText ?? "").trim();
+                    return {
+                        id: idx + 1,
+                        left: { type: leftType, value: leftValue },
+                        right: { type: rightType, value: rightValue },
+                    };
+                })
+                .filter((row) => row.left.value && row.right.value);
+            return {
+                question_text: data.question_text,
+                question_type: "matching",
+                options: { type: "matching", mode, pairs },
+                correct_answer: null,
+                points: data.points ? Number(data.points) : 1,
+                explanation: data.explanation?.trim() ? data.explanation : null,
+            };
+        }
+        if (type === "multiple_checkbox") {
+            const optionsRows = (data.multipleCheckboxOptions ?? [])
+                .map((row) => ({
+                    text: String(row.text ?? "").trim(),
+                    is_correct: Boolean(row.is_correct),
+                }))
+                .filter((row) => row.text);
+            return {
+                question_text: data.question_text,
+                question_type: "multiple_checkbox",
+                options: { type: "multiple_checkbox", options: optionsRows },
+                correct_answer: null,
+                points: data.points ? Number(data.points) : 1,
+                explanation: data.explanation?.trim() ? data.explanation : null,
+            };
+        }
+
         return {
             question_text: data.question_text,
             question_type: type,
@@ -175,6 +255,8 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
             question_type: "multiple_choice",
             correct_answer: "0",
             points: "1",
+            matchingPairs: emptyMatchingRows(),
+            multipleCheckboxOptions: emptyMultipleCheckboxRows(),
         });
         setComposerStep("form");
     };
@@ -189,6 +271,47 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
         if (payload.question_type === "short_answer" && (!payload.correct_answer || String(payload.correct_answer).trim() === "")) {
             return { correct_answer: ["Kunci jawaban singkat wajib diisi."] };
         }
+        if (payload.question_type === "matching") {
+            const pairs = payload.options?.pairs ?? [];
+            if (!Array.isArray(pairs) || pairs.length < 2) {
+                return { matching_pairs: ["Minimal dua pasangan lengkap (kiri & kanan)."] };
+            }
+            const seenL = new Set();
+            const seenR = new Set();
+            for (const p of pairs) {
+                const lk = normPairSide(p.left?.value);
+                const rk = normPairSide(p.right?.value);
+                if (seenL.has(lk)) {
+                    return { matching_pairs: ["Teks kolom kiri tidak boleh duplikat."] };
+                }
+                if (seenR.has(rk)) {
+                    return { matching_pairs: ["Teks kolom kanan tidak boleh duplikat."] };
+                }
+                seenL.add(lk);
+                seenR.add(rk);
+            }
+        }
+        if (payload.question_type === "multiple_checkbox") {
+            const rows = payload.options?.options ?? [];
+            if (!Array.isArray(rows) || rows.length < 2) {
+                return { multiple_checkbox_options: ["Minimal dua opsi untuk soal pilihan ganda kompleks."] };
+            }
+            const seen = new Set();
+            let correctCount = 0;
+            for (const row of rows) {
+                const text = String(row?.text ?? "").trim();
+                if (!text) return { multiple_checkbox_options: ["Semua opsi wajib diisi."] };
+                const key = text.toLowerCase().replace(/\s+/g, " ");
+                if (seen.has(key)) {
+                    return { multiple_checkbox_options: ["Teks opsi tidak boleh duplikat."] };
+                }
+                seen.add(key);
+                if (row?.is_correct) correctCount++;
+            }
+            if (correctCount < 1) {
+                return { multiple_checkbox_options: ["Minimal satu opsi harus dicentang sebagai jawaban benar."] };
+            }
+        }
         return null;
     };
 
@@ -200,14 +323,53 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
                       .split("\n")
                       .map((s) => s.trim())
                       .filter(Boolean)
-                : null;
+                : questionType === "matching"
+                  ? {
+                        type: "matching",
+                        mode: draft.matchingMode || "text-text",
+                        pairs: (draft.matchingPairs ?? [])
+                            .map((row, idx) => {
+                                const mode = draft.matchingMode || "text-text";
+                                const leftType = mode.startsWith("image") ? "image" : "text";
+                                const rightType = mode.endsWith("image") ? "image" : "text";
+                                return {
+                                    id: idx + 1,
+                                    left: {
+                                        type: leftType,
+                                        value:
+                                            leftType === "image"
+                                                ? String(row.leftImage ?? "").trim()
+                                                : String(row.leftText ?? "").trim(),
+                                    },
+                                    right: {
+                                        type: rightType,
+                                        value:
+                                            rightType === "image"
+                                                ? String(row.rightImage ?? "").trim()
+                                                : String(row.rightText ?? "").trim(),
+                                    },
+                                };
+                            })
+                            .filter((row) => row.left.value && row.right.value),
+                    }
+                : questionType === "multiple_checkbox"
+                  ? {
+                        type: "multiple_checkbox",
+                        options: (draft.multipleCheckboxOptions ?? [])
+                            .map((row) => ({
+                                text: String(row.text ?? "").trim(),
+                                is_correct: Boolean(row.is_correct),
+                            }))
+                            .filter((row) => row.text),
+                    }
+                  : null;
 
         return {
             question_text: draft.question_text ?? "",
             question_type: questionType,
             options,
             correct_answer:
-                questionType === "essay"
+                questionType === "essay" || questionType === "matching" || questionType === "multiple_checkbox"
                     ? null
                     : questionType === "true_false"
                       ? (draft.correct_answer === "false" ? "false" : "true")
@@ -241,6 +403,9 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
                     correct_answer: data.correct_answer,
                     points: data.points || "1",
                     explanation: data.explanation,
+                    matchingMode: data.matchingMode,
+                    matchingPairs: data.matchingPairs,
+                    multipleCheckboxOptions: data.multipleCheckboxOptions,
                 },
             ]);
             setData({
@@ -248,6 +413,9 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
                 question_type: "multiple_choice",
                 correct_answer: "0",
                 points: "1",
+                matchingMode: "text-text",
+                matchingPairs: emptyMatchingRows(),
+                multipleCheckboxOptions: emptyMultipleCheckboxRows(),
             });
             setVisitErrors({});
             return;
@@ -331,6 +499,33 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
         setSequentialDrafts([]);
         setComposerStep("form");
         const qt = q.question_type ?? "multiple_choice";
+        let matchingPairs = emptyMatchingRows();
+        let matchingMode = "text-text";
+        let multipleCheckboxOptions = emptyMultipleCheckboxRows();
+        if (qt === "matching" && q.options && typeof q.options === "object" && Array.isArray(q.options.pairs)) {
+            matchingMode = q.options.mode || "text-text";
+            matchingPairs = q.options.pairs.map((p) => ({
+                leftText: String(p?.left?.type === "text" ? p?.left?.value : ""),
+                rightText: String(p?.right?.type === "text" ? p?.right?.value : ""),
+                leftImage: String(p?.left?.type === "image" ? p?.left?.value : ""),
+                rightImage: String(p?.right?.type === "image" ? p?.right?.value : ""),
+            }));
+            if (matchingPairs.length < 2) {
+                matchingPairs = [...matchingPairs, ...emptyMatchingRows()].slice(0, 2);
+            }
+        }
+        if (qt === "multiple_checkbox" && q.options && typeof q.options === "object" && Array.isArray(q.options.options)) {
+            multipleCheckboxOptions = q.options.options.map((o) => ({
+                text: String(o?.text ?? ""),
+                is_correct: Boolean(o?.is_correct),
+            }));
+            if (multipleCheckboxOptions.length < 2) {
+                multipleCheckboxOptions = [
+                    ...multipleCheckboxOptions,
+                    ...emptyMultipleCheckboxRows(),
+                ].slice(0, 2);
+            }
+        }
         setData({
             question_text: q.question_text ?? "",
             question_type: qt,
@@ -343,6 +538,9 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
                       : "",
             points: String(q.points ?? "1"),
             explanation: q.explanation ?? "",
+            matchingMode,
+            matchingPairs,
+            multipleCheckboxOptions,
         });
         setVisitErrors({});
         clearErrors();
@@ -367,6 +565,11 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
                 correct_answer: previousDraft.correct_answer ?? "0",
                 points: String(previousDraft.points ?? "1"),
                 explanation: previousDraft.explanation ?? "",
+                matchingMode: previousDraft.matchingMode ?? "text-text",
+                matchingPairs: previousDraft.matchingPairs ?? emptyMatchingRows(),
+                multipleCheckboxOptions:
+                    previousDraft.multipleCheckboxOptions ??
+                    emptyMultipleCheckboxRows(),
             });
             setVisitErrors({});
             return;
@@ -397,6 +600,23 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
         }
         if (data.question_type === "short_answer") {
             return data.correct_answer?.trim() ? "Kunci jawaban terisi" : "Belum diisi";
+        }
+        if (data.question_type === "matching") {
+            const leftIsImage = String(data.matchingMode || "text-text").startsWith("image");
+            const rightIsImage = String(data.matchingMode || "text-text").endsWith("image");
+            const n = (data.matchingPairs ?? []).filter((p) => {
+                const l = leftIsImage ? p.leftImage : p.leftText;
+                const r = rightIsImage ? p.rightImage : p.rightText;
+                return String(l ?? "").trim() && String(r ?? "").trim();
+            }).length;
+            return n >= 2 ? `${n} pasangan` : "Lengkapi pasangan";
+        }
+        if (data.question_type === "multiple_checkbox") {
+            const rows = (data.multipleCheckboxOptions ?? []).filter((o) => o.text?.trim());
+            const correct = rows.filter((o) => o.is_correct).length;
+            return rows.length >= 2
+                ? `${rows.length} opsi, ${correct} benar`
+                : "Lengkapi opsi checkbox";
         }
         return "Dinilai manual guru";
     })();
@@ -530,19 +750,25 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
                         <label className="text-xs font-semibold uppercase text-slate-500">Tipe soal</label>
                         <select
                             value={data.question_type}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                                const t = e.target.value;
+                                const base = emptyForm();
                                 setData({
-                                    ...emptyForm(),
-                                    question_type: e.target.value,
+                                    ...base,
+                                    question_text: data.question_text,
+                                    question_type: t,
                                     correct_answer:
-                                        e.target.value === "multiple_choice"
+                                        t === "multiple_choice"
                                             ? "0"
-                                            : e.target.value === "true_false"
+                                            : t === "true_false"
                                               ? "true"
                                               : "",
                                     points: data.points || "1",
-                                })
-                            }
+                                    matchingMode: "text-text",
+                                    matchingPairs: base.matchingPairs,
+                                    multipleCheckboxOptions: base.multipleCheckboxOptions,
+                                });
+                            }}
                             className="mt-1 block w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[#163d8f] focus:outline-none focus:ring-2 focus:ring-[#163d8f]/20 disabled:bg-slate-100"
                         >
                             {TYPE_OPTIONS.map((t) => (
@@ -613,7 +839,240 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
                         </div>
                     )}
 
-                    {data.question_type !== "essay" && (
+                    {data.question_type === "matching" && (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-4 shadow-sm">
+                            <div className="mb-3">
+                                <label className="text-xs font-semibold uppercase text-slate-500">
+                                    Tipe pasangan
+                                </label>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                    {[
+                                        { value: "text-text", label: "Teks - Teks" },
+                                        { value: "text-image", label: "Teks - Gambar" },
+                                        { value: "image-text", label: "Gambar - Teks" },
+                                        { value: "image-image", label: "Gambar - Gambar" },
+                                    ].map((m) => (
+                                        <label
+                                            key={m.value}
+                                            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="matchingMode"
+                                                checked={data.matchingMode === m.value}
+                                                onChange={() =>
+                                                    setData("matchingMode", m.value)
+                                                }
+                                            />
+                                            {m.label}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                            <label className="text-xs font-semibold uppercase text-slate-500">
+                                Pasangan menjodohkan <span className="text-rose-500">*</span>
+                            </label>
+                            <p className="mt-1 text-xs text-slate-600">
+                                Minimal 2 pasangan. Isi teks atau upload gambar sesuai mode.
+                            </p>
+                            <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                                <span className="text-[11px] font-semibold uppercase text-slate-500">
+                                    Kolom kiri (soal)
+                                </span>
+                                <span className="text-[11px] font-semibold uppercase text-slate-500">
+                                    Kolom kanan (jawaban)
+                                </span>
+                            </div>
+                            <div className="mt-2 space-y-2">
+                                {(data.matchingPairs ?? []).map((row, idx) => (
+                                    <div
+                                        key={`mp-${idx}`}
+                                        className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1fr_auto]"
+                                    >
+                                        {String(data.matchingMode).startsWith("image") ? (
+                                            <div className="space-y-2">
+                                                <input
+                                                    type="file"
+                                                    accept=".jpg,.jpeg,.png,image/png,image/jpeg"
+                                                    onChange={async (e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (!file) return;
+                                                        const dataUrl = await fileToDataUrl(file);
+                                                        const next = [...(data.matchingPairs ?? [])];
+                                                        next[idx] = { ...next[idx], leftImage: dataUrl };
+                                                        setData("matchingPairs", next);
+                                                    }}
+                                                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"
+                                                />
+                                                {row.leftImage ? (
+                                                    <img
+                                                        src={
+                                                            row.leftImage.startsWith("data:")
+                                                                ? row.leftImage
+                                                                : `/storage/${row.leftImage}`
+                                                        }
+                                                        alt="preview kiri"
+                                                        className="h-20 w-28 rounded-lg object-cover shadow-sm"
+                                                    />
+                                                ) : null}
+                                            </div>
+                                        ) : (
+                                            <input
+                                                type="text"
+                                                value={row.leftText}
+                                                onChange={(e) => {
+                                                    const next = [...(data.matchingPairs ?? [])];
+                                                    next[idx] = { ...next[idx], leftText: e.target.value };
+                                                    setData("matchingPairs", next);
+                                                }}
+                                                placeholder="Teks kiri"
+                                                className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#163d8f] focus:outline-none focus:ring-2 focus:ring-[#163d8f]/20"
+                                            />
+                                        )}
+                                        {String(data.matchingMode).endsWith("image") ? (
+                                            <div className="space-y-2">
+                                                <input
+                                                    type="file"
+                                                    accept=".jpg,.jpeg,.png,image/png,image/jpeg"
+                                                    onChange={async (e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (!file) return;
+                                                        const dataUrl = await fileToDataUrl(file);
+                                                        const next = [...(data.matchingPairs ?? [])];
+                                                        next[idx] = { ...next[idx], rightImage: dataUrl };
+                                                        setData("matchingPairs", next);
+                                                    }}
+                                                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"
+                                                />
+                                                {row.rightImage ? (
+                                                    <img
+                                                        src={
+                                                            row.rightImage.startsWith("data:")
+                                                                ? row.rightImage
+                                                                : `/storage/${row.rightImage}`
+                                                        }
+                                                        alt="preview kanan"
+                                                        className="h-20 w-28 rounded-lg object-cover shadow-sm"
+                                                    />
+                                                ) : null}
+                                            </div>
+                                        ) : (
+                                            <input
+                                                type="text"
+                                                value={row.rightText}
+                                                onChange={(e) => {
+                                                    const next = [...(data.matchingPairs ?? [])];
+                                                    next[idx] = { ...next[idx], rightText: e.target.value };
+                                                    setData("matchingPairs", next);
+                                                }}
+                                                placeholder="Teks kanan"
+                                                className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#163d8f] focus:outline-none focus:ring-2 focus:ring-[#163d8f]/20"
+                                            />
+                                        )}
+                                        <button
+                                            type="button"
+                                            disabled={(data.matchingPairs ?? []).length <= 2}
+                                            onClick={() => {
+                                                const next = (data.matchingPairs ?? []).filter((_, i) => i !== idx);
+                                                setData("matchingPairs", next.length >= 2 ? next : data.matchingPairs);
+                                            }}
+                                            className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                        >
+                                            Hapus
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setData("matchingPairs", [
+                                        ...(data.matchingPairs ?? []),
+                                        {
+                                            leftText: "",
+                                            rightText: "",
+                                            leftImage: "",
+                                            rightImage: "",
+                                        },
+                                    ])
+                                }
+                                className="mt-3 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                                + Tambah pasangan
+                            </button>
+                        </div>
+                    )}
+
+                    {data.question_type === "multiple_checkbox" && (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-4 shadow-sm">
+                            <label className="text-xs font-semibold uppercase text-slate-500">
+                                Opsi pilihan ganda kompleks <span className="text-rose-500">*</span>
+                            </label>
+                            <p className="mt-1 text-xs text-slate-600">
+                                Centang opsi yang benar. Minimal 2 opsi dan minimal 1 jawaban benar.
+                            </p>
+                            <div className="mt-3 space-y-2">
+                                {(data.multipleCheckboxOptions ?? []).map((row, idx) => (
+                                    <div
+                                        key={`mcb-opt-${idx}`}
+                                        className="grid grid-cols-[auto_1fr_auto] items-center gap-2"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(row.is_correct)}
+                                            onChange={(e) => {
+                                                const next = [...(data.multipleCheckboxOptions ?? [])];
+                                                next[idx] = { ...next[idx], is_correct: e.target.checked };
+                                                setData("multipleCheckboxOptions", next);
+                                            }}
+                                            className="h-5 w-5 rounded accent-indigo-600"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={row.text}
+                                            onChange={(e) => {
+                                                const next = [...(data.multipleCheckboxOptions ?? [])];
+                                                next[idx] = { ...next[idx], text: e.target.value };
+                                                setData("multipleCheckboxOptions", next);
+                                            }}
+                                            placeholder={`Opsi ${idx + 1}`}
+                                            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#163d8f] focus:outline-none focus:ring-2 focus:ring-[#163d8f]/20"
+                                        />
+                                        <button
+                                            type="button"
+                                            disabled={(data.multipleCheckboxOptions ?? []).length <= 2}
+                                            onClick={() => {
+                                                const next = (data.multipleCheckboxOptions ?? []).filter((_, i) => i !== idx);
+                                                setData(
+                                                    "multipleCheckboxOptions",
+                                                    next.length >= 2 ? next : data.multipleCheckboxOptions
+                                                );
+                                            }}
+                                            className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                        >
+                                            Hapus
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setData("multipleCheckboxOptions", [
+                                        ...(data.multipleCheckboxOptions ?? []),
+                                        { text: "", is_correct: false },
+                                    ])
+                                }
+                                className="mt-3 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                                + Tambah opsi
+                            </button>
+                        </div>
+                    )}
+
+                    {data.question_type !== "essay" &&
+                        data.question_type !== "matching" &&
+                        data.question_type !== "multiple_checkbox" && (
                         <div>
                             <label className="text-xs font-semibold uppercase text-slate-500">
                                 {data.question_type === "short_answer" ? "Kunci jawaban" : "Jawaban benar"}
@@ -755,6 +1214,72 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
                                 ))}
                             </ul>
                         ) : null}
+                        {data.question_type === "matching" ? (
+                            <ul className="mt-3 space-y-1.5 rounded-xl border border-slate-200 bg-white p-2 text-xs text-slate-700 shadow-sm">
+                                {(data.matchingPairs ?? [])
+                                    .filter((p) => {
+                                        const leftIsImage = String(data.matchingMode).startsWith("image");
+                                        const rightIsImage = String(data.matchingMode).endsWith("image");
+                                        const l = leftIsImage ? p.leftImage : p.leftText;
+                                        const r = rightIsImage ? p.rightImage : p.rightText;
+                                        return String(l ?? "").trim() && String(r ?? "").trim();
+                                    })
+                                    .map((p, i) => (
+                                        <li key={i} className="flex gap-2">
+                                            <span className="font-semibold text-slate-500">{i + 1}.</span>
+                                            <span className="flex items-center gap-2">
+                                                {String(data.matchingMode).startsWith("image") ? (
+                                                    <img
+                                                        src={
+                                                            String(p.leftImage).startsWith("data:")
+                                                                ? p.leftImage
+                                                                : `/storage/${p.leftImage}`
+                                                        }
+                                                        alt="left"
+                                                        className="h-8 w-10 rounded object-cover"
+                                                    />
+                                                ) : (
+                                                    <span>{p.leftText}</span>
+                                                )}
+                                                <span>?</span>
+                                                {String(data.matchingMode).endsWith("image") ? (
+                                                    <img
+                                                        src={
+                                                            String(p.rightImage).startsWith("data:")
+                                                                ? p.rightImage
+                                                                : `/storage/${p.rightImage}`
+                                                        }
+                                                        alt="right"
+                                                        className="h-8 w-10 rounded object-cover"
+                                                    />
+                                                ) : (
+                                                    <span>{p.rightText}</span>
+                                                )}
+                                            </span>
+                                        </li>
+                                    ))}
+                            </ul>
+                        ) : null}
+                        {data.question_type === "multiple_checkbox" ? (
+                            <ul className="mt-3 space-y-1.5 rounded-xl border border-slate-200 bg-white p-2 text-xs text-slate-700 shadow-sm">
+                                {(data.multipleCheckboxOptions ?? [])
+                                    .filter((o) => o.text?.trim())
+                                    .map((o, i) => (
+                                        <li key={i} className="flex items-center gap-2">
+                                            <span
+                                                className={`inline-flex h-4 w-4 items-center justify-center rounded border text-[10px] ${
+                                                    o.is_correct
+                                                        ? "border-emerald-300 bg-emerald-100 text-emerald-700"
+                                                        : "border-slate-300 bg-slate-100 text-slate-500"
+                                                }`}
+                                            >
+                                                {o.is_correct ? "?" : ""}
+                                            </span>
+                                            <span>{o.text}</span>
+                                        </li>
+                                    ))}
+                            </ul>
+                        ) : null}
                     </aside>
                 </div>
             )}
@@ -771,7 +1296,7 @@ export default function QuestionBank({ mode, entityId, questions = [], canManage
                                     type="search"
                                     value={savedListQuery}
                                     onChange={(e) => setSavedListQuery(e.target.value)}
-                                    placeholder="Cari teks soal…"
+                                    placeholder="Cari teks soal"
                                     className="min-w-[140px] flex-1 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#163d8f] focus:outline-none focus:ring-2 focus:ring-[#163d8f]/20"
                                     aria-label="Cari soal di daftar"
                                 />

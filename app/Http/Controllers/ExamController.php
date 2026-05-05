@@ -2,23 +2,25 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Exam;
-use App\Models\Subject;
-use App\Models\SchoolClass;
+use App\Helpers\ExamTimeHelper;
 use App\Models\ClassSubject;
-use App\Models\User;
+use App\Models\Exam;
 use App\Models\ExamAttempt;
 use App\Models\ExamAttemptAnswer;
 use App\Models\ExamQuestion;
+use App\Models\SchoolClass;
+use App\Models\Subject;
+use App\Models\User;
 use App\Support\AttemptScoreCalculator;
 use App\Support\AttemptStatusHelper;
-use App\Helpers\ExamTimeHelper;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
-use Carbon\Carbon;
 
 class ExamController extends Controller
 {
@@ -60,7 +62,7 @@ class ExamController extends Controller
 
         // Filter by teacher (for teachers, only show their exams)
         if (auth()->user()->hasRole('guru')) {
-            $query->whereHas('classSubject', function($q) {
+            $query->whereHas('classSubject', function ($q) {
                 $q->forTeacher(auth()->user());
             });
         }
@@ -102,14 +104,14 @@ class ExamController extends Controller
             $search = trim((string) $request->search);
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%")
-                  ->orWhereHas('subject', function ($subjectQuery) use ($search) {
-                      $subjectQuery->where('name', 'like', "%{$search}%")
-                          ->orWhere('code', 'like', "%{$search}%");
-                  })
-                  ->orWhereHas('schoolClass', function ($classQuery) use ($search) {
-                      $classQuery->where('name', 'like', "%{$search}%");
-                  });
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhereHas('subject', function ($subjectQuery) use ($search) {
+                        $subjectQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('schoolClass', function ($classQuery) use ($search) {
+                        $classQuery->where('name', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -117,7 +119,7 @@ class ExamController extends Controller
         $exams->getCollection()->transform(function (Exam $exam) {
             $status = 'inactive';
 
-            if (!$exam->is_active || $exam->is_cancelled) {
+            if (! $exam->is_active || $exam->is_cancelled) {
                 $status = 'inactive';
             } elseif ($exam->start_time && now()->lt($exam->start_time)) {
                 $status = 'upcoming';
@@ -134,11 +136,11 @@ class ExamController extends Controller
         });
 
         if (auth()->user()->hasRole('guru')) {
-            $subjects = Subject::whereHas('classSubjects', function($q) {
+            $subjects = Subject::whereHas('classSubjects', function ($q) {
                 $q->forTeacher(auth()->user());
             })->where('is_active', true)->get();
 
-            $classes = SchoolClass::whereHas('classSubjects', function($q) {
+            $classes = SchoolClass::whereHas('classSubjects', function ($q) {
                 $q->forTeacher(auth()->user());
             })->where('is_active', true)->distinct()->get();
         } elseif (auth()->user()->hasRole('siswa')) {
@@ -162,7 +164,7 @@ class ExamController extends Controller
             'subjects' => $subjects,
             'classes' => $classes,
             'teachers' => $teachers,
-            'filters' => $request->only(['subject_id', 'class_id', 'teacher_id', 'search', 'type', 'status'])
+            'filters' => $request->only(['subject_id', 'class_id', 'teacher_id', 'search', 'type', 'status']),
         ]);
     }
 
@@ -176,12 +178,12 @@ class ExamController extends Controller
         // Teachers can only access subjects and classes they teach
         if (auth()->user()->hasRole('guru')) {
             // Get only subjects where the teacher is assigned
-            $subjects = Subject::whereHas('classSubjects', function($q) {
+            $subjects = Subject::whereHas('classSubjects', function ($q) {
                 $q->forTeacher(auth()->user());
             })->where('is_active', true)->get();
 
             // Get only classes where the teacher teaches
-            $classes = SchoolClass::whereHas('classSubjects', function($q) {
+            $classes = SchoolClass::whereHas('classSubjects', function ($q) {
                 $q->forTeacher(auth()->user());
             })->where('is_active', true)->distinct()->get();
         } else {
@@ -249,74 +251,74 @@ class ExamController extends Controller
                 'status' => 'nullable|string',
             ]);
 
-        \Log::info('Validation passed', [
-            'validated_data' => $validated,
-            'user_id' => auth()->id(),
-        ]);
+            \Log::info('Validation passed', [
+                'validated_data' => $validated,
+                'user_id' => auth()->id(),
+            ]);
 
-        // Find the class_subject based on class_id and subject_id
-        $classSubject = ClassSubject::where('class_id', $validated['class_id'])
-            ->where('subject_id', $validated['subject_id'])
-            ->first();
+            // Find the class_subject based on class_id and subject_id
+            $classSubject = ClassSubject::where('class_id', $validated['class_id'])
+                ->where('subject_id', $validated['subject_id'])
+                ->first();
 
-        if (!$classSubject) {
-            return back()->withErrors(['subject_id' => 'Mata pelajaran tidak ditemukan untuk kelas ini.']);
-        }
+            if (! $classSubject) {
+                return back()->withErrors(['subject_id' => 'Mata pelajaran tidak ditemukan untuk kelas ini.']);
+            }
 
-        $this->authorizeClassSubjectSlotTeacher($classSubject);
+            $this->authorizeClassSubjectSlotTeacher($classSubject);
 
-        $examType = match ($validated['type']) {
-            'midterm' => 'mid_term',
-            'final' => 'final',
-            'quiz' => 'quiz',
-            'practice' => 'practice',
-            default => 'quiz',
-        };
+            $examType = match ($validated['type']) {
+                'midterm' => 'mid_term',
+                'final' => 'final',
+                'quiz' => 'quiz',
+                'practice' => 'practice',
+                default => 'quiz',
+            };
 
-        // Combine date and time using Carbon
-        $startDateTime = \Carbon\Carbon::parse($validated['scheduled_date'] . ' ' . $validated['start_time']);
-        $endDateTime = \Carbon\Carbon::parse($validated['scheduled_date'] . ' ' . $validated['end_time']);
+            // Combine date and time using Carbon
+            $startDateTime = Carbon::parse($validated['scheduled_date'].' '.$validated['start_time']);
+            $endDateTime = Carbon::parse($validated['scheduled_date'].' '.$validated['end_time']);
 
-        // Debug log untuk memastikan data masuk DB dengan benar
-        \Log::info('Exam datetime debug', [
-            'scheduled_date' => $validated['scheduled_date'],
-            'start_time_input' => $validated['start_time'],
-            'end_time_input' => $validated['end_time'],
-            'start_datetime' => $startDateTime,
-            'end_datetime' => $endDateTime,
-            'duration' => $validated['duration'],
-        ]);
+            // Debug log untuk memastikan data masuk DB dengan benar
+            \Log::info('Exam datetime debug', [
+                'scheduled_date' => $validated['scheduled_date'],
+                'start_time_input' => $validated['start_time'],
+                'end_time_input' => $validated['end_time'],
+                'start_datetime' => $startDateTime,
+                'end_datetime' => $endDateTime,
+                'duration' => $validated['duration'],
+            ]);
 
-        // Create exam record
-        $exam = Exam::create([
-            'title' => $validated['title'],
-            'description' => $validated['description'] ?? null,
-            'instructions' => $validated['instructions'] ?? null,
-            'class_id' => $validated['class_id'],
-            'class_subject_id' => $classSubject->id,
-            'exam_type' => $examType,
-            'scheduled_date' => $startDateTime,
-            'start_time' => $startDateTime,
-            'end_time' => $endDateTime,
-            'duration' => $validated['duration'],
-            'duration_minutes' => $validated['duration'],
-            'max_attempts' => $validated['max_attempts'] ?? 1,
-            'passing_marks' => $validated['passing_score'] ?? 0,
-            'total_marks' => 100,
-            'requires_supervision' => $request->boolean('supervision_required'),
-            'allow_review' => $request->boolean('allow_review'),
-            'created_by' => auth()->id(),
-            'is_active' => true,
-        ]);
+            // Create exam record
+            $exam = Exam::create([
+                'title' => $validated['title'],
+                'description' => $validated['description'] ?? null,
+                'instructions' => $validated['instructions'] ?? null,
+                'class_id' => $validated['class_id'],
+                'class_subject_id' => $classSubject->id,
+                'exam_type' => $examType,
+                'scheduled_date' => $startDateTime,
+                'start_time' => $startDateTime,
+                'end_time' => $endDateTime,
+                'duration' => $validated['duration'],
+                'duration_minutes' => $validated['duration'],
+                'max_attempts' => $validated['max_attempts'] ?? 1,
+                'passing_marks' => $validated['passing_score'] ?? 0,
+                'total_marks' => 100,
+                'requires_supervision' => $request->boolean('supervision_required'),
+                'allow_review' => $request->boolean('allow_review'),
+                'created_by' => auth()->id(),
+                'is_active' => true,
+            ]);
 
-        \Log::info('Exam created successfully', [
-            'exam_id' => $exam->id,
-            'exam_title' => $exam->title,
-            'redirect_to' => 'exams.show',
-        ]);
+            \Log::info('Exam created successfully', [
+                'exam_id' => $exam->id,
+                'exam_title' => $exam->title,
+                'redirect_to' => 'exams.show',
+            ]);
 
-        return redirect()->route('exams.show', $exam)
-            ->with('success', 'Ujian berhasil dibuat. Sekarang tambahkan soal-soal.');
+            return redirect()->route('exams.show', $exam)
+                ->with('success', 'Ujian berhasil dibuat. Sekarang tambahkan soal-soal.');
 
         } catch (\Exception $e) {
             \Log::error('Exam creation failed', [
@@ -326,7 +328,7 @@ class ExamController extends Controller
                 'request_data' => $request->all(),
             ]);
 
-            return back()->withErrors(['error' => 'Terjadi kesalahan saat menyimpan data ujian: ' . $e->getMessage()]);
+            return back()->withErrors(['error' => 'Terjadi kesalahan saat menyimpan data ujian: '.$e->getMessage()]);
         }
     }
 
@@ -343,15 +345,15 @@ class ExamController extends Controller
             'teacher',
             'creator',
             'questions',
-                    ];
-        if (auth()->user()->can('exams view') && !auth()->user()->hasRole('siswa')) {
+        ];
+        if (auth()->user()->can('exams view') && ! auth()->user()->hasRole('siswa')) {
             $load[] = 'schoolClass.students';
         }
         $exam->load($load);
         $exam->loadMissing('classSubject');
 
         // Load attempts for teachers and admins
-        if (auth()->user()->can('exams view') && !auth()->user()->hasRole('siswa')) {
+        if (auth()->user()->can('exams view') && ! auth()->user()->hasRole('siswa')) {
             $attempts = $exam->attempts()
                 ->with(['student', 'answers.question'])
                 ->orderBy('started_at', 'desc')
@@ -403,11 +405,11 @@ class ExamController extends Controller
 
         // Teachers can only edit exams for subjects they teach
         if (auth()->user()->hasRole('guru')) {
-            $subjects = Subject::whereHas('classSubjects', function($q) {
+            $subjects = Subject::whereHas('classSubjects', function ($q) {
                 $q->forTeacher(auth()->user());
             })->where('is_active', true)->get();
 
-            $classes = SchoolClass::whereHas('classSubjects', function($q) {
+            $classes = SchoolClass::whereHas('classSubjects', function ($q) {
                 $q->forTeacher(auth()->user());
             })->where('is_active', true)->distinct()->get();
         } else {
@@ -417,15 +419,15 @@ class ExamController extends Controller
 
         // Format date and time for HTML inputs
         $examData = $exam->toArray();
-        
+
         // Handle scheduled_date formatting
         if ($exam->scheduled_date) {
             // Try different date formats
             $date = \DateTime::createFromFormat('Y-m-d', $exam->scheduled_date);
-            if (!$date) {
+            if (! $date) {
                 $date = \DateTime::createFromFormat('Y-m-d H:i:s', $exam->scheduled_date);
             }
-            if (!$date) {
+            if (! $date) {
                 $date = \DateTime::createFromFormat('Y-m-d\TH:i:s', $exam->scheduled_date);
             }
             if ($date) {
@@ -436,7 +438,7 @@ class ExamController extends Controller
         } else {
             $examData['scheduled_date'] = null;
         }
-        
+
         // Handle time formatting
         $examData['start_time'] = $exam->start_time ? date('H:i', strtotime($exam->start_time)) : null;
         $examData['end_time'] = $exam->end_time ? date('H:i', strtotime($exam->end_time)) : null;
@@ -481,7 +483,7 @@ class ExamController extends Controller
             'allow_review' => 'boolean',
             'start_time' => 'required',
             'end_time' => 'required',
-                    ]);
+        ]);
 
         $classSubject = ClassSubject::where('class_id', $validated['class_id'])
             ->where('subject_id', $validated['subject_id'])
@@ -502,8 +504,8 @@ class ExamController extends Controller
         };
 
         // Combine date and time using Carbon (same as store method)
-        $startDateTime = \Carbon\Carbon::parse($validated['scheduled_date'] . ' ' . $validated['start_time']);
-        $endDateTime = \Carbon\Carbon::parse($validated['scheduled_date'] . ' ' . $validated['end_time']);
+        $startDateTime = Carbon::parse($validated['scheduled_date'].' '.$validated['start_time']);
+        $endDateTime = Carbon::parse($validated['scheduled_date'].' '.$validated['end_time']);
 
         // Debug log untuk memastikan data masuk DB dengan benar
         \Log::info('Exam update datetime debug', [
@@ -557,11 +559,11 @@ class ExamController extends Controller
     public function startAttempt(Exam $exam)
     {
         // Check if user is a student and enrolled in the class
-        if (!auth()->user()->hasRole('siswa')) {
+        if (! auth()->user()->hasRole('siswa')) {
             abort(403, 'Hanya siswa yang dapat mengikuti ujian.');
         }
 
-        if (!$exam->schoolClass->students()->where('users.id', auth()->id())->exists()) {
+        if (! $exam->schoolClass->students()->where('users.id', auth()->id())->exists()) {
             abort(403, 'Anda tidak terdaftar di kelas ini.');
         }
 
@@ -579,17 +581,11 @@ class ExamController extends Controller
         $examEndTime = $exam->end_time;
 
         if (now() < $examStartTime) {
-            return back()->with('error', 'Ujian belum dimulai. Dimulai pada: ' . $examStartTime->format('d M Y H:i'));
+            return back()->with('error', 'Ujian belum dimulai. Dimulai pada: '.$examStartTime->format('d M Y H:i'));
         }
 
         if (now() > $examEndTime) {
-            return back()->with('error', 'Ujian sudah berakhir pada: ' . $examEndTime->format('d M Y H:i'));
-        }
-
-        // Check attempt limit
-        $attemptCount = $exam->attempts()->where('student_id', auth()->id())->count();
-        if ($attemptCount >= $exam->max_attempts) {
-            return back()->with('error', 'Anda sudah mencapai batas percobaan.');
+            return back()->with('error', 'Ujian sudah berakhir pada: '.$examEndTime->format('d M Y H:i'));
         }
 
         // Check if there's an unfinished attempt
@@ -600,6 +596,13 @@ class ExamController extends Controller
 
         if ($unfinishedAttempt) {
             return redirect()->route('exams.attempt.take', [$exam, $unfinishedAttempt]);
+        }
+
+        // Check attempt limit (hanya untuk membuat attempt baru)
+        $maxAttempts = max(1, (int) ($exam->max_attempts ?? 1));
+        $attemptCount = $exam->attempts()->where('student_id', auth()->id())->count();
+        if ($attemptCount >= $maxAttempts) {
+            return back()->with('error', 'Anda sudah mencapai batas percobaan (maks '.$maxAttempts.'x).');
         }
 
         // Create new attempt
@@ -630,8 +633,17 @@ class ExamController extends Controller
         // Check if attempt is expired using ExamTimeHelper
         if (ExamTimeHelper::isExpired($attempt)) {
             ExamTimeHelper::updateExpiredAttempt($attempt);
+
             return redirect()->route('exams.show', $exam)
                 ->with('error', 'Waktu pengerjaan ujian sudah habis.');
+        }
+
+        // Hard stop berdasarkan jadwal global ujian (start_time - end_time).
+        if ($exam->end_time && now()->greaterThan($exam->end_time)) {
+            ExamTimeHelper::updateExpiredAttempt($attempt);
+
+            return redirect()->route('exams.show', $exam)
+                ->with('error', 'Waktu ujian global sudah berakhir.');
         }
 
         $exam->load(['questions' => function ($query) {
@@ -641,7 +653,7 @@ class ExamController extends Controller
         return Inertia::render('Exams/Attempt', [
             'exam' => $exam,
             'attempt' => $attempt,
-            'timeRemaining' => \App\Helpers\ExamTimeHelper::getRemainingSeconds($attempt),
+            'timeRemaining' => ExamTimeHelper::getRemainingSeconds($attempt),
         ]);
     }
 
@@ -903,7 +915,7 @@ class ExamController extends Controller
             ]);
 
             $data = $this->prepareExamQuestionData($request);
-            
+
             \Log::info('Question data prepared', [
                 'data' => $data,
                 'exam_id' => $exam->id,
@@ -911,7 +923,7 @@ class ExamController extends Controller
 
             $order = (int) ($exam->questions()->max('order') ?? 0) + 1;
             $question = $exam->questions()->create(array_merge($data, ['order' => $order]));
-            
+
             \Log::info('Question created', [
                 'question_id' => $question->id,
                 'exam_id' => $exam->id,
@@ -919,7 +931,7 @@ class ExamController extends Controller
             ]);
 
             $exam->update(['total_questions' => $exam->questions()->count()]);
-            
+
             \Log::info('Exam total_questions updated', [
                 'exam_id' => $exam->id,
                 'total_questions' => $exam->questions()->count(),
@@ -935,7 +947,7 @@ class ExamController extends Controller
                 'user_id' => auth()->id(),
             ]);
 
-            return back()->withErrors(['error' => 'Terjadi kesalahan saat menambahkan soal: ' . $e->getMessage()]);
+            return back()->withErrors(['error' => 'Terjadi kesalahan saat menambahkan soal: '.$e->getMessage()]);
         }
     }
 
@@ -986,9 +998,8 @@ class ExamController extends Controller
 
         $validated = $request->validate([
             'question_text' => 'required|string',
-            'question_type' => 'required|in:multiple_choice,true_false,short_answer,essay',
-            'options' => 'nullable|array',
-            'options.*' => 'nullable|string',
+            'question_type' => 'required|in:multiple_choice,true_false,short_answer,essay,matching,multiple_checkbox',
+            'options' => 'nullable',
             'correct_answer' => 'nullable|string|max:10000',
             'points' => 'nullable|numeric|min:0|max:1000',
             'explanation' => 'nullable|string',
@@ -998,8 +1009,14 @@ class ExamController extends Controller
         $options = null;
 
         if ($type === 'multiple_choice') {
+            $optsRaw = $request->input('options');
+            if (! is_array($optsRaw)) {
+                throw ValidationException::withMessages([
+                    'options' => 'Opsi pilihan ganda tidak valid.',
+                ]);
+            }
             $opts = array_values(array_filter(
-                $validated['options'] ?? [],
+                $optsRaw,
                 fn ($x) => $x !== null && trim((string) $x) !== ''
             ));
             if (count($opts) < 2) {
@@ -1013,7 +1030,7 @@ class ExamController extends Controller
                 ]);
             }
             $ca = (string) $validated['correct_answer'];
-            if (!ctype_digit($ca) || (int) $ca < 0 || (int) $ca >= count($opts)) {
+            if (! ctype_digit($ca) || (int) $ca < 0 || (int) $ca >= count($opts)) {
                 throw ValidationException::withMessages([
                     'correct_answer' => 'Jawaban benar harus memilih salah satu opsi (indeks 0, 1, …).',
                 ]);
@@ -1026,7 +1043,7 @@ class ExamController extends Controller
                 ]);
             }
             $ca = strtolower(trim((string) $validated['correct_answer']));
-            if (!in_array($ca, ['true', 'false'], true)) {
+            if (! in_array($ca, ['true', 'false'], true)) {
                 throw ValidationException::withMessages([
                     'correct_answer' => 'Untuk benar/salah, isi jawaban benar dengan true atau false.',
                 ]);
@@ -1046,6 +1063,120 @@ class ExamController extends Controller
                 ]);
             }
             $validated['correct_answer'] = implode("\n", $lines);
+        } elseif ($type === 'matching') {
+            $opt = $request->input('options');
+            if (! is_array($opt) || ($opt['type'] ?? null) !== 'matching') {
+                throw ValidationException::withMessages([
+                    'options' => 'Format soal menjodohkan tidak valid.',
+                ]);
+            }
+            $mode = (string) ($opt['mode'] ?? 'text-text');
+            if (! in_array($mode, ['text-text', 'text-image', 'image-text', 'image-image'], true)) {
+                throw ValidationException::withMessages([
+                    'options' => 'Mode soal menjodohkan tidak valid.',
+                ]);
+            }
+            $pairs = $opt['pairs'] ?? [];
+            if (! is_array($pairs) || count($pairs) < 2) {
+                throw ValidationException::withMessages([
+                    'options' => 'Minimal dua pasangan untuk soal menjodohkan.',
+                ]);
+            }
+            $normalized = [];
+            $leftKeys = [];
+            $rightKeys = [];
+            foreach ($pairs as $i => $row) {
+                if (! is_array($row)) {
+                    throw ValidationException::withMessages([
+                        'options' => 'Pasangan ke-'.($i + 1).' tidak valid.',
+                    ]);
+                }
+                $left = $this->normalizeAndStoreMatchingItem(
+                    $row['left'] ?? null,
+                    str_starts_with($mode, 'image') ? 'image' : 'text'
+                );
+                $right = $this->normalizeAndStoreMatchingItem(
+                    $row['right'] ?? null,
+                    str_ends_with($mode, 'image') ? 'image' : 'text'
+                );
+                if ($left === null || $right === null) {
+                    throw ValidationException::withMessages([
+                        'options' => 'Setiap pasangan wajib berisi teks kiri dan kanan.',
+                    ]);
+                }
+                $lk = mb_strtolower(preg_replace('/\s+/u', ' ', (string) $left['value']), 'UTF-8');
+                $rk = mb_strtolower(preg_replace('/\s+/u', ' ', (string) $right['value']), 'UTF-8');
+                if (isset($leftKeys[$lk])) {
+                    throw ValidationException::withMessages([
+                        'options' => 'Teks di kolom kiri tidak boleh duplikat.',
+                    ]);
+                }
+                if (isset($rightKeys[$rk])) {
+                    throw ValidationException::withMessages([
+                        'options' => 'Teks di kolom kanan tidak boleh duplikat.',
+                    ]);
+                }
+                $leftKeys[$lk] = true;
+                $rightKeys[$rk] = true;
+                $normalized[] = [
+                    'id' => $i + 1,
+                    'left' => $left,
+                    'right' => $right,
+                ];
+            }
+            $options = ['type' => 'matching', 'mode' => $mode, 'pairs' => $normalized];
+            $validated['correct_answer'] = null;
+        } elseif ($type === 'multiple_checkbox') {
+            $opt = $request->input('options');
+            if (! is_array($opt) || ($opt['type'] ?? null) !== 'multiple_checkbox' || ! is_array($opt['options'] ?? null)) {
+                throw ValidationException::withMessages([
+                    'options' => 'Format soal pilihan ganda kompleks tidak valid.',
+                ]);
+            }
+            $rows = $opt['options'];
+            if (count($rows) < 2) {
+                throw ValidationException::withMessages([
+                    'options' => 'Minimal dua opsi untuk soal pilihan ganda kompleks.',
+                ]);
+            }
+            $normalized = [];
+            $seen = [];
+            $correctCount = 0;
+            foreach ($rows as $i => $row) {
+                if (! is_array($row)) {
+                    throw ValidationException::withMessages([
+                        'options' => 'Opsi ke-'.($i + 1).' tidak valid.',
+                    ]);
+                }
+                $text = trim((string) ($row['text'] ?? ''));
+                if ($text === '') {
+                    throw ValidationException::withMessages([
+                        'options' => 'Semua opsi harus diisi.',
+                    ]);
+                }
+                $key = mb_strtolower(preg_replace('/\s+/u', ' ', $text), 'UTF-8');
+                if (isset($seen[$key])) {
+                    throw ValidationException::withMessages([
+                        'options' => 'Teks opsi tidak boleh duplikat.',
+                    ]);
+                }
+                $seen[$key] = true;
+                $isCorrect = (bool) ($row['is_correct'] ?? false);
+                if ($isCorrect) {
+                    $correctCount++;
+                }
+                $normalized[] = [
+                    'text' => $text,
+                    'is_correct' => $isCorrect,
+                ];
+            }
+            if ($correctCount < 1) {
+                throw ValidationException::withMessages([
+                    'options' => 'Minimal satu opsi harus ditandai sebagai jawaban benar.',
+                ]);
+            }
+            $options = ['type' => 'multiple_checkbox', 'options' => $normalized];
+            $validated['correct_answer'] = null;
         } else {
             $ca = isset($validated['correct_answer']) ? trim((string) $validated['correct_answer']) : '';
             $validated['correct_answer'] = $ca === '' ? null : $ca;
@@ -1075,6 +1206,76 @@ class ExamController extends Controller
         }
     }
 
+    /**
+     * @param  mixed  $item
+     * @return array{type: string, value: string}|null
+     */
+    private function normalizeAndStoreMatchingItem($item, string $expectedType): ?array
+    {
+        if (is_string($item)) {
+            $v = trim($item);
+            if ($v === '' || $expectedType !== 'text') {
+                return null;
+            }
+
+            return ['type' => 'text', 'value' => $v];
+        }
+        if (! is_array($item)) {
+            return null;
+        }
+
+        $type = (string) ($item['type'] ?? '');
+        $value = (string) ($item['value'] ?? '');
+        if ($type !== $expectedType) {
+            return null;
+        }
+
+        if ($type === 'text') {
+            $text = trim($value);
+            if ($text === '') {
+                return null;
+            }
+
+            return ['type' => 'text', 'value' => $text];
+        }
+
+        $stored = $this->storeMatchingImageFromClientValue($value);
+        if ($stored === null) {
+            return null;
+        }
+
+        return ['type' => 'image', 'value' => $stored];
+    }
+
+    private function storeMatchingImageFromClientValue(string $value): ?string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+
+        if (! str_starts_with($value, 'data:image/')) {
+            return $value;
+        }
+
+        if (! preg_match('/^data:image\/(png|jpe?g);base64,(.+)$/i', $value, $m)) {
+            return null;
+        }
+        $ext = strtolower($m[1]) === 'jpeg' ? 'jpg' : strtolower($m[1]);
+        $decoded = base64_decode($m[2], true);
+        if ($decoded === false) {
+            return null;
+        }
+
+        $path = 'matching/'.date('Y/m').'/'.Str::uuid().'.'.$ext;
+        $written = Storage::disk('public')->put($path, $decoded);
+        if (! $written) {
+            return null;
+        }
+
+        return $path;
+    }
+
     private function buildClassSubjectsMap($classes): array
     {
         $classIds = collect($classes)->pluck('id')->filter()->values();
@@ -1094,7 +1295,7 @@ class ExamController extends Controller
                         'id' => $row->subject_id,
                         'name' => $row->subject?->name,
                     ])
-                    ->filter(fn ($subject) => !empty($subject['id']) && !empty($subject['name']))
+                    ->filter(fn ($subject) => ! empty($subject['id']) && ! empty($subject['name']))
                     ->values()
                     ->all();
             })

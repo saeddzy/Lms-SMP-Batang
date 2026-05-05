@@ -14,6 +14,8 @@ use App\Support\AttemptScoreCalculator;
 use App\Support\AttemptStatusHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -518,6 +520,7 @@ class QuizController extends Controller
             return Inertia::render('Quizzes/AttemptReview', [
                 'quiz' => $quiz,
                 'attempt' => $attempt,
+                'isStudentView' => false,
             ]);
         }
 
@@ -528,6 +531,19 @@ class QuizController extends Controller
 
         // Check if attempt is still valid
         if ($attempt->finished_at) {
+            if ($quiz->show_results) {
+                $quiz->load(['questions' => fn ($q) => $q->orderBy('order')]);
+                $attempt->load([
+                    'answers' => fn ($q) => $q->with('question')->orderBy('question_id'),
+                ]);
+
+                return Inertia::render('Quizzes/AttemptReview', [
+                    'quiz' => $quiz,
+                    'attempt' => $attempt,
+                    'isStudentView' => true,
+                ]);
+            }
+
             return redirect()->route('quizzes.show', $quiz)
                 ->with('error', 'Percobaan kuis sudah selesai.');
         }
@@ -586,6 +602,50 @@ class QuizController extends Controller
                     'answer' => $studentAnswer,
                     'is_correct' => false,
                     'points_awarded' => null,
+                ]);
+
+                continue;
+            }
+
+            if ($question->question_type === 'matching') {
+                $graded = $question->gradeMatchingResponse(is_string($studentAnswer) ? $studentAnswer : null);
+                if ($graded === null) {
+                    $graded = [
+                        'points_awarded' => 0.0,
+                        'correct_count' => 0,
+                        'pair_count' => 0,
+                        'all_correct' => false,
+                    ];
+                }
+                if ($graded['all_correct']) {
+                    $correctCount++;
+                }
+                $attempt->answers()->create([
+                    'question_id' => $question->id,
+                    'answer' => is_string($studentAnswer) ? $studentAnswer : '',
+                    'is_correct' => $graded['all_correct'],
+                    'points_awarded' => $graded['points_awarded'],
+                ]);
+
+                continue;
+            }
+
+            if ($question->question_type === 'multiple_checkbox') {
+                $graded = $question->gradeMultipleCheckboxResponse(is_string($studentAnswer) ? $studentAnswer : null);
+                if ($graded === null) {
+                    $graded = [
+                        'points_awarded' => 0.0,
+                        'all_correct' => false,
+                    ];
+                }
+                if ($graded['all_correct']) {
+                    $correctCount++;
+                }
+                $attempt->answers()->create([
+                    'question_id' => $question->id,
+                    'answer' => is_string($studentAnswer) ? $studentAnswer : '',
+                    'is_correct' => $graded['all_correct'],
+                    'points_awarded' => $graded['points_awarded'],
                 ]);
 
                 continue;
@@ -775,9 +835,8 @@ class QuizController extends Controller
         $validated = $request->validate([
             'questions' => ['required', 'array', 'min:1'],
             'questions.*.question_text' => ['required', 'string'],
-            'questions.*.question_type' => ['required', 'in:multiple_choice,true_false,short_answer,essay'],
-            'questions.*.options' => ['nullable', 'array'],
-            'questions.*.options.*' => ['nullable', 'string'],
+            'questions.*.question_type' => ['required', 'in:multiple_choice,true_false,short_answer,essay,matching,multiple_checkbox'],
+            'questions.*.options' => ['nullable'],
             'questions.*.correct_answer' => ['nullable', 'string', 'max:10000'],
             'questions.*.points' => ['nullable', 'numeric', 'min:0', 'max:1000'],
             'questions.*.explanation' => ['nullable', 'string'],
@@ -843,9 +902,8 @@ class QuizController extends Controller
 
         $validated = $request->validate([
             'question_text' => 'required|string',
-            'question_type' => 'required|in:multiple_choice,true_false,short_answer,essay',
-            'options' => 'nullable|array',
-            'options.*' => 'nullable|string',
+            'question_type' => 'required|in:multiple_choice,true_false,short_answer,essay,matching,multiple_checkbox',
+            'options' => 'nullable',
             'correct_answer' => 'nullable|string|max:10000',
             'points' => 'nullable|numeric|min:0|max:1000',
             'explanation' => 'nullable|string',
@@ -855,8 +913,14 @@ class QuizController extends Controller
         $options = null;
 
         if ($type === 'multiple_choice') {
+            $optsRaw = $request->input('options');
+            if (! is_array($optsRaw)) {
+                throw ValidationException::withMessages([
+                    'options' => 'Opsi pilihan ganda tidak valid.',
+                ]);
+            }
             $opts = array_values(array_filter(
-                $validated['options'] ?? [],
+                $optsRaw,
                 fn ($x) => $x !== null && trim((string) $x) !== ''
             ));
             if (count($opts) < 2) {
@@ -903,6 +967,120 @@ class QuizController extends Controller
                 ]);
             }
             $validated['correct_answer'] = implode("\n", $lines);
+        } elseif ($type === 'matching') {
+            $opt = $request->input('options');
+            if (! is_array($opt) || ($opt['type'] ?? null) !== 'matching') {
+                throw ValidationException::withMessages([
+                    'options' => 'Format soal menjodohkan tidak valid.',
+                ]);
+            }
+            $mode = (string) ($opt['mode'] ?? 'text-text');
+            if (! in_array($mode, ['text-text', 'text-image', 'image-text', 'image-image'], true)) {
+                throw ValidationException::withMessages([
+                    'options' => 'Mode soal menjodohkan tidak valid.',
+                ]);
+            }
+            $pairs = $opt['pairs'] ?? [];
+            if (! is_array($pairs) || count($pairs) < 2) {
+                throw ValidationException::withMessages([
+                    'options' => 'Minimal dua pasangan untuk soal menjodohkan.',
+                ]);
+            }
+            $normalized = [];
+            $leftKeys = [];
+            $rightKeys = [];
+            foreach ($pairs as $i => $row) {
+                if (! is_array($row)) {
+                    throw ValidationException::withMessages([
+                        'options' => 'Pasangan ke-'.($i + 1).' tidak valid.',
+                    ]);
+                }
+                $left = $this->normalizeAndStoreMatchingItem(
+                    $row['left'] ?? null,
+                    str_starts_with($mode, 'image') ? 'image' : 'text'
+                );
+                $right = $this->normalizeAndStoreMatchingItem(
+                    $row['right'] ?? null,
+                    str_ends_with($mode, 'image') ? 'image' : 'text'
+                );
+                if ($left === null || $right === null) {
+                    throw ValidationException::withMessages([
+                        'options' => 'Setiap pasangan wajib berisi teks kiri dan kanan.',
+                    ]);
+                }
+                $lk = mb_strtolower(preg_replace('/\s+/u', ' ', (string) $left['value']), 'UTF-8');
+                $rk = mb_strtolower(preg_replace('/\s+/u', ' ', (string) $right['value']), 'UTF-8');
+                if (isset($leftKeys[$lk])) {
+                    throw ValidationException::withMessages([
+                        'options' => 'Teks di kolom kiri tidak boleh duplikat.',
+                    ]);
+                }
+                if (isset($rightKeys[$rk])) {
+                    throw ValidationException::withMessages([
+                        'options' => 'Teks di kolom kanan tidak boleh duplikat.',
+                    ]);
+                }
+                $leftKeys[$lk] = true;
+                $rightKeys[$rk] = true;
+                $normalized[] = [
+                    'id' => $i + 1,
+                    'left' => $left,
+                    'right' => $right,
+                ];
+            }
+            $options = ['type' => 'matching', 'mode' => $mode, 'pairs' => $normalized];
+            $validated['correct_answer'] = null;
+        } elseif ($type === 'multiple_checkbox') {
+            $opt = $request->input('options');
+            if (! is_array($opt) || ($opt['type'] ?? null) !== 'multiple_checkbox' || ! is_array($opt['options'] ?? null)) {
+                throw ValidationException::withMessages([
+                    'options' => 'Format soal pilihan ganda kompleks tidak valid.',
+                ]);
+            }
+            $rows = $opt['options'];
+            if (count($rows) < 2) {
+                throw ValidationException::withMessages([
+                    'options' => 'Minimal dua opsi untuk soal pilihan ganda kompleks.',
+                ]);
+            }
+            $normalized = [];
+            $seen = [];
+            $correctCount = 0;
+            foreach ($rows as $i => $row) {
+                if (! is_array($row)) {
+                    throw ValidationException::withMessages([
+                        'options' => 'Opsi ke-'.($i + 1).' tidak valid.',
+                    ]);
+                }
+                $text = trim((string) ($row['text'] ?? ''));
+                if ($text === '') {
+                    throw ValidationException::withMessages([
+                        'options' => 'Semua opsi harus diisi.',
+                    ]);
+                }
+                $key = mb_strtolower(preg_replace('/\s+/u', ' ', $text), 'UTF-8');
+                if (isset($seen[$key])) {
+                    throw ValidationException::withMessages([
+                        'options' => 'Teks opsi tidak boleh duplikat.',
+                    ]);
+                }
+                $seen[$key] = true;
+                $isCorrect = (bool) ($row['is_correct'] ?? false);
+                if ($isCorrect) {
+                    $correctCount++;
+                }
+                $normalized[] = [
+                    'text' => $text,
+                    'is_correct' => $isCorrect,
+                ];
+            }
+            if ($correctCount < 1) {
+                throw ValidationException::withMessages([
+                    'options' => 'Minimal satu opsi harus ditandai sebagai jawaban benar.',
+                ]);
+            }
+            $options = ['type' => 'multiple_checkbox', 'options' => $normalized];
+            $validated['correct_answer'] = null;
         } else {
             // essay: opsional rubrik / catatan di correct_answer (boleh kosong)
             $ca = isset($validated['correct_answer']) ? trim((string) $validated['correct_answer']) : '';
@@ -931,6 +1109,76 @@ class QuizController extends Controller
         if ($ca !== null && ! is_string($ca) && is_scalar($ca)) {
             $request->merge(['correct_answer' => (string) $ca]);
         }
+    }
+
+    /**
+     * @param  mixed  $item
+     * @return array{type: string, value: string}|null
+     */
+    private function normalizeAndStoreMatchingItem($item, string $expectedType): ?array
+    {
+        if (is_string($item)) {
+            $v = trim($item);
+            if ($v === '' || $expectedType !== 'text') {
+                return null;
+            }
+
+            return ['type' => 'text', 'value' => $v];
+        }
+        if (! is_array($item)) {
+            return null;
+        }
+
+        $type = (string) ($item['type'] ?? '');
+        $value = (string) ($item['value'] ?? '');
+        if ($type !== $expectedType) {
+            return null;
+        }
+
+        if ($type === 'text') {
+            $text = trim($value);
+            if ($text === '') {
+                return null;
+            }
+
+            return ['type' => 'text', 'value' => $text];
+        }
+
+        $stored = $this->storeMatchingImageFromClientValue($value);
+        if ($stored === null) {
+            return null;
+        }
+
+        return ['type' => 'image', 'value' => $stored];
+    }
+
+    private function storeMatchingImageFromClientValue(string $value): ?string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+
+        if (! str_starts_with($value, 'data:image/')) {
+            return $value;
+        }
+
+        if (! preg_match('/^data:image\/(png|jpe?g);base64,(.+)$/i', $value, $m)) {
+            return null;
+        }
+        $ext = strtolower($m[1]) === 'jpeg' ? 'jpg' : strtolower($m[1]);
+        $decoded = base64_decode($m[2], true);
+        if ($decoded === false) {
+            return null;
+        }
+
+        $path = 'matching/'.date('Y/m').'/'.Str::uuid().'.'.$ext;
+        $written = Storage::disk('public')->put($path, $decoded);
+        if (! $written) {
+            return null;
+        }
+
+        return $path;
     }
 
     private function assertQuizPointsBudget(Quiz $quiz, float $incomingPoints, ?QuizQuestion $current = null): void

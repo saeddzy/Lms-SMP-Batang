@@ -1,6 +1,14 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import Card from "@/Components/Card";
+import MatchingQuestionBlock, {
+    isMatchingResponseComplete,
+    parseMatchingPairs,
+} from "@/Components/Lms/MatchingQuestionBlock";
+import MultipleCheckboxQuestionBlock, {
+    isMultipleCheckboxResponseComplete,
+    parseMultipleCheckboxOptions,
+} from "@/Components/Lms/MultipleCheckboxQuestionBlock";
 import { Head, router } from "@inertiajs/react";
 import axios from "axios";
 import Swal from "sweetalert2";
@@ -72,7 +80,18 @@ export default function QuizAttempt({ quiz, attempt, timeRemaining }) {
         const state = answers[q.id];
         if (!state) return false;
 
-        if (Array.isArray(q.options) && q.options.length > 0) {
+        if (q.question_type === "matching") {
+            return isMatchingResponseComplete(q.options, state?.answer);
+        }
+        if (q.question_type === "multiple_checkbox") {
+            return isMultipleCheckboxResponseComplete(state?.answer);
+        }
+
+        if (
+            q.question_type === "multiple_choice" &&
+            Array.isArray(q.options) &&
+            q.options.length > 0
+        ) {
             return (
                 Array.isArray(state.selected_options) &&
                 state.selected_options.length > 0
@@ -97,6 +116,16 @@ export default function QuizAttempt({ quiz, attempt, timeRemaining }) {
         }));
     };
 
+    const onMatchingChange = useCallback((questionId, json) => {
+        setAnswers((prev) => ({
+            ...prev,
+            [questionId]: {
+                answer: json,
+                selected_options: null,
+            },
+        }));
+    }, []);
+
     const goToQuestion = async (targetIndex) => {
         if (
             targetIndex < 0 ||
@@ -111,6 +140,17 @@ export default function QuizAttempt({ quiz, attempt, timeRemaining }) {
     };
 
     const submit = async () => {
+        const incomplete = questions.filter((q) => !isAnswered(q));
+        if (incomplete.length > 0) {
+            await Swal.fire({
+                title: "Belum lengkap",
+                text: `Masih ada ${incomplete.length} soal yang belum dijawab dengan benar. Periksa soal menjodohkan / lainnya.`,
+                icon: "warning",
+                confirmButtonColor: "#1c1917",
+            });
+            return;
+        }
+
         setSubmitting(true);
         try {
             const payloadAnswers = Object.entries(answers).reduce(
@@ -154,7 +194,13 @@ export default function QuizAttempt({ quiz, attempt, timeRemaining }) {
                     icon: waitingManual ? "info" : data.passed ? "success" : "info",
                     confirmButtonColor: "#1c1917",
                 });
-                router.visit(route("quizzes.show", quiz.id));
+                if (quiz.show_results) {
+                    router.visit(
+                        route("quizzes.attempt", { quiz: quiz.id, attempt: attempt.id })
+                    );
+                } else {
+                    router.visit(route("quizzes.show", quiz.id));
+                }
             }
         } catch (e) {
             const msg =
@@ -215,10 +261,53 @@ export default function QuizAttempt({ quiz, attempt, timeRemaining }) {
 
                         {current && (
                             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_220px]">
-                                <div className="rounded-xl border border-stone-200 p-4">
+                                <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
                                     <p className="font-medium text-stone-900">
                                         {currentQuestion + 1}. {current.question_text}
                                     </p>
+
+                                    {current.question_type === "matching" &&
+                                        (() => {
+                                            const pairs = parseMatchingPairs(current.options);
+                                            if (pairs.length < 2) {
+                                                return (
+                                                    <p className="mt-3 text-sm text-rose-600">
+                                                        Soal menjodohkan belum dikonfigurasi (minimal 2 pasangan).
+                                                    </p>
+                                                );
+                                            }
+                                            return (
+                                                <MatchingQuestionBlock
+                                                    pairs={pairs}
+                                                    value={answers[current.id]?.answer ?? ""}
+                                                    onChange={(json) =>
+                                                        onMatchingChange(current.id, json)
+                                                    }
+                                                />
+                                            );
+                                        })()}
+
+                                    {current.question_type === "multiple_checkbox" &&
+                                        (() => {
+                                            const options = parseMultipleCheckboxOptions(current.options);
+                                            if (options.length < 2) {
+                                                return (
+                                                    <p className="mt-3 text-sm text-rose-600">
+                                                        Soal pilihan ganda kompleks belum dikonfigurasi.
+                                                    </p>
+                                                );
+                                            }
+                                            return (
+                                                <MultipleCheckboxQuestionBlock
+                                                    key={`quiz-mcbox-${current.id}`}
+                                                    options={options}
+                                                    value={answers[current.id]?.answer ?? ""}
+                                                    onChange={(json) =>
+                                                        setAnswer(current.id, json, null)
+                                                    }
+                                                />
+                                            );
+                                        })()}
 
                                     {current.question_type === "multiple_choice" &&
                                         Array.isArray(current.options) && (

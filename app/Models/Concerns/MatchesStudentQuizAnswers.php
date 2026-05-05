@@ -15,6 +15,8 @@ trait MatchesStudentQuizAnswers
             'multiple_choice' => $this->matchMultipleChoice($studentAnswer),
             'true_false' => $this->matchTrueFalse($studentAnswer),
             'short_answer' => $this->matchShortAnswer($studentAnswer),
+            'matching' => $this->matchingIsFullyCorrect($studentAnswer),
+            'multiple_checkbox' => $this->multipleCheckboxIsFullyCorrect($studentAnswer),
             'essay' => false,
             default => false,
         };

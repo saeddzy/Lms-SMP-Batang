@@ -190,7 +190,7 @@ export default function StudentQuizzes() {
                   label: q.unfinished_attempt_id ? "Lanjutkan" : "Kerjakan",
                   href: route("quizzes.show", q.id),
                   className:
-                      "bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-500",
+                      "bg-[#163d8f] text-white hover:bg-[#0f2e6f] focus-visible:ring-[#163d8f]",
               }
             : isUpcoming
               ? {

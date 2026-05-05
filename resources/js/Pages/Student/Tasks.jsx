@@ -32,6 +32,37 @@ function submissionStatus(task, submission) {
     return "pending";
 }
 
+function getAttachmentCount(task) {
+    const explicitCount = Number(task?.attachment_count);
+    if (Number.isFinite(explicitCount) && explicitCount > 0) {
+        return explicitCount;
+    }
+
+    const list = task?.attachments;
+    if (Array.isArray(list)) {
+        return list.filter(Boolean).length;
+    }
+
+    if (typeof list === "string" && list.trim() !== "") {
+        return 1;
+    }
+
+    const submission = Array.isArray(task?.submissions)
+        ? (task.submissions[0] ?? null)
+        : null;
+
+    if (
+        task?.file_path ||
+        task?.file_name ||
+        submission?.file_path ||
+        submission?.file_name
+    ) {
+        return 1;
+    }
+
+    return 0;
+}
+
 const statusConfig = {
     pending: {
         label: "Belum dikumpulkan",
@@ -174,6 +205,11 @@ export default function StudentTasks() {
                             const actionLabel = submission
                                 ? "Kumpulkan Ulang"
                                 : "Kumpulkan";
+                            const attachmentCount = getAttachmentCount(task);
+                            const attachmentLabel =
+                                attachmentCount > 0
+                                    ? `${attachmentCount} lampiran`
+                                    : "Tidak ada lampiran";
 
                             return (
                                 <article
@@ -260,8 +296,13 @@ export default function StudentTasks() {
                                                             Lampiran
                                                         </p>
                                                         <p className="text-sm font-semibold text-slate-900">
-                                                            {task.file_path ? "1 Lampiran" : "Tidak ada lampiran"}
+                                                            {attachmentLabel}
                                                         </p>
+                                                        {attachmentCount > 0 ? (
+                                                            <p className="mt-0.5 text-xs text-slate-500">
+                                                                Lihat detail tugas untuk membuka dokumen
+                                                            </p>
+                                                        ) : null}
                                                     </div>
                                                 </div>
                                                 <div className="flex items-start gap-3 rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200/70">

@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
+import MatchingQuestionBlock, {
+    isMatchingResponseComplete,
+    parseMatchingPairs,
+} from "@/Components/Lms/MatchingQuestionBlock";
+import MultipleCheckboxQuestionBlock, {
+    isMultipleCheckboxResponseComplete,
+    parseMultipleCheckboxOptions,
+} from "@/Components/Lms/MultipleCheckboxQuestionBlock";
 import { Head, router, usePage } from "@inertiajs/react";
 import { IconClock, IconCheck, IconX, IconAlertTriangle } from "@tabler/icons-react";
 
@@ -89,7 +97,7 @@ export default function ExamAttempt() {
             setTimeLeft(diff);
             
             if (diff === 0) {
-                handleSubmit(); // Auto submit when time is up
+                handleSubmit({ allowIncomplete: true }); // Auto submit when time is up
             }
         }, 1000);
 
@@ -225,7 +233,7 @@ export default function ExamAttempt() {
         if (!autoSubmitTriggered || isSubmitting) {
             return;
         }
-        handleSubmit();
+        handleSubmit({ allowIncomplete: true });
     }, [autoSubmitTriggered, isSubmitting]);
 
     const handleAnswerChange = (questionId, answer, selectedOptions = null) => {
@@ -243,7 +251,18 @@ export default function ExamAttempt() {
         const ans = answers[question.id];
         if (!ans) return false;
 
-        if (Array.isArray(question.options) && question.options.length > 0) {
+        if (question.question_type === "matching") {
+            return isMatchingResponseComplete(question.options, ans.answer);
+        }
+        if (question.question_type === "multiple_checkbox") {
+            return isMultipleCheckboxResponseComplete(ans.answer);
+        }
+
+        if (
+            question.question_type === "multiple_choice" &&
+            Array.isArray(question.options) &&
+            question.options.length > 0
+        ) {
             return (
                 Array.isArray(ans.selected_options) &&
                 ans.selected_options.length > 0
@@ -294,8 +313,18 @@ export default function ExamAttempt() {
         }
     };
 
-    const handleSubmit = async ({ exitFirst = false } = {}) => {
+    const handleSubmit = async ({ exitFirst = false, allowIncomplete = false } = {}) => {
         if (isSubmitting) return;
+
+        if (!allowIncomplete) {
+            const incomplete = questions.filter((q) => !hasAnswerForQuestion(q));
+            if (incomplete.length > 0) {
+                setSubmitError(
+                    `Masih ada ${incomplete.length} soal yang belum dijawab (periksa menjodohkan / lainnya).`
+                );
+                return;
+            }
+        }
 
         submitTriggeredRef.current = true;
         setIsSubmitting(true);
@@ -310,9 +339,12 @@ export default function ExamAttempt() {
 
             // Save all answers first
             for (const [questionId, answerData] of Object.entries(answers)) {
-                await postJson(route('exams.attempt.save-answer', [exam.id, attempt.id]), {
-                    question_id: questionId,
-                    ...answerData
+                const raw =
+                    typeof answerData?.answer === "string" ? answerData.answer.trim() : "";
+                if (!raw) continue;
+                await postJson(route("exams.attempt.save-answer", [exam.id, attempt.id]), {
+                    question_id: Number(questionId),
+                    answer: raw,
                 });
             }
 
@@ -338,7 +370,7 @@ export default function ExamAttempt() {
         }
     };
 
-    const handleManualSubmit = () => handleSubmit({ exitFirst: true });
+    const handleManualSubmit = () => handleSubmit({ exitFirst: true, allowIncomplete: false });
 
     const formatTime = (minutes) => {
         const hours = Math.floor(minutes / 60);
@@ -352,16 +384,7 @@ export default function ExamAttempt() {
         return 'text-green-600 bg-green-50';
     };
 
-    const answeredCount = questions.filter((q) => {
-        const ans = answers[q.id];
-        if (!ans) return false;
-
-        if (Array.isArray(q.options) && q.options.length > 0) {
-            return Array.isArray(ans.selected_options) && ans.selected_options.length > 0;
-        }
-
-        return typeof ans.answer === "string" && ans.answer.trim() !== "";
-    }).length;
+    const answeredCount = questions.filter((q) => hasAnswerForQuestion(q)).length;
     const isLockedByViolation = violations >= MAX_VIOLATIONS || autoSubmitTriggered;
 
     return (
@@ -418,7 +441,7 @@ export default function ExamAttempt() {
                 {/* Question */}
                 {questions[currentQuestion] && (
                     <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_240px]">
-                        <div className="rounded-lg border border-slate-200 bg-white p-6">
+                        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                             <div className="mb-4">
                                 <div className="flex items-start gap-2 mb-2">
                                     <span className="flex-shrink-0 w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-sm font-medium">
@@ -438,62 +461,115 @@ export default function ExamAttempt() {
                                 )}
                             </div>
 
-                            {/* Options */}
-                            {questions[currentQuestion].options && questions[currentQuestion].options.length > 0 ? (
-                                <div className="space-y-3">
-                                    {questions[currentQuestion].options.map((option, index) => (
-                                        <label 
-                                            key={index}
-                                            className="flex items-start gap-3 p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors"
-                                        >
-                                            <input
-                                                type="radio"
-                                                name={`question_${questions[currentQuestion].id}`}
-                                                value={index}
-                                                disabled={isLockedByViolation}
-                                                checked={answers[questions[currentQuestion].id]?.selected_options?.includes(index)}
-                                                onChange={(e) => {
-                                                    const question = questions[currentQuestion];
-                                                    const currentAnswers = answers[questions[currentQuestion].id]?.selected_options || [];
-                                                    if (e.target.checked) {
-                                                        handleAnswerChange(
-                                                            questions[currentQuestion].id, 
-                                                            question.question_type === "multiple_choice"
-                                                                ? String(index)
-                                                                : option,
-                                                            [index]
-                                                        );
-                                                    } else {
-                                                        handleAnswerChange(
-                                                            questions[currentQuestion].id, 
-                                                            question.question_type === "multiple_choice"
-                                                                ? String(index)
-                                                                : option,
-                                                            currentAnswers.filter(id => id !== index)
-                                                        );
-                                                    }
-                                                }}
-                                                className="mt-1"
-                                            />
-                                            <div className="flex-1">
-                                                <span className="font-medium text-slate-900">
-                                                    {String.fromCharCode(65 + index)}. {option}
-                                                </span>
-                                            </div>
-                                        </label>
-                                    ))}
-                                </div>
-                            ) : (
-                                /* Essay question */
-                                <textarea
-                                    rows={4}
-                                    placeholder="Tulis jawaban Anda di sini..."
-                                    disabled={isLockedByViolation}
-                                    value={answers[questions[currentQuestion].id]?.answer || ''}
-                                    onChange={(e) => handleAnswerChange(questions[currentQuestion].id, e.target.value)}
-                                    className="w-full rounded-lg border border-slate-200 p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                />
-                            )}
+                            {(() => {
+                                const q = questions[currentQuestion];
+                                if (
+                                    q.question_type === "multiple_choice" &&
+                                    Array.isArray(q.options) &&
+                                    q.options.length > 0
+                                ) {
+                                    return (
+                                        <div className="space-y-3">
+                                            {q.options.map((option, index) => (
+                                                <label 
+                                                    key={index}
+                                                    className="flex items-start gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors shadow-sm"
+                                                >
+                                                    <input
+                                                        type="radio"
+                                                        name={`question_${q.id}`}
+                                                        value={index}
+                                                        disabled={isLockedByViolation}
+                                                        checked={answers[q.id]?.selected_options?.includes(index)}
+                                                        onChange={(e) => {
+                                                            const currentAnswers = answers[q.id]?.selected_options || [];
+                                                            if (e.target.checked) {
+                                                                handleAnswerChange(
+                                                                    q.id, 
+                                                                    String(index),
+                                                                    [index]
+                                                                );
+                                                            } else {
+                                                                handleAnswerChange(
+                                                                    q.id, 
+                                                                    String(index),
+                                                                    currentAnswers.filter(id => id !== index)
+                                                                );
+                                                            }
+                                                        }}
+                                                        className="mt-1"
+                                                    />
+                                                    <div className="flex-1">
+                                                        <span className="font-medium text-slate-900">
+                                                            {String.fromCharCode(65 + index)}. {option}
+                                                        </span>
+                                                    </div>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    );
+                                }
+                                if (q.question_type === "matching") {
+                                    const pairs = parseMatchingPairs(q.options);
+                                    if (pairs.length < 2) {
+                                        return (
+                                            <p className="text-sm text-rose-600">
+                                                Soal menjodohkan belum dikonfigurasi.
+                                            </p>
+                                        );
+                                    }
+                                    return (
+                                        <MatchingQuestionBlock
+                                            key={`exam-matching-${q.id}`}
+                                            pairs={pairs}
+                                            value={answers[q.id]?.answer ?? ""}
+                                            onChange={(json) => handleAnswerChange(q.id, json)}
+                                            disabled={isLockedByViolation}
+                                        />
+                                    );
+                                }
+                                if (q.question_type === "multiple_checkbox") {
+                                    const options = parseMultipleCheckboxOptions(q.options);
+                                    if (options.length < 2) {
+                                        return (
+                                            <p className="text-sm text-rose-600">
+                                                Soal pilihan ganda kompleks belum dikonfigurasi.
+                                            </p>
+                                        );
+                                    }
+                                    return (
+                                        <MultipleCheckboxQuestionBlock
+                                            key={`exam-mcbox-${q.id}`}
+                                            options={options}
+                                            value={answers[q.id]?.answer ?? ""}
+                                            onChange={(json) => handleAnswerChange(q.id, json)}
+                                            disabled={isLockedByViolation}
+                                        />
+                                    );
+                                }
+                                if (q.question_type === "essay") {
+                                    return (
+                                        <textarea
+                                            rows={8}
+                                            placeholder="Tulis jawaban Anda di sini..."
+                                            disabled={isLockedByViolation}
+                                            value={answers[q.id]?.answer || ""}
+                                            onChange={(e) => handleAnswerChange(q.id, e.target.value)}
+                                            className="w-full rounded-xl border border-slate-200 p-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                    );
+                                }
+                                return (
+                                    <textarea
+                                        rows={4}
+                                        placeholder="Tulis jawaban Anda di sini..."
+                                        disabled={isLockedByViolation}
+                                        value={answers[q.id]?.answer || ""}
+                                        onChange={(e) => handleAnswerChange(q.id, e.target.value)}
+                                        className="w-full rounded-xl border border-slate-200 p-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                );
+                            })()}
                         </div>
 
                         <div className="rounded-lg border border-slate-200 bg-white p-4">
@@ -558,7 +634,7 @@ export default function ExamAttempt() {
                     <button
                         onClick={handleManualSubmit}
                         disabled={isSubmitting || timeLeft === 0 || isLockedByViolation}
-                        className="px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                        className="px-8 py-3 bg-[#163d8f] text-white rounded-lg hover:bg-[#0f2e6f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
                     >
                         {isSubmitting
                             ? 'Menyimpan...'

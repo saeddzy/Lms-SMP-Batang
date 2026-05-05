@@ -54,46 +54,26 @@ function examTypeLabel(t) {
 
 function examWindow(exam) {
     if (exam.is_cancelled) return "batal";
-    
-    // Gunakan duration_minutes atau duration sebagai fallback
-    const duration = exam.duration_minutes != null ? exam.duration_minutes : exam.duration;
-    if (!exam.scheduled_date || duration == null) return "invalid";
-    
-    // Parse scheduled_date - handle different date formats
-    let startDate;
-    try {
-        // Jika scheduled_date sudah full date format
-        if (exam.scheduled_date.includes('T') || exam.scheduled_date.includes('-')) {
-            startDate = new Date(exam.scheduled_date);
-        } else {
-            // Jika hanya date format (YYYY-MM-DD), tambahkan waktu start_time atau default 00:00
-            const dateStr = exam.start_time ? `${exam.scheduled_date}T${exam.start_time}` : `${exam.scheduled_date}T00:00:00`;
-            startDate = new Date(dateStr);
-        }
-    } catch (error) {
-        console.error('Error parsing date:', exam.scheduled_date, error);
-        return "invalid";
-    }
-    
-    // Validasi start date
-    if (isNaN(startDate.getTime())) return "invalid";
-    
-    // Hitung waktu akhir berdasarkan duration (dalam menit)
-    const end = new Date(startDate.getTime() + Number(duration) * 60 * 1000);
+
+    const startDate = exam.start_time
+        ? new Date(exam.start_time)
+        : exam.scheduled_date
+          ? new Date(exam.scheduled_date)
+          : null;
+    if (!startDate || Number.isNaN(startDate.getTime())) return "invalid";
+
+    const endDate = exam.end_time ? new Date(exam.end_time) : null;
+    const duration = Number(exam.duration_minutes ?? exam.duration);
+    const end =
+        endDate && !Number.isNaN(endDate.getTime())
+            ? endDate
+            : Number.isFinite(duration) && duration > 0
+              ? new Date(startDate.getTime() + duration * 60 * 1000)
+              : null;
+    if (!end) return "invalid";
+
     const now = new Date();
-    
-    // Debug logging (bisa dihapus di production)
-    console.log('Exam Debug:', {
-        scheduled_date: exam.scheduled_date,
-        start_time: exam.start_time,
-        duration: duration,
-        startDate: startDate.toISOString(),
-        endDate: end.toISOString(),
-        now: now.toISOString(),
-        nowLessThanStart: now < startDate,
-        nowGreaterThanEnd: now > end
-    });
-    
+
     if (now < startDate) return "belum";
     if (now > end) return "selesai";
     return "buka";
@@ -129,6 +109,9 @@ export default function Show() {
         () => attempts.find((a) => !a.finished_at),
         [attempts]
     );
+    const maxAttempts = Number(exam.max_attempts ?? 1);
+    const attemptsUsed = attempts.length;
+    const canCreateNewAttempt = attemptsUsed < maxAttempts;
 
     const completedAttempts = attempts.filter((a) => a.finished_at);
     const avgScore =
@@ -209,9 +192,11 @@ export default function Show() {
                     Mulai ujian
                 </p>
                 <p className="mt-1 text-sm font-medium text-slate-900">
-                    {exam.start_time
-                        ? formatStudentDateTime(exam.start_time)
-                        : exam.scheduled_date
+                    {exam.start_time && exam.end_time
+                        ? `${formatStudentDateTime(exam.start_time)} — ${formatStudentDateTime(exam.end_time)}`
+                        : exam.start_time
+                          ? formatStudentDateTime(exam.start_time)
+                          : exam.scheduled_date
                             ? formatStudentDateTime(exam.scheduled_date)
                             : "—"}
                 </p>
@@ -231,7 +216,12 @@ export default function Show() {
                     Percobaan maks.
                 </p>
                 <p className="mt-1 font-medium text-slate-900">
-                    {exam.max_attempts ?? "—"}
+                    {exam.max_attempts ?? "—"}{" "}
+                    {isStudent ? (
+                        <span className="text-xs font-normal text-slate-500">
+                            (terpakai {attemptsUsed}/{maxAttempts})
+                        </span>
+                    ) : null}
                 </p>
             </div>
             <div className="rounded-md border border-slate-200 bg-slate-50/80 p-4 sm:col-span-2">
@@ -570,17 +560,22 @@ export default function Show() {
                 window !== "batal" &&
                 window !== "invalid" && (
                     <div className="flex flex-wrap gap-3">
-                        {(window === "buka" || unfinished) && (
+                        {(window === "buka" || unfinished) && (unfinished || canCreateNewAttempt) && (
                             <button
                                 type="button"
                                 onClick={startOrContinue}
-                                className="inline-flex items-center rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25"
+                                className="inline-flex items-center rounded-xl bg-[#163d8f] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f2e6f]"
                             >
                                 {unfinished
                                     ? "Lanjutkan ujian"
                                     : "Mulai ujian"}
                             </button>
                         )}
+                        {window === "buka" && !unfinished && !canCreateNewAttempt ? (
+                            <span className="inline-flex items-center rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-800">
+                                Batas percobaan tercapai ({attemptsUsed}/{maxAttempts})
+                            </span>
+                        ) : null}
                         <button
                             type="button"
                             onClick={() =>

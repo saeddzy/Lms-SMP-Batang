@@ -107,8 +107,10 @@ export default function Create() {
 
     const typeOptions = [
         { value: "multiple_choice", label: "Pilihan Ganda" },
+        { value: "multiple_checkbox", label: "Pilihan Ganda Kompleks (Checkbox)" },
         { value: "true_false", label: "Benar/Salah" },
         { value: "essay", label: "Esai" },
+        { value: "matching", label: "Menjodohkan (Matching)" },
         { value: "mixed", label: "Campuran" },
     ];
 
@@ -417,7 +419,7 @@ export default function Create() {
                                                     className="rounded border-slate-300 text-[#163d8f] shadow-sm focus:ring-[#163d8f]"
                                                 />
                                                 <span className="ml-2 text-sm text-gray-600">
-                                                    Tampilkan hasil setelah selesai
+                                                    Izinkan siswa review soal & jawaban (pembahasan)
                                                 </span>
                                             </label>
                                         </div>

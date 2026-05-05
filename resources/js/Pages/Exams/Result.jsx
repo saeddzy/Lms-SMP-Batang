@@ -1,6 +1,12 @@
 import React from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import Card from "@/Components/Card";
+import { MatchingReviewTable, parseMatchingPairs } from "@/Components/Lms/MatchingQuestionBlock";
+import {
+    MultipleCheckboxReview,
+    parseMultipleCheckboxAnswer,
+    parseMultipleCheckboxOptions,
+} from "@/Components/Lms/MultipleCheckboxQuestionBlock";
 import { Head, router, usePage } from "@inertiajs/react";
 import { IconCheck, IconX, IconClock, IconPercentage } from "@tabler/icons-react";
 
@@ -58,6 +64,30 @@ export default function ExamResult() {
 
         if (type === "true_false") {
             return raw === "true" ? "Benar" : raw === "false" ? "Salah" : raw;
+        }
+
+        if (type === "matching") {
+            try {
+                const rows = JSON.parse(raw);
+                if (Array.isArray(rows)) {
+                    return rows.map((r) => `${r.left} → ${r.answer}`).join("; ");
+                }
+            } catch {
+                /* fall through */
+            }
+        }
+
+        if (type === "multiple_checkbox") {
+            const options = parseMultipleCheckboxOptions(ans?.question?.options);
+            const byNorm = new Map(
+                options.map((o) => [
+                    String(o.text).trim().toLowerCase().replace(/\s+/g, " "),
+                    o.text,
+                ])
+            );
+            const picked = parseMultipleCheckboxAnswer(raw);
+            if (picked.length === 0) return "(kosong)";
+            return picked.map((k) => byNorm.get(k) ?? k).join("; ");
         }
 
         return raw;
@@ -167,15 +197,16 @@ export default function ExamResult() {
                 </div>
 
                 {/* Answers */}
-                <div className="mb-6 rounded-lg border border-slate-200 bg-white p-6">
-                    <h2 className="text-lg font-semibold text-slate-900">
-                        Jawaban Siswa
-                    </h2>
-                    <div className="mt-4 space-y-4">
-                        {sortedAnswers.length === 0 ? (
-                            <p className="text-sm text-slate-500">Belum ada jawaban tersimpan.</p>
-                        ) : (
-                            sortedAnswers.map((ans, idx) => {
+                {!isStudentView && (
+                    <div className="mb-6 rounded-lg border border-slate-200 bg-white p-6">
+                        <h2 className="text-lg font-semibold text-slate-900">
+                            Jawaban Siswa
+                        </h2>
+                        <div className="mt-4 space-y-4">
+                            {sortedAnswers.length === 0 ? (
+                                <p className="text-sm text-slate-500">Belum ada jawaban tersimpan.</p>
+                            ) : (
+                                sortedAnswers.map((ans, idx) => {
                                 const isEssay = ans.question?.question_type === "essay";
                                 return (
                                     <div
@@ -195,6 +226,17 @@ export default function ExamResult() {
                                             <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
                                                 {formatStudentAnswer(ans)}
                                             </p>
+                                            {ans.question?.question_type === "matching" ? (
+                                                <MatchingReviewTable
+                                                    pairs={parseMatchingPairs(ans.question?.options)}
+                                                    answerRaw={ans.answer}
+                                                />
+                                            ) : ans.question?.question_type === "multiple_checkbox" ? (
+                                                <MultipleCheckboxReview
+                                                    options={parseMultipleCheckboxOptions(ans.question?.options)}
+                                                    answerRaw={ans.answer}
+                                                />
+                                            ) : null}
                                         </div>
                                         {isEssay ? (
                                             <div className="mt-2 space-y-1 text-xs text-slate-600">
@@ -211,6 +253,19 @@ export default function ExamResult() {
                                                     </p>
                                                 ) : null}
                                             </div>
+                                        ) : ans.question?.question_type === "multiple_checkbox" ? (
+                                            <p className="mt-2 text-xs text-slate-600">
+                                                Status:{" "}
+                                                {ans.is_correct ? (
+                                                    <span className="font-semibold text-emerald-700">
+                                                        Semua pilihan tepat
+                                                    </span>
+                                                ) : (
+                                                    <span className="font-semibold text-amber-700">
+                                                        Parsial ({ans.points_awarded ?? 0} / {ans.question?.points ?? 0} poin)
+                                                    </span>
+                                                )}
+                                            </p>
                                         ) : (
                                             <p className="mt-2 text-xs text-slate-600">
                                                 Status:{" "}
@@ -227,10 +282,11 @@ export default function ExamResult() {
                                         )}
                                     </div>
                                 );
-                            })
-                        )}
+                                })
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Time Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -273,7 +329,7 @@ export default function ExamResult() {
                                     : route("exams.show", exam.id)
                             )
                         }
-                        className="px-6 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+                        className="px-6 py-2 bg-[#163d8f] text-white rounded-lg hover:bg-[#0f2e6f] transition-colors"
                     >
                         {isStudentView
                             ? "Kembali ke Daftar Ujian"
@@ -289,7 +345,7 @@ export default function ExamResult() {
                     {attempt.attempt_status === 'finished' && (
                         <button
                             onClick={() => window.print()}
-                            className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                            className="px-6 py-2 bg-[#163d8f] text-white rounded-lg hover:bg-[#0f2e6f] transition-colors"
                         >
                             Cetak Hasil
                         </button>

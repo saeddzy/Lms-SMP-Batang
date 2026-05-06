@@ -134,7 +134,6 @@ Route::middleware('auth')->group(function () {
     Route::get('grades/students/{student}/report', [GradeController::class, 'studentReport'])->name('grades.student-report');
     Route::get('grades/students-by-class/{class}', [GradeController::class, 'getStudentsByClass'])->name('grades.students-by-class');
     Route::post('grades/bulk-create', [GradeController::class, 'bulkCreate'])->name('grades.bulk-create');
-    Route::post('grades/activity-weights', [GradeController::class, 'saveActivityWeights'])->name('grades.activity-weights');
 
     // Dashboard Routes
     Route::get('/student/dashboard', [StudentDashboardController::class, 'index'])->name('student.dashboard');

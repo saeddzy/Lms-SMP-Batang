@@ -4,7 +4,6 @@ namespace App\Support;
 
 use App\Models\Exam;
 use App\Models\ExamAttempt;
-use App\Models\GradeActivityWeight;
 use App\Models\Quiz;
 use App\Models\QuizAttempt;
 use App\Models\SchoolClass;
@@ -28,7 +27,6 @@ final class ClassGradeBoard
         SchoolClass $class,
         ?int $subjectId,
         ?array $allowedClassSubjectIds,
-        string $academicYearKey
     ): array {
         $classId = $class->id;
         $performanceFilter = (string) $request->input('performance', '');
@@ -122,20 +120,6 @@ final class ClassGradeBoard
             $examBest[$k] = max($examBest[$k] ?? 0, $sc);
         }
 
-        $weightRows = collect();
-        $sumWeights = 0.0;
-        if ($subjectId) {
-            $weightRows = GradeActivityWeight::query()
-                ->where('class_id', $classId)
-                ->where('subject_id', $subjectId)
-                ->where('academic_year', $academicYearKey)
-                ->get();
-            $sumWeights = round((float) $weightRows->sum('weight'), 2);
-        }
-
-        $useWeighted = $subjectId && $weightRows->isNotEmpty()
-            && abs($sumWeights - 100.0) < 0.02;
-
         $rows = [];
         foreach ($students as $student) {
             $sid = $student->id;
@@ -144,9 +128,10 @@ final class ClassGradeBoard
                 return $taskPct[$sid][$task->id] ?? null;
             })->filter(fn ($v) => $v !== null);
 
-            $taskAvg = $taskPcts->isEmpty()
-                ? 0
-                : round((float) $taskPcts->avg(), 1);
+            $hasTaskScores = $taskPcts->isNotEmpty();
+            $taskAvg = $hasTaskScores
+                ? (float) $taskPcts->avg()
+                : 0.0;
 
             $quizBests = collect($quizzesInScope)->map(function ($qz) use ($sid, $quizBest) {
                 $k = $sid.'_'.$qz->id;
@@ -154,9 +139,10 @@ final class ClassGradeBoard
                 return $quizBest[$k] ?? null;
             })->filter(fn ($v) => $v !== null);
 
-            $quizAvg = $quizBests->isEmpty()
-                ? 0
-                : round((float) $quizBests->avg(), 1);
+            $hasQuizScores = $quizBests->isNotEmpty();
+            $quizAvg = $hasQuizScores
+                ? (float) $quizBests->avg()
+                : 0.0;
 
             $examBests = collect($examsInScope)->map(function ($ex) use ($sid, $examBest) {
                 $k = $sid.'_'.$ex->id;
@@ -164,37 +150,25 @@ final class ClassGradeBoard
                 return $examBest[$k] ?? null;
             })->filter(fn ($v) => $v !== null);
 
-            $examAvg = $examBests->isEmpty()
-                ? 0
-                : round((float) $examBests->avg(), 1);
+            $hasExamScores = $examBests->isNotEmpty();
+            $examAvg = $hasExamScores
+                ? (float) $examBests->avg()
+                : 0.0;
 
-            if ($useWeighted) {
-                $numerator = 0.0;
-                foreach ($weightRows as $wr) {
-                    $score = match ($wr->activity_type) {
-                        'task' => (float) ($taskPct[$sid][$wr->activity_id] ?? 0),
-                        'quiz' => (float) ($quizBest[$sid.'_'.$wr->activity_id] ?? 0),
-                        'exam' => (float) ($examBest[$sid.'_'.$wr->activity_id] ?? 0),
-                        default => 0.0,
-                    };
-                    $numerator += ((float) $wr->weight) * $score;
-                }
-                $overallAvg = round($numerator / 100.0, 1);
-            } else {
-                $overallParts = collect();
-                if ($taskPcts->isNotEmpty()) {
-                    $overallParts->push($taskAvg);
-                }
-                if ($quizBests->isNotEmpty()) {
-                    $overallParts->push($quizAvg);
-                }
-                if ($examBests->isNotEmpty()) {
-                    $overallParts->push($examAvg);
-                }
-                $overallAvg = $overallParts->isEmpty()
-                    ? 0
-                    : round((float) $overallParts->avg(), 1);
-            }
+            $taskAvgRounded = round($taskAvg, 2);
+            $quizAvgRounded = round($quizAvg, 2);
+            $examAvgRounded = round($examAvg, 2);
+
+            $overallAvg = self::computeRphFinalFromAverages(
+                $taskAvg,
+                $hasTaskScores,
+                $quizAvg,
+                $hasQuizScores,
+                $examAvg,
+                $hasExamScores,
+            );
+
+            $rphDisplay = self::computeRphDisplayOnly($taskAvg, $hasTaskScores, $quizAvg, $hasQuizScores);
 
             $detail = self::buildStudentDetail(
                 $sid,
@@ -204,8 +178,6 @@ final class ClassGradeBoard
                 $taskPct,
                 $quizBest,
                 $examBest,
-                $weightRows,
-                $useWeighted
             );
 
             $rows[] = [
@@ -213,13 +185,13 @@ final class ClassGradeBoard
                 'student_name' => $student->name,
                 'student_email' => $student->email ?? '',
                 'student_nis' => $student->nis ?? null,
-                'task_avg' => $taskAvg,
-                'quiz_avg' => $quizAvg,
-                'exam_avg' => $examAvg,
+                'task_avg' => $taskAvgRounded,
+                'quiz_avg' => $quizAvgRounded,
+                'exam_avg' => $examAvgRounded,
+                'rph' => $rphDisplay,
                 'overall_avg' => $overallAvg,
                 'is_passed' => $overallAvg >= $passingScore,
                 'detail' => $detail,
-                'uses_weighted_formula' => $useWeighted,
             ];
         }
 
@@ -270,7 +242,7 @@ final class ClassGradeBoard
      */
     public static function catalog(
         int $classId,
-        int $subjectId,
+        ?int $subjectId,
         ?array $allowedClassSubjectIds
     ): array {
         return [
@@ -281,8 +253,180 @@ final class ClassGradeBoard
     }
 
     /**
-     * @param  Collection<int, GradeActivityWeight>  $weightRows
+     * RPH = rata-rata dari rerata tugas dan rerata kuis yang ada (hanya komponen ber-nilai).
+     * Nilai akhir = ((RPH × 2) + rerata ujian) ÷ 3 jika ujian ada; jika tidak, sesuai data tersedia.
+     * Pembulatan 2 desimal pada nilai akhir (dan komponen dipakai presisi penuh lalu dibulatkan di akhir).
      */
+    public static function computeRphFinalFromAverages(
+        float $taskAvg,
+        bool $hasTaskScores,
+        float $quizAvg,
+        bool $hasQuizScores,
+        float $examAvg,
+        bool $hasExamScores,
+    ): float {
+        $rphParts = [];
+        if ($hasTaskScores) {
+            $rphParts[] = $taskAvg;
+        }
+        if ($hasQuizScores) {
+            $rphParts[] = $quizAvg;
+        }
+
+        if ($rphParts === []) {
+            $rph = null;
+        } else {
+            $rph = array_sum($rphParts) / count($rphParts);
+        }
+
+        if ($rph !== null && $hasExamScores) {
+            return round((2 * $rph + $examAvg) / 3, 2);
+        }
+        if ($rph !== null) {
+            return round($rph, 2);
+        }
+        if ($hasExamScores) {
+            return round($examAvg, 2);
+        }
+
+        return 0.0;
+    }
+
+    /**
+     * Nilai RPH saja (untuk tampilan), atau null jika tidak ada tugas maupun kuis ber-nilai.
+     */
+    public static function computeRphDisplayOnly(
+        float $taskAvg,
+        bool $hasTaskScores,
+        float $quizAvg,
+        bool $hasQuizScores,
+    ): ?float {
+        $rphParts = [];
+        if ($hasTaskScores) {
+            $rphParts[] = $taskAvg;
+        }
+        if ($hasQuizScores) {
+            $rphParts[] = $quizAvg;
+        }
+        if ($rphParts === []) {
+            return null;
+        }
+
+        return round(array_sum($rphParts) / count($rphParts), 2);
+    }
+
+    /**
+     * Rekap RPH + nilai akhir untuk satu siswa pada satu kelas & mapel (sinkron dengan scope manajemen nilai).
+     *
+     * @return array{
+     *   task_avg: float,
+     *   quiz_avg: float,
+     *   exam_avg: float,
+     *   rph: ?float,
+     *   overall_avg: float,
+     *   formula_note: string,
+     *   has_task_scores: bool,
+     *   has_quiz_scores: bool,
+     *   has_exam_scores: bool,
+     * }|null
+     */
+    public static function studentSubjectRphBreakdown(int $studentId, int $classId, int $subjectId): ?array
+    {
+        $tasks = self::scopedTasks($classId, $subjectId, null);
+        $quizzes = self::scopedQuizzes($classId, $subjectId, null);
+        $exams = self::scopedExams($classId, $subjectId, null);
+
+        $taskIds = $tasks->pluck('id')->all();
+        $quizIds = $quizzes->pluck('id')->all();
+        $examIds = $exams->pluck('id')->all();
+
+        if ($taskIds === [] && $quizIds === [] && $examIds === []) {
+            return null;
+        }
+
+        $taskSubs = TaskSubmission::query()
+            ->where('student_id', $studentId)
+            ->whereNotNull('score')
+            ->whereIn('task_id', $taskIds)
+            ->with('task')
+            ->get();
+
+        $taskPcts = [];
+        foreach ($taskSubs as $sub) {
+            $t = $sub->task;
+            if (! $t || ! $t->max_score || (float) $t->max_score <= 0) {
+                continue;
+            }
+            $taskPcts[] = ((float) $sub->score / (float) $t->max_score) * 100;
+        }
+
+        $quizAttempts = QuizAttempt::query()
+            ->where('student_id', $studentId)
+            ->whereNotNull('score')
+            ->whereIn('quiz_id', $quizIds)
+            ->get();
+
+        $quizBestByQ = [];
+        foreach ($quizAttempts as $att) {
+            $qid = $att->quiz_id;
+            $quizBestByQ[$qid] = max($quizBestByQ[$qid] ?? 0, (float) $att->score);
+        }
+        $quizVals = [];
+        foreach ($quizIds as $qid) {
+            if (array_key_exists($qid, $quizBestByQ)) {
+                $quizVals[] = $quizBestByQ[$qid];
+            }
+        }
+
+        $examAttempts = ExamAttempt::query()
+            ->where('student_id', $studentId)
+            ->whereNotNull('score')
+            ->whereIn('exam_id', $examIds)
+            ->get();
+
+        $examBestByE = [];
+        foreach ($examAttempts as $att) {
+            $eid = $att->exam_id;
+            $examBestByE[$eid] = max($examBestByE[$eid] ?? 0, (float) $att->score);
+        }
+        $examVals = [];
+        foreach ($examIds as $eid) {
+            if (array_key_exists($eid, $examBestByE)) {
+                $examVals[] = $examBestByE[$eid];
+            }
+        }
+
+        $hasTask = $taskPcts !== [];
+        $taskAvg = $hasTask ? (float) (array_sum($taskPcts) / count($taskPcts)) : 0.0;
+
+        $hasQuiz = $quizVals !== [];
+        $quizAvg = $hasQuiz ? (float) (array_sum($quizVals) / count($quizVals)) : 0.0;
+
+        $hasExam = $examVals !== [];
+        $examAvg = $hasExam ? (float) (array_sum($examVals) / count($examVals)) : 0.0;
+
+        if (! $hasTask && ! $hasQuiz && ! $hasExam) {
+            return null;
+        }
+
+        $overall = self::computeRphFinalFromAverages($taskAvg, $hasTask, $quizAvg, $hasQuiz, $examAvg, $hasExam);
+        $rph = self::computeRphDisplayOnly($taskAvg, $hasTask, $quizAvg, $hasQuiz);
+
+        $formulaNote = 'RPH = rata-rata (rerata tugas + rerata kuis) dari komponen yang ada; nilai akhir = ((2×RPH)+rerata ujian)÷3 bila ada ujian.';
+
+        return [
+            'task_avg' => round($taskAvg, 2),
+            'quiz_avg' => round($quizAvg, 2),
+            'exam_avg' => round($examAvg, 2),
+            'rph' => $rph,
+            'overall_avg' => $overall,
+            'formula_note' => $formulaNote,
+            'has_task_scores' => $hasTask,
+            'has_quiz_scores' => $hasQuiz,
+            'has_exam_scores' => $hasExam,
+        ];
+    }
+
     private static function buildStudentDetail(
         int $studentId,
         Collection $tasksInScope,
@@ -291,66 +435,47 @@ final class ClassGradeBoard
         array $taskPct,
         array $quizBest,
         array $examBest,
-        Collection $weightRows,
-        bool $useWeighted
     ): array {
-        $byKey = [];
-        foreach ($weightRows as $wr) {
-            $byKey[$wr->activity_type.':'.$wr->activity_id] = (float) $wr->weight;
-        }
-
-        $tasks = $tasksInScope->map(function ($task) use ($studentId, $taskPct, $byKey, $useWeighted) {
+        $tasks = $tasksInScope->map(function ($task) use ($studentId, $taskPct) {
             $score = $taskPct[$studentId][$task->id] ?? null;
-            $w = $byKey['task:'.$task->id] ?? null;
-            $contrib = ($useWeighted && $w !== null)
-                ? round($w * (float) ($score ?? 0) / 100, 2)
-                : null;
 
             return [
                 'type' => 'task',
                 'id' => $task->id,
                 'title' => $task->title,
-                'weight' => $w,
+                'weight' => null,
                 'score' => $score !== null ? round((float) $score, 1) : null,
-                'contribution' => $contrib,
+                'contribution' => null,
             ];
         })->values()->all();
 
-        $quizzes = $quizzesInScope->map(function ($qz) use ($studentId, $quizBest, $byKey, $useWeighted) {
+        $quizzes = $quizzesInScope->map(function ($qz) use ($studentId, $quizBest) {
             $k = $studentId.'_'.$qz->id;
             $score = array_key_exists($k, $quizBest) ? (float) $quizBest[$k] : null;
-            $w = $byKey['quiz:'.$qz->id] ?? null;
-            $contrib = ($useWeighted && $w !== null)
-                ? round($w * (float) ($score ?? 0) / 100, 2)
-                : null;
 
             return [
                 'type' => 'quiz',
                 'id' => $qz->id,
                 'title' => $qz->title,
-                'weight' => $w,
+                'weight' => null,
                 'score' => $score !== null ? round($score, 1) : null,
                 'score_note' => 'Nilai tertinggi dari percobaan',
-                'contribution' => $contrib,
+                'contribution' => null,
             ];
         })->values()->all();
 
-        $exams = $examsInScope->map(function ($ex) use ($studentId, $examBest, $byKey, $useWeighted) {
+        $exams = $examsInScope->map(function ($ex) use ($studentId, $examBest) {
             $k = $studentId.'_'.$ex->id;
             $score = array_key_exists($k, $examBest) ? (float) $examBest[$k] : null;
-            $w = $byKey['exam:'.$ex->id] ?? null;
-            $contrib = ($useWeighted && $w !== null)
-                ? round($w * (float) ($score ?? 0) / 100, 2)
-                : null;
 
             return [
                 'type' => 'exam',
                 'id' => $ex->id,
                 'title' => $ex->title,
-                'weight' => $w,
+                'weight' => null,
                 'score' => $score !== null ? round($score, 1) : null,
                 'score_note' => 'Nilai tertinggi dari percobaan',
-                'contribution' => $contrib,
+                'contribution' => null,
             ];
         })->values()->all();
 

@@ -6,7 +6,6 @@ use App\Exports\GradesExportCombinedSheet;
 use App\Models\Exam;
 use App\Models\ExamAttempt;
 use App\Models\FinalGrade;
-use App\Models\GradeActivityWeight;
 use App\Models\GradeComponent;
 use App\Models\Quiz;
 use App\Models\QuizAttempt;
@@ -42,7 +41,6 @@ class GradeController extends Controller
 
         $classBoard = [];
         $subjectsForClass = [];
-        $gradingMeta = null;
 
         if ($selectedClassId) {
             $class = SchoolClass::query()
@@ -98,15 +96,6 @@ class GradeController extends Controller
             }
 
             $classBoard = $this->buildClassBoard($request, $class, $selectedSubjectId, $allowedClassSubjectIds);
-
-            if ($selectedSubjectId) {
-                $gradingMeta = $this->gradingMetaForScope(
-                    $request,
-                    $class,
-                    (int) $selectedSubjectId,
-                    $allowedClassSubjectIds
-                );
-            }
         }
 
         return Inertia::render('Grades/Index', [
@@ -115,7 +104,6 @@ class GradeController extends Controller
             'subjectsForClass' => $subjectsForClass,
             'selectedClassId' => $selectedClassId,
             'selectedSubjectId' => $selectedSubjectId ?: null,
-            'gradingMeta' => $gradingMeta,
             'filters' => $request->only([
                 'class_id',
                 'subject_id',
@@ -128,168 +116,9 @@ class GradeController extends Controller
         ]);
     }
 
-    /**
-     * Konteks pembobotan per aktivitas (hanya jika kelas + mapel dipilih).
-     *
-     * @param  list<int>|null  $allowedClassSubjectIds
-     * @return array<string, mixed>|null
-     */
-    private function gradingMetaForScope(
-        Request $request,
-        SchoolClass $class,
-        int $subjectId,
-        ?array $allowedClassSubjectIds
-    ): ?array {
-        $key = $this->academicYearKey($request);
-        $catalog = ClassGradeBoard::catalog($class->id, $subjectId, $allowedClassSubjectIds);
-
-        $weights = GradeActivityWeight::query()
-            ->where('class_id', $class->id)
-            ->where('subject_id', $subjectId)
-            ->where('academic_year', $key)
-            ->get();
-
-        $sum = round((float) $weights->sum('weight'), 2);
-
-        return [
-            'academic_year_key' => $key,
-            'tasks' => $catalog['tasks']->map(fn ($t) => [
-                'id' => $t->id,
-                'title' => $t->title,
-            ])->values()->all(),
-            'quizzes' => $catalog['quizzes']->map(fn ($q) => [
-                'id' => $q->id,
-                'title' => $q->title,
-            ])->values()->all(),
-            'exams' => $catalog['exams']->map(fn ($e) => [
-                'id' => $e->id,
-                'title' => $e->title,
-            ])->values()->all(),
-            'weights' => $weights->map(fn ($w) => [
-                'activity_type' => $w->activity_type,
-                'activity_id' => (int) $w->activity_id,
-                'weight' => (float) $w->weight,
-            ])->values()->all(),
-            'weight_sum' => $sum,
-            'weights_ready' => abs($sum - 100.0) < 0.02,
-        ];
-    }
-
     private function academicYearKey(Request $request): string
     {
         return mb_substr(trim((string) $request->input('period', '')), 0, 32);
-    }
-
-    /**
-     * Simpan pembobotan nilai per tugas/kuis/ujian (total 100%).
-     */
-    public function saveActivityWeights(Request $request)
-    {
-        Gate::authorize('grades index');
-
-        /** @var User $user */
-        $user = auth()->user();
-
-        $validated = $request->validate([
-            'class_id' => 'required|exists:school_classes,id',
-            'subject_id' => 'required|exists:subjects,id',
-            'academic_year' => 'nullable|string|max:32',
-            'weights' => 'required|array',
-            'weights.*.activity_type' => 'required|in:task,quiz,exam',
-            'weights.*.activity_id' => 'required|integer|min:1',
-            'weights.*.weight' => 'required|numeric|min:0|max:100',
-        ]);
-
-        $class = SchoolClass::query()->whereKey($validated['class_id'])->firstOrFail();
-
-        if (! $this->teacherCanViewClassGrades($user, $class)) {
-            abort(403, 'Anda tidak memiliki akses ke nilai kelas ini.');
-        }
-
-        $subjectId = (int) $validated['subject_id'];
-
-        $allowedClassSubjectIds = null;
-        if ($user->hasRole('guru')) {
-            $allowedClassSubjectIds = $class->classSubjects()
-                ->forTeacher($user)
-                ->pluck('id')
-                ->all();
-
-            $taughtSubjectIds = $class->classSubjects()
-                ->forTeacher($user)
-                ->pluck('subject_id')
-                ->unique()
-                ->all();
-
-            if (! in_array($subjectId, $taughtSubjectIds, true)) {
-                abort(403, 'Anda tidak mengampu mapel ini di kelas ini.');
-            }
-        }
-
-        $catalog = ClassGradeBoard::catalog($class->id, $subjectId, $allowedClassSubjectIds);
-        $allowedKeys = [];
-        foreach ($catalog['tasks'] as $t) {
-            $allowedKeys['task:'.$t->id] = true;
-        }
-        foreach ($catalog['quizzes'] as $q) {
-            $allowedKeys['quiz:'.$q->id] = true;
-        }
-        foreach ($catalog['exams'] as $e) {
-            $allowedKeys['exam:'.$e->id] = true;
-        }
-
-        foreach ($validated['weights'] as $row) {
-            $k = $row['activity_type'].':'.$row['activity_id'];
-            if (! isset($allowedKeys[$k])) {
-                return back()->withErrors([
-                    'weights' => 'Ada aktivitas yang tidak termasuk lingkup kelas/mapel ini.',
-                ]);
-            }
-        }
-
-        $sum = collect($validated['weights'])->sum(fn ($r) => (float) $r['weight']);
-        if (abs($sum - 100.0) > 0.02) {
-            return back()->withErrors([
-                'weights' => 'Total bobot harus tepat 100%. Saat ini: '.round($sum, 2).'%.',
-            ]);
-        }
-
-        $year = mb_substr(trim((string) ($validated['academic_year'] ?? '')), 0, 32);
-
-        GradeActivityWeight::query()
-            ->where('class_id', $class->id)
-            ->where('subject_id', $subjectId)
-            ->where('academic_year', $year)
-            ->delete();
-
-        foreach ($validated['weights'] as $row) {
-            $w = (float) $row['weight'];
-            if ($w <= 0) {
-                continue;
-            }
-
-            GradeActivityWeight::query()->create([
-                'class_id' => $class->id,
-                'subject_id' => $subjectId,
-                'academic_year' => $year,
-                'activity_type' => $row['activity_type'],
-                'activity_id' => (int) $row['activity_id'],
-                'weight' => round($w, 2),
-                'updated_by' => $user->id,
-            ]);
-        }
-
-        return redirect()
-            ->route('grades.index', [
-                'class_id' => $class->id,
-                'subject_id' => $subjectId,
-                'period' => $year !== '' ? $year : null,
-                'search' => $request->input('search'),
-                'sort' => $request->input('sort'),
-                'performance' => $request->input('performance'),
-                'score_range' => $request->input('score_range'),
-            ])
-            ->with('success', 'Pembobotan nilai disimpan. Nilai akhir memakai rumus Σ(bobot × nilai) ÷ 100.');
     }
 
     /**
@@ -342,7 +171,7 @@ class GradeController extends Controller
     }
 
     /**
-     * Rekap per siswa: % tugas, kuis (tertinggi per kuis), ujian; nilai akhir berbobot jika diatur (Σ bobot×nilai ÷ 100).
+     * Rekap per siswa: % tugas, kuis (tertinggi per kuis), ujian; nilai akhir = RPH ((2×RPH)+ujian)/3.
      *
      * @param  list<int>|null  $allowedClassSubjectIds  null = admin (semua slot kelas); array = batasi ke slot mapel guru
      * @return list<array<string, mixed>>
@@ -354,7 +183,6 @@ class GradeController extends Controller
             $class,
             $subjectId,
             $allowedClassSubjectIds,
-            $this->academicYearKey($request)
         );
     }
 
@@ -818,7 +646,7 @@ class GradeController extends Controller
                     ->all();
             }
 
-            foreach ($this->exportActivityDefinitions($class, $selectedSubjectId, $allowedClassSubjectIds, $academicYearKey) as $def) {
+            foreach ($this->exportActivityDefinitions($class, $selectedSubjectId, $allowedClassSubjectIds) as $def) {
                 $mergedDefs[$def['key']] = $def;
             }
         }
@@ -955,9 +783,7 @@ class GradeController extends Controller
                         (float) ($row['quiz_avg'] ?? 0),
                         (float) ($row['exam_avg'] ?? 0),
                         (float) ($row['overall_avg'] ?? 0),
-                        ! empty($row['uses_weighted_formula'])
-                            ? 'Σ(bobot×nilai)÷100'
-                            : 'Rata kategori (tugas / kuis / ujian)',
+                        'RPH: ((2×RPH)+ujian)÷3; RPH=rata(rerata tugas, rerata kuis)',
                     ]
                 );
             }
@@ -990,19 +816,8 @@ class GradeController extends Controller
         SchoolClass $class,
         ?int $subjectId,
         ?array $allowedClassSubjectIds,
-        string $academicYearKey
     ): array {
         $catalog = ClassGradeBoard::catalog($class->id, $subjectId, $allowedClassSubjectIds);
-
-        $weightsKeyed = collect();
-        if ($subjectId !== null) {
-            $weightsKeyed = GradeActivityWeight::query()
-                ->where('class_id', $class->id)
-                ->where('subject_id', $subjectId)
-                ->where('academic_year', $academicYearKey)
-                ->get()
-                ->keyBy(fn ($w) => $w->activity_type.':'.$w->activity_id);
-        }
 
         $defs = [];
         foreach ($catalog['tasks'] as $t) {
@@ -1013,7 +828,7 @@ class GradeController extends Controller
                 'activity_type' => 'task',
                 'id' => (int) $t->id,
                 'title' => $t->title,
-                'weight' => isset($weightsKeyed[$k]) ? (float) $weightsKeyed[$k]->weight : null,
+                'weight' => null,
             ];
         }
         foreach ($catalog['quizzes'] as $q) {
@@ -1024,7 +839,7 @@ class GradeController extends Controller
                 'activity_type' => 'quiz',
                 'id' => (int) $q->id,
                 'title' => $q->title,
-                'weight' => isset($weightsKeyed[$k]) ? (float) $weightsKeyed[$k]->weight : null,
+                'weight' => null,
             ];
         }
         foreach ($catalog['exams'] as $e) {
@@ -1035,7 +850,7 @@ class GradeController extends Controller
                 'activity_type' => 'exam',
                 'id' => (int) $e->id,
                 'title' => $e->title,
-                'weight' => isset($weightsKeyed[$k]) ? (float) $weightsKeyed[$k]->weight : null,
+                'weight' => null,
             ];
         }
 

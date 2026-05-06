@@ -40,6 +40,8 @@ export default function StudentGrades() {
                 return "Kuis";
             case "exam":
                 return "Ujian";
+            case "final_rph":
+                return "Nilai akhir";
             default:
                 return type || "—";
         }
@@ -82,13 +84,13 @@ export default function StudentGrades() {
             <StudentShell
                 eyebrow="Akademik"
                 title="Nilai & rapor ringkas"
-                subtitle="Gabungan nilai akhir, tugas yang sudah dinilai, skor kuis, dan skor ujian (persentase)."
+                subtitle="Nilai akhir (RPH) dihitung dari tugas, kuis, dan ujian; diperbarui otomatis dari penilaian terbaru."
             >
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <StudentStatCard
                         icon={IconChartBar}
                         label="Rata-rata"
-                        value={`${stats?.averageGrade ?? 0}%`}
+                        value={`${Number(stats?.averageGrade ?? 0).toFixed(2)}%`}
                         hint={`Predikat ${getGradeLetter(stats?.averageGrade ?? 0)}`}
                         accent="indigo"
                     />
@@ -102,14 +104,14 @@ export default function StudentGrades() {
                     <StudentStatCard
                         icon={IconTrophy}
                         label="Tertinggi"
-                        value={`${stats?.highestGrade ?? 0}%`}
+                        value={`${Number(stats?.highestGrade ?? 0).toFixed(2)}%`}
                         hint="Nilai puncak Anda"
                         accent="emerald"
                     />
                     <StudentStatCard
                         icon={IconAlertTriangle}
                         label="Terendah"
-                        value={`${stats?.lowestGrade ?? 0}%`}
+                        value={`${Number(stats?.lowestGrade ?? 0).toFixed(2)}%`}
                         hint="Untuk referensi perbaikan"
                         accent="amber"
                     />
@@ -179,7 +181,7 @@ export default function StudentGrades() {
                                         <Table.Td>
                                             <span className="text-lg font-bold tabular-nums text-slate-900">
                                                 {grade.score != null && grade.score !== ""
-                                                    ? `${grade.score}%`
+                                                    ? `${Number(grade.score).toFixed(2)}%`
                                                     : "—"}
                                             </span>
                                         </Table.Td>

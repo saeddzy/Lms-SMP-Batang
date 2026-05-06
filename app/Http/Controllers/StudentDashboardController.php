@@ -12,6 +12,7 @@ use App\Models\QuizAttempt;
 use App\Models\ExamAttempt;
 use App\Models\User;
 use App\Support\AttemptStatusHelper;
+use App\Support\ClassGradeBoard;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
@@ -88,61 +89,68 @@ class StudentDashboardController extends Controller
     {
         $activities = collect();
 
-        // Recent task submissions
+        // Recent task submissions (abaikan jika tugas sudah dihapus)
         $taskSubmissions = TaskSubmission::where('student_id', $user->id)
+            ->whereHas('task')
             ->with(['task.subject', 'task.schoolClass'])
             ->latest('submitted_at')
             ->take(5)
             ->get()
             ->map(function ($submission) {
+                $task = $submission->task;
+
                 return [
                     'id' => $submission->id,
                     'type' => 'task_submission',
-                    'title' => 'Kamu mengumpulkan tugas: ' . $submission->task->title,
-                    'subject' => $submission->task->subject->name,
-                    'class' => $submission->task->schoolClass->name,
+                    'title' => 'Kamu mengumpulkan tugas: ' . ($task?->title ?? '(dihapus)'),
+                    'subject' => $task?->subject?->name ?? '—',
+                    'class' => $task?->schoolClass?->name ?? '—',
                     'date' => $submission->submitted_at,
                     'status' => $submission->score ? 'Dinilai' : 'Menunggu penilaian',
                     'score' => $submission->score,
                 ];
             });
 
-        // Recent quiz attempts and results
+        // Recent quiz attempts and results (abaikan jika kuis sudah dihapus)
         $quizAttempts = QuizAttempt::where('student_id', $user->id)
+            ->whereHas('quiz')
             ->with(['quiz.subject', 'quiz.schoolClass'])
             ->latest('finished_at')
             ->take(5)
             ->get()
             ->map(function ($attempt) {
-                $title = 'Kamu telah menyelesaikan kuis: ' . $attempt->quiz->title;
+                $quiz = $attempt->quiz;
+                $title = 'Kamu telah menyelesaikan kuis: ' . ($quiz?->title ?? '(dihapus)');
 
                 return [
                     'id' => $attempt->id,
                     'type' => 'quiz_attempt',
                     'title' => $title,
-                    'subject' => $attempt->quiz->subject->name,
-                    'class' => $attempt->quiz->schoolClass->name,
+                    'subject' => $quiz?->subject?->name ?? '—',
+                    'class' => $quiz?->schoolClass?->name ?? '—',
                     'date' => $attempt->finished_at,
                     'status' => $attempt->passed ? 'Lulus' : 'Tidak lulus',
                     'score' => $attempt->score,
                 ];
             });
 
-        // Recent exam attempts and results
+        // Recent exam attempts and results (abaikan jika ujian sudah dihapus)
         $examAttempts = ExamAttempt::where('student_id', $user->id)
+            ->whereHas('exam')
             ->with(['exam.subject', 'exam.schoolClass'])
             ->latest('finished_at')
             ->take(5)
             ->get()
             ->map(function ($attempt) {
-                $title = 'Kamu telah menyelesaikan ujian: ' . $attempt->exam->title;
+                $exam = $attempt->exam;
+                $title = 'Kamu telah menyelesaikan ujian: ' . ($exam?->title ?? '(dihapus)');
 
                 return [
                     'id' => $attempt->id,
                     'type' => 'exam_attempt',
                     'title' => $title,
-                    'subject' => $attempt->exam->subject->name,
-                    'class' => $attempt->exam->schoolClass->name,
+                    'subject' => $exam?->subject?->name ?? '—',
+                    'class' => $exam?->schoolClass?->name ?? '—',
                     'date' => $attempt->finished_at,
                     'status' => $attempt->passed ? 'Lulus' : 'Tidak lulus',
                     'score' => $attempt->score,
@@ -626,9 +634,9 @@ class StudentDashboardController extends Controller
         $scores = $rows->pluck('score')->filter(fn ($s) => $s !== null && $s !== '');
         $stats = [
             'totalGrades' => $rows->count(),
-            'averageGrade' => $scores->isEmpty() ? 0 : round((float) $scores->avg(), 1),
-            'highestGrade' => $scores->isEmpty() ? 0 : round((float) $scores->max(), 1),
-            'lowestGrade' => $scores->isEmpty() ? 0 : round((float) $scores->min(), 1),
+            'averageGrade' => $scores->isEmpty() ? 0 : round((float) $scores->avg(), 2),
+            'highestGrade' => $scores->isEmpty() ? 0 : round((float) $scores->max(), 2),
+            'lowestGrade' => $scores->isEmpty() ? 0 : round((float) $scores->min(), 2),
         ];
 
         $perPage = 15;
@@ -666,6 +674,39 @@ class StudentDashboardController extends Controller
     private function buildUnifiedStudentGradeRows(User $user): \Illuminate\Support\Collection
     {
         $studentId = $user->id;
+
+        $user->loadMissing(['enrolledClasses.subjects']);
+
+        $rphSummaryRows = collect();
+        foreach ($user->enrolledClasses as $class) {
+            foreach ($class->subjects->unique('id') as $subject) {
+                $bd = ClassGradeBoard::studentSubjectRphBreakdown($studentId, $class->id, $subject->id);
+                if ($bd === null) {
+                    continue;
+                }
+                $fbParts = array_values(array_filter([
+                    $bd['rph'] !== null ? 'RPH '.$bd['rph'].'%' : null,
+                    ! empty($bd['has_task_scores']) ? 'Rerata tugas '.$bd['task_avg'].'%' : null,
+                    ! empty($bd['has_quiz_scores']) ? 'Rerata kuis '.$bd['quiz_avg'].'%' : null,
+                    ! empty($bd['has_exam_scores']) ? 'Rerata ujian '.$bd['exam_avg'].'%' : null,
+                ]));
+                $rphSummaryRows->push([
+                    'id' => 'rph-final-'.$class->id.'-'.$subject->id,
+                    'student_id' => $studentId,
+                    'subject' => $subject,
+                    'class' => $class,
+                    'assessment_type' => 'final_rph',
+                    'assessment' => [
+                        'title' => 'Nilai akhir (RPH)',
+                        'description' => $bd['formula_note'],
+                    ],
+                    'score' => $bd['overall_avg'],
+                    'status' => 'published',
+                    'feedback' => implode(' · ', $fbParts),
+                    'created_at' => Carbon::now(),
+                ]);
+            }
+        }
 
         $finalRows = FinalGrade::query()
             ->where('student_id', $studentId)
@@ -784,7 +825,8 @@ class StudentDashboardController extends Controller
             })
             ->filter();
 
-        return $finalRows
+        return $rphSummaryRows
+            ->concat($finalRows)
             ->concat($taskRows)
             ->concat($quizRows)
             ->concat($examRows)

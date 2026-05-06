@@ -6,6 +6,7 @@ import {
     IconBook,
     IconClipboardList,
     IconBrain,
+    IconAward,
     IconAlertCircle,
     IconClock,
     IconArrowRight,
@@ -107,34 +108,27 @@ function calculateDaysLeft(deadline) {
 }
 
 function calculateRealProgress(enrolledClasses, learningStats) {
-    // Use actual learning stats data
     const tasks = learningStats?.tasks ?? {};
     const quizzes = learningStats?.quizzes ?? {};
-    const materials = learningStats?.materials ?? {}; // Assuming materials data exists
-    
+    const exams = learningStats?.exams ?? {};
+
     const totalTasks = tasks.total || 0;
     const completedTasks = tasks.completed || 0;
     const totalQuizzes = quizzes.total || 0;
     const completedQuizzes = quizzes.completed || 0;
     const passedQuizzes = quizzes.passed || 0;
+    const totalExams = exams.total || 0;
+    const completedExams = exams.completed || 0;
     const averageGrade = learningStats?.average_grade || 0;
-    
-    // Materials data (fallback if not available)
-    const totalMaterials = materials.total || 0;
-    const completedMaterials = materials.completed || 0;
 
-    // Calculate individual progress percentages
     const tasksProgress = totalTasks > 0 ? Math.min(100, (completedTasks / totalTasks) * 100) : 0;
     const quizzesProgress = totalQuizzes > 0 ? Math.min(100, (completedQuizzes / totalQuizzes) * 100) : 0;
-    const materialsProgress = totalMaterials > 0 ? Math.min(100, (completedMaterials / totalMaterials) * 100) : 0; // Default 0% when no material data
+    const examsProgress = totalExams > 0 ? Math.min(100, (completedExams / totalExams) * 100) : 0;
 
-    // Weighted calculation: 40% materi, 30% tugas, 30% kuis
-    const weightedProgress = 
-        (materialsProgress * 0.4) + 
-        (tasksProgress * 0.3) + 
-        (quizzesProgress * 0.3);
+    // 40% ujian, 30% tugas, 30% kuis (mengganti slot materi)
+    const weightedProgress =
+        examsProgress * 0.4 + tasksProgress * 0.3 + quizzesProgress * 0.3;
 
-    // Cap at 100%
     const overallProgress = Math.min(100, Math.max(0, Math.round(weightedProgress)));
 
     return {
@@ -144,14 +138,14 @@ function calculateRealProgress(enrolledClasses, learningStats) {
         totalQuizzes,
         completedQuizzes,
         passedQuizzes,
+        totalExams,
+        completedExams,
         averageGrade,
-        totalMaterials,
-        completedMaterials,
         breakdown: {
-            materials: Math.round(materialsProgress),
+            exams: Math.round(examsProgress),
             tasks: Math.round(tasksProgress),
-            quizzes: Math.round(quizzesProgress)
-        }
+            quizzes: Math.round(quizzesProgress),
+        },
     };
 }
 
@@ -510,18 +504,18 @@ export default function StudentDashboard() {
                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                             <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
                                                 <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
-                                                    <IconBook className="h-4 w-4 text-violet-600" stroke={1.5} />
-                                                    Materi
+                                                    <IconAward className="h-4 w-4 text-rose-600" stroke={1.5} />
+                                                    Ujian
                                                 </div>
                                                 <div className="mt-2 h-2.5 rounded-full bg-slate-200">
                                                     <div
-                                                        className="h-2.5 rounded-full bg-violet-500"
-                                                        style={{ width: `${realProgress.breakdown.materials}%` }}
+                                                        className="h-2.5 rounded-full bg-rose-500"
+                                                        style={{ width: `${realProgress.breakdown.exams}%` }}
                                                     />
                                                 </div>
                                                 <div className="mt-2 flex items-center justify-between text-xs font-medium text-slate-600">
                                                     <span>Progress</span>
-                                                    <span className="tabular-nums">{realProgress.breakdown.materials}%</span>
+                                                    <span className="tabular-nums">{realProgress.breakdown.exams}%</span>
                                                 </div>
                                             </div>
 

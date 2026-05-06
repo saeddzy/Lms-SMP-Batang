@@ -516,8 +516,43 @@ export default function Show() {
                     <h3 className="text-sm font-semibold text-slate-900">
                         Pratinjau materi
                     </h3>
+                    {isDocumentType && fileUrl ? (
+                        <p className="mt-1 text-xs text-slate-500">
+                            Dokumen bisa dibuka di bawah atau disimpan lewat unduh.
+                        </p>
+                    ) : null}
                 </div>
-                <div className="px-6 py-5">{renderPreview()}</div>
+                <div className="px-6 py-5">
+                    {isDocumentType && fileUrl ? (
+                        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-4 py-3">
+                            <a
+                                href={downloadUrl || fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download={
+                                    !isRemote && material.file_name
+                                        ? material.file_name
+                                        : undefined
+                                }
+                                className="inline-flex items-center justify-center rounded-md bg-[#163d8f] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0f2e6f]"
+                            >
+                                {isRemote ? "Buka / unduh tautan" : "Unduh dokumen"}
+                            </a>
+                            {!isRemote ? (
+                                <span className="text-xs text-slate-600">
+                                    {material.file_name
+                                        ? `Berkas: ${material.file_name}`
+                                        : "Unduhan memakai nama berkas dari server."}
+                                </span>
+                            ) : (
+                                <span className="text-xs text-slate-600">
+                                    Berkas di hosting eksternal — unduh dari situs penyedia jika perlu.
+                                </span>
+                            )}
+                        </div>
+                    ) : null}
+                    {renderPreview()}
+                </div>
             </section>
         </div>
     );
